@@ -2,7 +2,9 @@
 
 A simple coal availability 'stripes' visualisation (attempting to) vaguely using OpenElectricity design language.
 
-<img src="coal-stripes-screenshot.png" alt="Coal Stripes Visualisation" width="70%">
+<div align="center">
+<img src="coal-stripes-screenshot.png" alt="Coal Stripes Visualisation" width="80%">
+</div>
 
 ## Overview
 
