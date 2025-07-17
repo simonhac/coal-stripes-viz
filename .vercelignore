@@ -1,0 +1,5 @@
+test/
+output/
+*.log
+.env.local
+node_modules/

@@ -1,0 +1,14 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "functions": {
+    "src/pages/api/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
+  "env": {
+    "OPENELECTRICITY_API_KEY": "@openelectricity-api-key"
+  }
+}

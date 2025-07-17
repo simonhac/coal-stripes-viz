@@ -1,0 +1,372 @@
+/* Import DM Sans font */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+/* OpenNEM Design System CSS - Extracted from opennem-fe */
+
+:root {
+  /* Colors */
+  --opennem-primary: #e34a33;
+  --opennem-primary-rgb: rgb(199, 69, 35);
+  --primary: black;
+  --link: black;
+  --beige-light: #d0d1cd;
+  --beige-lighter: rgb(250, 249, 246);
+  --dark-grey: #353535;
+  --border-colour: #e5e5e5;
+  --buttons-background: #f5f5f5;
+  
+  /* Typography */
+  --font-stack: 'DM Sans', sans-serif;
+  --body-size: 14px;
+  
+  /* Spacing */
+  --app-padding: 1rem;
+  --toolbar-padding: 24px;
+  
+  /* Other */
+  --header-hover-radius: 4px;
+  --border-style: 1px dotted #cdcdcd;
+}
+
+/* Base styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-stack);
+  font-size: var(--body-size);
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+  background-color: #faf9f6;
+  color: var(--primary);
+}
+
+/* Header styling - OpenElectricity exact match */
+header {
+  background: #faf9f6;
+}
+
+header a {
+  text-decoration: none;
+  color: black;
+}
+
+
+/* Navigation link styling to match OpenElectricity exactly */
+.opennem-nav-link {
+  padding: 8px 16px;
+  color: rgb(106, 106, 106);
+  font-family: var(--font-stack);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: text-decoration 0.2s ease;
+}
+
+.opennem-nav-link:hover {
+  text-decoration: underline;
+}
+
+/* Base utility classes for header */
+.bg-white {
+  background-color: white;
+}
+
+.border-b {
+  border-bottom: 1px dotted #cdcdcd;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.py-6 {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.text-black {
+  color: black;
+}
+
+.no-underline {
+  text-decoration: none;
+}
+
+/* Stripes page layout */
+.opennem-stripes-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--app-padding);
+}
+
+.opennem-stripes-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 var(--app-padding);
+}
+
+.opennem-stripes-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opennem-stripes-title h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.opennem-dropdown {
+  background: var(--buttons-background);
+  border: var(--border-style);
+  border-radius: var(--header-hover-radius);
+  padding: 8px 12px;
+  font-family: var(--font-stack);
+  font-size: var(--body-size);
+  color: var(--primary);
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.opennem-date-range {
+  font-size: 19.6px;
+  color: rgb(74, 74, 74);
+  font-weight: 300;
+  font-family: var(--font-stack);
+}
+
+/* Scale bar */
+.opennem-scale-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 0 var(--app-padding);
+}
+
+.opennem-scale-gradient {
+  width: 200px;
+  height: 20px;
+  background: linear-gradient(to right, 
+    #22c55e 0%,    /* Green for high values */
+    #84cc16 25%,   /* Light green */
+    #eab308 50%,   /* Yellow */
+    #f97316 75%,   /* Orange */
+    #ef4444 100%   /* Red for low values */
+  );
+  border: 1px solid var(--border-colour);
+}
+
+.opennem-scale-label {
+  font-size: 12px;
+  color: var(--dark-grey);
+  font-weight: 500;
+}
+
+/* Stripes visualization */
+.opennem-stripes-viz {
+  background: #faf9f6;
+}
+
+.opennem-region {
+  margin: 24px 0;
+}
+
+.opennem-region:last-child {
+  border-bottom: none;
+}
+
+.opennem-region-header {
+  background: #faf9f6;
+  color: black;
+  padding: 8px 0;
+  font-size: 16.8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding-left: 6px;
+  margin-left: 0;
+}
+
+.opennem-region-content {
+  position: relative;
+  min-height: 40px;
+  padding-top: 16px;
+}
+
+/* Individual stripe rows */
+.opennem-stripe-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: none; /* Remove borders between units */
+  min-height: 12px; /* Minimum height, but can be larger based on capacity */
+}
+
+/* Add space between facilities */
+.opennem-facility-group {
+  margin-bottom: 8px;
+}
+
+.opennem-facility-group:last-child {
+  margin-bottom: 0;
+}
+
+.opennem-facility-label {
+  background: #faf9f6;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--dark-grey);
+  font-weight: 400;
+  min-width: 140px;
+  max-width: 140px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opennem-stripe-data {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.opennem-stripe-segment {
+  flex: 1;
+  height: 100%;
+  border-right: 1px solid rgba(0, 0, 0, 0.01);
+  cursor: pointer;
+  transition: opacity 0.1s ease;
+}
+
+.opennem-stripe-segment:hover {
+  opacity: 0.8;
+}
+
+/* Hover indicator line */
+.opennem-hover-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ef4444;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Tooltip */
+.opennem-tooltip {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: var(--header-hover-radius);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 1000;
+  max-width: 200px;
+}
+
+.opennem-tooltip-date {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.opennem-tooltip-facility {
+  color: #ccc;
+  margin-bottom: 2px;
+}
+
+.opennem-tooltip-value {
+  color: #ccc;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .opennem-header-content {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .opennem-stripes-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .opennem-scale-bar {
+    justify-content: flex-start;
+  }
+  
+  .opennem-facility-label {
+    min-width: 80px;
+    font-size: 10px;
+  }
+}
+
+/* Loading states */
+.opennem-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--dark-grey);
+}
+
+.opennem-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-colour);
+  border-top: 2px solid var(--opennem-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error states */
+.opennem-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--opennem-primary);
+  text-align: center;
+  padding: var(--app-padding);
+}
