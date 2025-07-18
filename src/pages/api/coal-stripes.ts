@@ -65,14 +65,18 @@ export default async function handler(
     // Return appropriate error response
     if (error instanceof Error) {
       return res.status(500).json({ 
-        error: 'Internal Server Error', 
-        message: error.message 
+        error: 'Coal Stripes API Error', 
+        message: error.message,
+        source: 'coal-stripes-api',
+        timestamp: new Date().toISOString()
       });
     }
     
     return res.status(500).json({ 
-      error: 'Internal Server Error', 
-      message: 'An unexpected error occurred' 
+      error: 'Coal Stripes API Error', 
+      message: 'An unexpected error occurred',
+      source: 'coal-stripes-api',
+      timestamp: new Date().toISOString()
     });
   }
 }
