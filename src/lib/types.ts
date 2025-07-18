@@ -1,4 +1,5 @@
 // Type definitions for coal stripes visualization
+import { CalendarDate } from '@internationalized/date';
 
 export interface CoalUnit {
   code: string;
@@ -6,7 +7,7 @@ export interface CoalUnit {
   facility_code: string;
   capacity: number;
   fueltech: 'coal_black' | 'coal_brown';
-  data: Record<string, number>; // date -> energy MWh
+  data: Record<string, number>; // date string -> energy MWh (for frontend compatibility)
 }
 
 export interface RegionData {
@@ -24,7 +25,7 @@ export interface Regions {
 
 export interface CoalStripesData {
   regions: Regions;
-  dates: string[];
+  dates: string[]; // ISO date strings for frontend compatibility
   actualDateStart: string;
   actualDateEnd: string;
   lastGoodDay: string;
@@ -33,18 +34,19 @@ export interface CoalStripesData {
   actualDays: number;
 }
 
+// Internal interface for coal-data-service (uses CalendarDate internally)
 export interface DataAvailabilityInfo {
   requestedRange: {
-    start: string;
-    end: string;
+    start: CalendarDate;
+    end: CalendarDate;
     days: number;
   };
   actualRange: {
-    start: string;
-    end: string;
+    start: CalendarDate;
+    end: CalendarDate;
     days: number;
   };
-  lastGoodDay: string;
+  lastGoodDay: CalendarDate;
   dataPoints: number;
 }
 

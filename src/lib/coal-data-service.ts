@@ -7,6 +7,7 @@ import {
   Regions,
   CoalUnit
 } from './types';
+import { CalendarDate, today, parseDate, fromDate, toCalendarDate } from '@internationalized/date';
 
 export class CoalDataService {
   private client: OpenElectricityClient;
@@ -14,6 +15,7 @@ export class CoalDataService {
   constructor(apiKey: string) {
     this.client = new OpenElectricityClient({ apiKey });
   }
+
 
   /**
    * Main method to fetch and process coal stripes data
@@ -23,8 +25,8 @@ export class CoalDataService {
     
     // Step 1: Get date range with buffer
     const { requestStartDate, requestEndDate } = this.getRequestDateRange(requestDays);
-    const dateStart = requestStartDate.toISOString().split('T')[0];
-    const dateEnd = requestEndDate.toISOString().split('T')[0];
+    const dateStart = requestStartDate.toString(); // YYYY-MM-DD
+    const dateEnd = requestEndDate.toString(); // YYYY-MM-DD
     
     console.log(`📅 Requesting data from ${dateStart} to ${dateEnd} (${requestDays} days)`);
     
@@ -41,7 +43,8 @@ export class CoalDataService {
       allData, 
       facilities, 
       requestStartDate, 
-      requestEndDate
+      requestEndDate,
+      requestDays
     );
     
     console.log(`📊 Last day with good data: ${availabilityInfo.lastGoodDay}`);
@@ -61,9 +64,8 @@ export class CoalDataService {
    * Get request date range with buffer for data availability
    */
   private getRequestDateRange(requestDays: number) {
-    const requestEndDate = new Date();
-    const requestStartDate = new Date(requestEndDate);
-    requestStartDate.setDate(requestStartDate.getDate() - requestDays);
+    const requestEndDate = today('Australia/Brisbane');
+    const requestStartDate = requestEndDate.subtract({ days: requestDays });
     
     return { requestStartDate, requestEndDate };
   }
@@ -152,21 +154,24 @@ export class CoalDataService {
   private analyzeDataAvailability(
     allData: OpenElectricityDataRow[],
     facilities: OpenElectricityFacility[],
-    requestStartDate: Date,
-    requestEndDate: Date
+    requestStartDate: CalendarDate,
+    requestEndDate: CalendarDate,
+    requestDays: number
   ): DataAvailabilityInfo {
     console.log('🔍 Analyzing data availability...');
     
     // Create all possible dates in the requested range
     const allDates: string[] = [];
-    for (let d = new Date(requestStartDate); d <= requestEndDate; d.setDate(d.getDate() + 1)) {
-      allDates.push(d.toISOString().split('T')[0]);
+    let currentDate = requestStartDate;
+    while (currentDate.compare(requestEndDate) <= 0) {
+      allDates.push(currentDate.toString());
+      currentDate = currentDate.add({ days: 1 });
     }
     
     // Count data points per day
     const dailyDataCount: Record<string, number> = {};
     allData.forEach(row => {
-      const date = row.interval.toISOString().split('T')[0];
+      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane')).toString();
       dailyDataCount[date] = (dailyDataCount[date] || 0) + 1;
     });
     
@@ -188,28 +193,27 @@ export class CoalDataService {
       }
     }
     
-    // Fallback if no good day found
+    // Error if no data found at all
     if (!lastGoodDay) {
-      lastGoodDay = allDates[allDates.length - 3]; // 3 days ago as fallback
+      throw new Error(`No coal data found in the requested date range (${requestStartDate.toString()} to ${requestEndDate.toString()})`);
     }
     
-    // Create final date range - exactly 365 days ending with last good day
-    const finalEndDate = new Date(lastGoodDay);
-    const finalStartDate = new Date(finalEndDate);
-    finalStartDate.setDate(finalStartDate.getDate() - 364); // 364 days back + end day = 365 days
+    // Create final date range - exactly requestDays days ending with last good day
+    const finalEndDate = parseDate(lastGoodDay);
+    const finalStartDate = finalEndDate.subtract({ days: requestDays - 1 }); // (requestDays - 1) days back + end day = requestDays days
     
     return {
       requestedRange: {
-        start: requestStartDate.toISOString().split('T')[0],
-        end: requestEndDate.toISOString().split('T')[0],
-        days: Math.ceil((requestEndDate.getTime() - requestStartDate.getTime()) / (1000 * 60 * 60 * 24))
+        start: requestStartDate,
+        end: requestEndDate,
+        days: Math.ceil((requestEndDate.toDate('Australia/Brisbane').getTime() - requestStartDate.toDate('Australia/Brisbane').getTime()) / (1000 * 60 * 60 * 24)) + 1
       },
       actualRange: {
-        start: finalStartDate.toISOString().split('T')[0],
-        end: finalEndDate.toISOString().split('T')[0],
-        days: 365
+        start: finalStartDate,
+        end: finalEndDate,
+        days: requestDays
       },
-      lastGoodDay,
+      lastGoodDay: finalEndDate,
       dataPoints: dailyDataCount[lastGoodDay] || 0
     };
   }
@@ -231,26 +235,26 @@ export class CoalDataService {
     });
     
     // Process data into unit/date matrix (only for the final date range)
-    const unitData: Record<string, Record<string, number>> = {};
+    const unitData: Record<string, Map<CalendarDate, number>> = {};
     allData.forEach(row => {
       const unitCode = row.unit_code;
-      const date = row.interval.toISOString().split('T')[0];
+      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane'));
       const energy = row.energy || 0;
       
       // Only include data within our final date range
-      if (date >= actualRange.start && date <= actualRange.end) {
-        if (!unitData[unitCode]) unitData[unitCode] = {};
-        unitData[unitCode][date] = energy;
+      if (date.compare(actualRange.start) >= 0 && 
+          date.compare(actualRange.end) <= 0) {
+        if (!unitData[unitCode]) unitData[unitCode] = new Map();
+        unitData[unitCode].set(date, energy);
       }
     });
     
-    // Create date array for the final 365 days
-    const allDates: string[] = [];
-    const finalStartDate = new Date(actualRange.start + 'T00:00:00Z');
-    const finalEndDate = new Date(actualRange.end + 'T00:00:00Z');
-    
-    for (let d = new Date(finalStartDate); d <= finalEndDate; d.setUTCDate(d.getUTCDate() + 1)) {
-      allDates.push(d.toISOString().split('T')[0]);
+    // Create date array for the final requested days
+    const allDates: CalendarDate[] = [];
+    let currentDate = actualRange.start;
+    while (currentDate.compare(actualRange.end) <= 0) {
+      allDates.push(currentDate);
+      currentDate = currentDate.add({ days: 1 });
     }
     
     // Find the first date where we have substantial data across multiple units
@@ -259,7 +263,7 @@ export class CoalDataService {
     
     for (const date of allDates) {
       const unitsWithData = Object.keys(unitData).filter(unitCode => {
-        const energy = unitData[unitCode][date];
+        const energy = unitData[unitCode].get(date);
         return energy !== undefined && energy > 0;
       }).length;
       
@@ -269,7 +273,7 @@ export class CoalDataService {
       }
     }
     
-    // Create final dates array - use the full actualRange to ensure we get exactly 365 days
+    // Create final dates array - use the full actualRange to ensure we get exactly requestDays days
     // Don't filter by firstGoodDate as this would truncate the range
     const dates = allDates;
     
@@ -297,18 +301,25 @@ export class CoalDataService {
         }
       }
       
-      if (facilityCode && unitInfo && unitInfo.status_id === 'operating' && unitInfo.fueltech_id) {
+      if (facilityCode && unitInfo && unitInfo.status_id === 'operating' && 
+          (unitInfo.fueltech_id === 'coal_black' || unitInfo.fueltech_id === 'coal_brown')) {
         const facility = facilityLookup[facilityCode];
         const region = facility.network_region as keyof Regions;
         
         if (regions[region]) {
+          // Convert Map to Record for frontend compatibility
+          const dataRecord: Record<string, number> = {};
+          for (const [date, energy] of unitData[unitCode]) {
+            dataRecord[date.toString()] = energy;
+          }
+          
           regions[region].units.push({
             code: unitCode,
             facility_name: facility.name,
             facility_code: facilityCode,
             capacity: unitInfo.capacity_registered || 0,
             fueltech: unitInfo.fueltech_id as 'coal_black' | 'coal_brown',
-            data: unitData[unitCode]
+            data: dataRecord
           });
         }
       }
@@ -331,10 +342,10 @@ export class CoalDataService {
     
     return {
       regions,
-      dates,
-      actualDateStart: actualRange.start,
-      actualDateEnd: actualRange.end,
-      lastGoodDay: availabilityInfo.lastGoodDay,
+      dates: dates.map(d => d.toString()),
+      actualDateStart: actualRange.start.toString(),
+      actualDateEnd: actualRange.end.toString(),
+      lastGoodDay: availabilityInfo.lastGoodDay.toString(),
       totalUnits,
       requestedDays: availabilityInfo.requestedRange.days,
       actualDays: dates.length
@@ -342,60 +353,3 @@ export class CoalDataService {
   }
 }
 
-// Utility functions for data processing
-export class CoalDataUtils {
-  /**
-   * Calculate capacity factor as percentage
-   */
-  static calculateCapacityFactor(dailyEnergyMWh: number, capacityMW: number): number {
-    if (!capacityMW || capacityMW <= 0) return 0;
-    
-    const maxPossibleMWh = capacityMW * 24;
-    const capacityFactor = (dailyEnergyMWh / maxPossibleMWh) * 100;
-    
-    return Math.min(100, capacityFactor);
-  }
-
-  /**
-   * Get shade character for capacity factor (for ASCII visualization)
-   */
-  static getShadeCharacter(capacityFactor: number): string {
-    const SHADES = {
-      offline: 'X',
-      shades: ['█', '▉', '▊', '▋', '▌', '▍', '▎', '▏', '░', '·']
-    };
-    
-    if (capacityFactor <= 0) return SHADES.offline;
-    
-    const shadeIndex = Math.min(9, Math.floor((100 - capacityFactor) / 10));
-    return SHADES.shades[shadeIndex];
-  }
-
-  /**
-   * Format date in Australian format (DD/MM)
-   */
-  static formatDateAU(dateStr: string): string {
-    const date = new Date(dateStr);
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${day}/${month}`;
-  }
-
-  /**
-   * Create date headers for weekly alignment
-   */
-  static createWeeklyHeaders(dates: string[]): string {
-    const headerChars = new Array(dates.length).fill(' ');
-    
-    // Place dates at weekly intervals (every 7 days)
-    for (let i = 0; i < dates.length; i += 7) {
-      const dateStr = this.formatDateAU(dates[i]);
-      // Place the date starting at position i
-      for (let j = 0; j < dateStr.length && i + j < dates.length; j++) {
-        headerChars[i + j] = dateStr[j];
-      }
-    }
-    
-    return headerChars.join('');
-  }
-}
