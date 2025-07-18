@@ -223,6 +223,41 @@ header a {
   padding-top: 10px;
 }
 
+/* X-axis with month labels */
+.opennem-region-x-axis {
+  position: relative;
+  height: 16px;
+  margin-top: 5px;
+  margin-left: 140px; /* Align with facility data */
+  flex: 1; /* Match the stripe data width */
+}
+
+/* Responsive adjustments for x-axis */
+@media (max-width: 768px) {
+  .opennem-region-x-axis {
+    margin-left: 80px; /* Match responsive facility label width */
+  }
+}
+
+.opennem-month-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 16px;
+  font-size: 9px;
+  font-weight: 400;
+  color: #bbb;
+  border-right: none;
+  padding-left: 4px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.opennem-month-label:last-child {
+  border-right: none;
+}
+
 /* Individual stripe rows */
 .opennem-stripe-row {
   display: flex;
@@ -233,7 +268,7 @@ header a {
 
 /* Add space between facilities */
 .opennem-facility-group {
-  margin-bottom: 5px;
+  margin-bottom: 2px;
 }
 
 .opennem-facility-group:last-child {

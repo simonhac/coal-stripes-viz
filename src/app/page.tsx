@@ -6,6 +6,83 @@ import { CoalDataUtils } from '../lib/coal-data-service';
 import { CoalUnit } from '../lib/types';
 import './opennem.css';
 
+function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: boolean = false) {
+  const monthGroups: Record<string, { 
+    dates: string[]; 
+    monthYear: string; 
+    shortMonthYear: string;
+    startIndex: number; 
+    endIndex: number; 
+  }> = {};
+  
+  // Group dates by month and track their positions
+  dates.forEach((date, index) => {
+    const dateObj = new Date(date + 'T00:00:00+10:00');
+    const monthYear = dateObj.toLocaleDateString('en-AU', { 
+      month: 'long', 
+      year: 'numeric',
+      timeZone: 'Australia/Brisbane'
+    });
+    const shortMonthYear = dateObj.toLocaleDateString('en-AU', { 
+      month: 'short', 
+      year: 'numeric',
+      timeZone: 'Australia/Brisbane'
+    });
+    const monthKey = dateObj.toISOString().substring(0, 7); // YYYY-MM format
+    
+    if (!monthGroups[monthKey]) {
+      monthGroups[monthKey] = { 
+        dates: [], 
+        monthYear, 
+        shortMonthYear,
+        startIndex: index, 
+        endIndex: index 
+      };
+    }
+    monthGroups[monthKey].dates.push(date);
+    monthGroups[monthKey].endIndex = index;
+  });
+  
+  const totalDates = dates.length;
+  
+  return Object.entries(monthGroups).map(([monthKey, group]) => {
+    const monthLabel = group.shortMonthYear.split(' ')[0]; // Just the month part (Jan, Feb, etc)
+    
+    // Calculate average capacity factor for this month across all units
+    let totalCapacityFactor = 0;
+    let dataPoints = 0;
+    
+    units.forEach(unit => {
+      group.dates.forEach(date => {
+        const energy = unit.data[date];
+        if (energy !== undefined) {
+          const capacityFactor = CoalDataUtils.calculateCapacityFactor(energy, unit.capacity);
+          totalCapacityFactor += capacityFactor;
+          dataPoints++;
+        }
+      });
+    });
+    
+    const avgCapacityFactor = dataPoints > 0 ? totalCapacityFactor / dataPoints : null;
+    
+    // Calculate position and width based on actual date positions
+    const startPosition = (group.startIndex / totalDates) * 100;
+    const width = ((group.endIndex - group.startIndex + 1) / totalDates) * 100;
+    
+    // Use single letter for narrow displays
+    const displayLabel = useShortLabels ? monthLabel.charAt(0) : monthLabel;
+    
+    return {
+      label: displayLabel,
+      fullLabel: monthLabel,
+      avgCapacityFactor,
+      width,
+      startPosition,
+      monthYear: group.monthYear
+    };
+  });
+}
+
 export default function Home() {
   const { data, loading, error, regionsWithData, totalUnits } = useCoalStripesWithRegions();
   const [hoveredData, setHoveredData] = useState<{
@@ -18,7 +95,177 @@ export default function Home() {
     x: number;
     y: number;
   } | null>(null);
+  const [hoveredMonth, setHoveredMonth] = useState<{
+    monthYear: string;
+    avgCapacityFactor: number | null;
+    region: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const [hoveredDateIndex, setHoveredDateIndex] = useState<number | null>(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const mousePos = useRef({ x: 0, y: 0 });
+  const isMouseOverStripes = useRef(false);
+  const stripesContainerRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+
+  useEffect(() => {
+    // Global mouse tracking
+    const handleMouseMove = (e: MouseEvent) => {
+      mousePos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    // High-frequency update loop
+    const updateLoop = () => {
+      if (isMouseOverStripes.current && stripesContainerRef.current && data) {
+        updateTooltipFromMousePos();
+      }
+      animationFrameRef.current = requestAnimationFrame(updateLoop);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    animationFrameRef.current = requestAnimationFrame(updateLoop);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [data, regionsWithData]);
+
+  const useShortLabels = windowWidth < 800; // Use single letters when window is narrow
+
+
+  const updateFastTooltip = (tooltipData: any) => {
+    let tooltip = document.getElementById('fast-tooltip');
+    if (!tooltip) {
+      // Create tooltip element if it doesn't exist
+      tooltip = document.createElement('div');
+      tooltip.id = 'fast-tooltip';
+      tooltip.className = 'opennem-tooltip';
+      document.body.appendChild(tooltip);
+    }
+
+    // Format the date
+    const dateObj = new Date(tooltipData.date + 'T00:00:00+10:00');
+    const formattedDate = dateObj.toLocaleDateString('en-AU', { 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric',
+      timeZone: 'Australia/Brisbane'
+    });
+
+    // Update content
+    const getCapacityText = (capacityFactor: number | null) => {
+      if (capacityFactor === null) return 'No data';
+      if (capacityFactor < 1) return 'Offline';
+      if (capacityFactor < 25) return `${capacityFactor.toFixed(1)}% (Low)`;
+      return `${capacityFactor.toFixed(1)}%`;
+    };
+
+    tooltip.innerHTML = `
+      <div class="opennem-tooltip-date">${formattedDate}</div>
+      <div class="opennem-tooltip-facility">${tooltipData.facility}: ${tooltipData.unit}</div>
+      <div class="opennem-tooltip-value">
+        ${getCapacityText(tooltipData.capacityFactor)}
+      </div>
+    `;
+
+    // Position tooltip
+    const viewportWidth = window.innerWidth;
+    const margin = 5;
+    const tooltipWidth = 150;
+
+    let left = tooltipData.x;
+    let transform = 'translate(-50%, -100%)';
+
+    if (tooltipData.x + (tooltipWidth / 2) > viewportWidth - margin) {
+      left = viewportWidth - tooltipWidth - margin;
+      transform = 'translateY(-100%)';
+    }
+
+    if (tooltipData.x - (tooltipWidth / 2) < margin) {
+      left = margin;
+      transform = 'translateY(-100%)';
+    }
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = (tooltipData.y - 10) + 'px';
+    tooltip.style.transform = transform;
+    tooltip.style.display = 'block';
+    tooltip.style.opacity = '1';
+  };
+
+  const updateTooltipFromMousePos = () => {
+    if (!stripesContainerRef.current || !data) return;
+
+    const container = stripesContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const { x, y } = mousePos.current;
+
+    // Check if mouse is within the container
+    if (x < containerRect.left || x > containerRect.right || y < containerRect.top || y > containerRect.bottom) {
+      // Hide tooltip if outside container
+      const tooltip = document.getElementById('fast-tooltip');
+      if (tooltip) {
+        tooltip.style.display = 'none';
+      }
+      return;
+    }
+
+    // Find all stripe segments at the current mouse position
+    const elementAtMouse = document.elementFromPoint(x, y);
+    if (!elementAtMouse || !elementAtMouse.classList.contains('opennem-stripe-segment')) {
+      // Hide tooltip if not over a stripe
+      const tooltip = document.getElementById('fast-tooltip');
+      if (tooltip) {
+        tooltip.style.display = 'none';
+      }
+      return;
+    }
+
+    // Extract data from the element's data attributes
+    const date = elementAtMouse.getAttribute('data-date');
+    const unitCode = elementAtMouse.getAttribute('data-unit');
+    const facilityName = elementAtMouse.getAttribute('data-facility');
+    const capacity = parseFloat(elementAtMouse.getAttribute('data-capacity') || '0');
+    const energy = parseFloat(elementAtMouse.getAttribute('data-energy') || '0');
+    const capacityFactor = parseFloat(elementAtMouse.getAttribute('data-capacity-factor') || '0');
+    const dateIndex = parseInt(elementAtMouse.getAttribute('data-date-index') || '0');
+
+    if (date && unitCode && facilityName) {
+      const rect = elementAtMouse.getBoundingClientRect();
+      
+      // Update tooltip directly in DOM - no React state!
+      updateFastTooltip({
+        date,
+        unit: unitCode,
+        facility: facilityName,
+        capacity,
+        energy: isNaN(energy) ? null : energy,
+        capacityFactor: isNaN(capacityFactor) ? null : capacityFactor,
+        x: x,
+        y: rect.top
+      });
+      
+      // Update hover line position
+      const hoverLines = document.querySelectorAll('.opennem-hover-line');
+      hoverLines.forEach(line => {
+        const lineElement = line as HTMLElement;
+        lineElement.style.left = `${(dateIndex / data.dates.length) * 100}%`;
+        lineElement.style.width = `${100 / data.dates.length}%`;
+        lineElement.style.display = 'block';
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -111,7 +358,27 @@ export default function Home() {
 
 
         {/* Main Stripes Visualization */}
-        <div className="opennem-stripes-viz">
+        <div 
+          ref={stripesContainerRef}
+          className="opennem-stripes-viz"
+          onMouseEnter={() => { isMouseOverStripes.current = true; }}
+          onMouseLeave={() => { 
+            isMouseOverStripes.current = false; 
+            setHoveredData(null);
+            setHoveredDateIndex(null);
+            // Hide fast tooltip
+            const tooltip = document.getElementById('fast-tooltip');
+            if (tooltip) {
+              tooltip.style.display = 'none';
+            }
+            // Hide hover lines
+            const hoverLines = document.querySelectorAll('.opennem-hover-line');
+            hoverLines.forEach(line => {
+              const lineElement = line as HTMLElement;
+              lineElement.style.display = 'none';
+            });
+          }}
+        >
           {regionsWithData.map((region) => (
             <div key={region.name} className="opennem-region">
               <div className="opennem-region-header">
@@ -152,24 +419,13 @@ export default function Home() {
                                   key={date}
                                   className="opennem-stripe-segment"
                                   style={{ backgroundColor: color }}
-                                  onMouseEnter={(e) => {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    setHoveredData({
-                                      date,
-                                      unit: unit.code,
-                                      facility: unit.facility_name,
-                                      capacity: unit.capacity,
-                                      energy: energy !== undefined ? energy : null,
-                                      capacityFactor,
-                                      x: rect.left + rect.width / 2,
-                                      y: rect.top
-                                    });
-                                    setHoveredDateIndex(index);
-                                  }}
-                                  onMouseLeave={() => {
-                                    setHoveredData(null);
-                                    setHoveredDateIndex(null);
-                                  }}
+                                  data-date={date}
+                                  data-unit={unit.code}
+                                  data-facility={unit.facility_name}
+                                  data-capacity={unit.capacity}
+                                  data-energy={energy !== undefined ? energy : ''}
+                                  data-capacity-factor={capacityFactor !== null ? capacityFactor : ''}
+                                  data-date-index={index}
                                 />
                               );
                             })}
@@ -190,6 +446,36 @@ export default function Home() {
                     })}
                   </div>
                 ))}
+                
+                {/* X-axis with month labels */}
+                <div className="opennem-region-x-axis">
+                  {getMonthLabels(data.dates, region.units, useShortLabels).map((month) => (
+                    <div
+                      key={month.monthYear}
+                      className="opennem-month-label"
+                      style={{ 
+                        backgroundColor: getCoalProportionColor(month.avgCapacityFactor),
+                        width: `${month.width}%`,
+                        left: `${month.startPosition}%`
+                      }}
+                      onMouseMove={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHoveredMonth({
+                          monthYear: month.monthYear,
+                          avgCapacityFactor: month.avgCapacityFactor,
+                          region: region.name,
+                          x: e.clientX,
+                          y: rect.top
+                        });
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredMonth(null);
+                      }}
+                    >
+                      {month.label}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           ))}
@@ -199,6 +485,9 @@ export default function Home() {
       {/* Tooltip */}
       {hoveredData && (
         <TooltipWithBounds hoveredData={hoveredData} />
+      )}
+      {hoveredMonth && (
+        <MonthTooltipWithBounds hoveredMonth={hoveredMonth} />
       )}
     </>
   );
@@ -255,53 +544,97 @@ function getCoalProportionColor(capacityFactor: number | null): string {
 
 function TooltipWithBounds({ hoveredData }: { hoveredData: any }) {
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ left: 0, top: 0, transform: '' });
 
-  useEffect(() => {
-    if (!tooltipRef.current) return;
+  // Calculate position immediately without useEffect or delays
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const margin = 5;
+  const tooltipWidth = 150; // Approximate tooltip width
 
-    const tooltip = tooltipRef.current;
-    const tooltipRect = tooltip.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const margin = 5;
+  let left = hoveredData.x;
+  let transform = 'translate(-50%, -100%)';
 
-    let left = hoveredData.x;
-    let transform = 'translate(-50%, -100%)';
+  // Check if tooltip would go outside right edge when centered
+  const tooltipRightEdge = hoveredData.x + (tooltipWidth / 2);
+  if (tooltipRightEdge > viewportWidth - margin) {
+    // Position tooltip fully to the left of the hover point
+    left = viewportWidth - tooltipWidth - margin;
+    transform = 'translateY(-100%)';
+  }
 
-    // Check if tooltip would go outside right edge when centered
-    const tooltipRightEdge = hoveredData.x + (tooltipRect.width / 2);
-    if (tooltipRightEdge > viewportWidth - margin) {
-      // Position tooltip fully to the left of the hover point
-      left = viewportWidth - tooltipRect.width - margin;
-      transform = 'translateY(-100%)';
-    }
-
-    // Check if tooltip would go outside left edge when centered
-    const tooltipLeftEdge = hoveredData.x - (tooltipRect.width / 2);
-    if (tooltipLeftEdge < margin) {
-      // Position tooltip fully to the right of the hover point
-      left = margin;
-      transform = 'translateY(-100%)';
-    }
-
-    setPosition({
-      left,
-      top: hoveredData.y - 10,
-      transform
-    });
-  }, [hoveredData]);
+  // Check if tooltip would go outside left edge when centered
+  const tooltipLeftEdge = hoveredData.x - (tooltipWidth / 2);
+  if (tooltipLeftEdge < margin) {
+    // Position tooltip fully to the right of the hover point
+    left = margin;
+    transform = 'translateY(-100%)';
+  }
 
   return (
     <div
       ref={tooltipRef}
       className="opennem-tooltip"
-      style={position}
+      style={{
+        left,
+        top: hoveredData.y - 10,
+        transform,
+        opacity: 1
+      }}
     >
       <div className="opennem-tooltip-date">{formatTooltipDate(hoveredData.date)}</div>
       <div className="opennem-tooltip-facility">{hoveredData.facility}: {hoveredData.unit}</div>
       <div className="opennem-tooltip-value">
         {hoveredData.capacityFactor === null ? 'No data' : 
+         hoveredData.capacityFactor < 1 ? 'Offline' :
          hoveredData.capacityFactor < 25 ? `${hoveredData.capacityFactor.toFixed(1)}% (Low)` : `${hoveredData.capacityFactor.toFixed(1)}%`}
+      </div>
+    </div>
+  );
+}
+
+function MonthTooltipWithBounds({ hoveredMonth }: { hoveredMonth: any }) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Calculate position immediately without useEffect or delays
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const margin = 5;
+  const tooltipWidth = 150; // Approximate tooltip width
+
+  let left = hoveredMonth.x;
+  let transform = 'translate(-50%, -100%)';
+
+  // Check if tooltip would go outside right edge when centered
+  const tooltipRightEdge = hoveredMonth.x + (tooltipWidth / 2);
+  if (tooltipRightEdge > viewportWidth - margin) {
+    // Position tooltip fully to the left of the hover point
+    left = viewportWidth - tooltipWidth - margin;
+    transform = 'translateY(-100%)';
+  }
+
+  // Check if tooltip would go outside left edge when centered
+  const tooltipLeftEdge = hoveredMonth.x - (tooltipWidth / 2);
+  if (tooltipLeftEdge < margin) {
+    // Position tooltip fully to the right of the hover point
+    left = margin;
+    transform = 'translateY(-100%)';
+  }
+
+  return (
+    <div
+      ref={tooltipRef}
+      className="opennem-tooltip"
+      style={{
+        left,
+        top: hoveredMonth.y - 10,
+        transform,
+        opacity: 1
+      }}
+    >
+      <div className="opennem-tooltip-date">{hoveredMonth.monthYear}</div>
+      <div className="opennem-tooltip-facility">{hoveredMonth.region}</div>
+      <div className="opennem-tooltip-value">
+        {hoveredMonth.avgCapacityFactor === null ? 'No data' : 
+         hoveredMonth.avgCapacityFactor < 1 ? 'Offline' :
+         hoveredMonth.avgCapacityFactor < 25 ? `${hoveredMonth.avgCapacityFactor.toFixed(1)}% (Low)` : `${hoveredMonth.avgCapacityFactor.toFixed(1)}%`}
       </div>
     </div>
   );
