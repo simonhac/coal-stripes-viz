@@ -30,6 +30,11 @@ export default async function handler(
       });
     }
 
+    // Debug: Log API key info (without exposing the key)
+    console.log('API Key present:', !!apiKey);
+    console.log('API Key length:', apiKey?.length);
+    console.log('API Key starts with:', apiKey?.substring(0, 3));
+
     // Get optional query parameters
     const requestDays = parseInt(req.query.days as string) || 365;
     
