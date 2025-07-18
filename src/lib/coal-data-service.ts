@@ -182,17 +182,28 @@ export class CoalDataService {
   ): DataAvailabilityInfo {
     console.log('🔍 Analyzing data availability...');
     
-    // Create all possible dates in the requested range
+    // Filter out today's data first as it's partial/incomplete
+    const todayBrisbane = today('Australia/Brisbane');
+    const filteredData = allData.filter(row => {
+      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane'));
+      return date.compare(todayBrisbane) !== 0;
+    });
+    
+    console.log(`🗑️  Filtered out ${allData.length - filteredData.length} data points for today (${todayBrisbane.toString()}) - partial data`);
+    
+    // Create all possible dates in the requested range (excluding today)
     const allDates: string[] = [];
     let currentDate = requestStartDate;
     while (currentDate.compare(requestEndDate) <= 0) {
-      allDates.push(currentDate.toString());
+      if (currentDate.compare(todayBrisbane) !== 0) {
+        allDates.push(currentDate.toString());
+      }
       currentDate = currentDate.add({ days: 1 });
     }
     
-    // Count data points per day
+    // Count data points per day (from filtered data)
     const dailyDataCount: Record<string, number> = {};
-    allData.forEach(row => {
+    filteredData.forEach(row => {
       const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane')).toString();
       dailyDataCount[date] = (dailyDataCount[date] || 0) + 1;
     });
@@ -204,105 +215,30 @@ export class CoalDataService {
     
     const minDataThreshold = Math.floor(expectedDataPoints * 0.5); // 50% threshold
     
-    // Find the most recent consecutive days with good data
-    // Work backwards from the end to find the most recent period with consistent data
-    let lastGoodDay = null;
-    let consecutiveGoodDays = 0;
-    
-    // First, find the last day with any data
-    for (let i = allDates.length - 1; i >= 0; i--) {
-      const date = allDates[i];
-      const dataCount = dailyDataCount[date] || 0;
-      if (dataCount > 0) {
-        lastGoodDay = date;
-        break;
-      }
-    }
+    // Find days with data (excluding today)
+    const daysWithData = allDates.filter(date => (dailyDataCount[date] || 0) > 0);
     
     // Error if no data found at all
-    if (!lastGoodDay) {
+    if (daysWithData.length === 0) {
       throw new Error(`No coal data found in the requested date range (${requestStartDate.toString()} to ${requestEndDate.toString()})`);
     }
     
-    // Find the best consecutive period with minimal data collection gaps
-    // We'll evaluate all possible consecutive periods and pick the one with the best data coverage
-    let bestPeriod = null;
-    let bestScore = -1;
+    // Sort days with data in descending order (most recent first)
+    daysWithData.sort((a, b) => b.localeCompare(a));
     
-    // Try all possible consecutive periods of requestDays length
-    for (let startIdx = 0; startIdx <= allDates.length - requestDays; startIdx++) {
-      const periodDates = allDates.slice(startIdx, startIdx + requestDays);
-      
-      // Calculate the score for this period (total data points and recency)
-      let totalDataPoints = 0;
-      let daysWithData = 0;
-      
-      for (const date of periodDates) {
-        const dataCount = dailyDataCount[date] || 0;
-        totalDataPoints += dataCount;
-        if (dataCount > 0) {
-          daysWithData++;
-        }
-      }
-      
-      // Score = (data coverage * 1000) + (recency bonus based on how recent the end date is)
-      // But heavily penalize periods with days that have no data at all
-      const dataCoverageScore = (daysWithData / requestDays) * 1000;
-      const recencyBonus = startIdx; // Higher index = more recent
-      
-      // Check if any day in this period has zero data across all units
-      let hasZeroDataDays = false;
-      for (const date of periodDates) {
-        const dataCount = dailyDataCount[date] || 0;
-        if (dataCount === 0) {
-          hasZeroDataDays = true;
-          break;
-        }
-      }
-      
-      // Heavily penalize periods with zero-data days
-      const zeroDataPenalty = hasZeroDataDays ? -10000 : 0;
-      const score = dataCoverageScore + recencyBonus + zeroDataPenalty;
-      
-      if (score > bestScore) {
-        bestScore = score;
-        bestPeriod = {
-          startDate: parseDate(periodDates[0]),
-          endDate: parseDate(periodDates[periodDates.length - 1]),
-          daysWithData,
-          totalDataPoints
-        };
-      }
+    // Take the most recent N days that have data, where N = requestDays
+    const selectedDays = daysWithData.slice(0, requestDays);
+    
+    if (selectedDays.length === 0) {
+      throw new Error(`No coal data found in the requested date range (${requestStartDate.toString()} to ${requestEndDate.toString()})`);
     }
     
-    // Use the best period found, or fallback to the most recent available period
-    if (!bestPeriod) {
-      // Fallback: use the most recent period, even if it has gaps
-      const finalEndDate = parseDate(lastGoodDay);
-      const finalStartDate = finalEndDate.subtract({ days: requestDays - 1 });
-      bestPeriod = { startDate: finalStartDate, endDate: finalEndDate };
-    }
+    // Sort selected days in ascending order for the final range
+    selectedDays.sort((a, b) => a.localeCompare(b));
     
-    let finalStartDate = bestPeriod.startDate;
-    let finalEndDate = bestPeriod.endDate;
-    
-    // For periods with zero-data days, trim them out
-    // Check if the selected period has any zero-data days and exclude them
-    const periodStartIdx = allDates.findIndex(d => d === finalStartDate.toString());
-    const periodEndIdx = allDates.findIndex(d => d === finalEndDate.toString());
-    
-    if (periodStartIdx !== -1 && periodEndIdx !== -1) {
-      const periodDates = allDates.slice(periodStartIdx, periodEndIdx + 1);
-      const validDates = periodDates.filter(date => (dailyDataCount[date] || 0) > 0);
-      
-      if (validDates.length > 0) {
-        finalStartDate = parseDate(validDates[0]);
-        finalEndDate = parseDate(validDates[validDates.length - 1]);
-      }
-    }
-    
-    // Calculate actual days returned (may be less than requested for 365-day requests)
-    const actualDays = Math.ceil((finalEndDate.toDate('Australia/Brisbane').getTime() - finalStartDate.toDate('Australia/Brisbane').getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const finalStartDate = parseDate(selectedDays[0]);
+    const finalEndDate = parseDate(selectedDays[selectedDays.length - 1]);
+    const actualDays = selectedDays.length;
     
     return {
       requestedRange: {
@@ -337,7 +273,9 @@ export class CoalDataService {
     });
     
     // Process data into unit/date matrix (only for the final date range)
+    // Today's data has already been filtered out in analyzeDataAvailability
     const unitData: Record<string, Map<CalendarDate, number>> = {};
+    
     allData.forEach(row => {
       const unitCode = row.unit_code;
       const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane'));
@@ -351,7 +289,8 @@ export class CoalDataService {
       }
     });
     
-    // Create date array for the final requested days
+    // Create date array for the final date range
+    // Today's data has already been filtered out in analyzeDataAvailability
     const allDates: CalendarDate[] = [];
     let currentDate = actualRange.start;
     while (currentDate.compare(actualRange.end) <= 0) {
