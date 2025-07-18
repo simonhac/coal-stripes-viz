@@ -64,9 +64,9 @@ export class CoalDataService {
    * Get request date range with buffer for data availability
    */
   private getRequestDateRange(requestDays: number) {
-    // Always end on yesterday - today might not have complete data yet
+    // End on today - we now know the API has current data available
     const todayDate = today('Australia/Brisbane');
-    const requestEndDate = todayDate.subtract({ days: 1 }); // Yesterday
+    const requestEndDate = todayDate; // Today
     
     // Request extra days to account for potential data delays, but respect API limits
     // The OpenElectricity API has a maximum range of 365 days for 1d intervals
