@@ -1,5 +1,7 @@
 // Test script for the CoalDataService
-import { CoalDataService, CoalDataUtils } from './coal-data-service';
+import { CoalDataService } from './coal-data-service';
+import { CoalDisplayUtils } from './display-utils';
+import { parseDate } from '@internationalized/date';
 
 // Load environment variables
 const path = require('path');
@@ -28,9 +30,9 @@ async function testCoalDataService() {
     
     // Test utility functions
     console.log('\n🔧 Testing utility functions:');
-    console.log(`   Capacity factor (12000 MWh, 660 MW): ${CoalDataUtils.calculateCapacityFactor(12000, 660).toFixed(1)}%`);
-    console.log(`   Shade character for 75%: ${CoalDataUtils.getShadeCharacter(75)}`);
-    console.log(`   Date format: ${CoalDataUtils.formatDateAU('2025-07-15')}`);
+    console.log(`   Capacity factor (12000 MWh, 660 MW): ${CoalDisplayUtils.calculateCapacityFactor(12000, 660).toFixed(1)}%`);
+    console.log(`   Shade character for 75%: ${CoalDisplayUtils.getShadeCharacter(75)}`);
+    console.log(`   Date format: ${CoalDisplayUtils.formatDateAU(parseDate('2025-07-15'))}`);
     
     // Show sample data for first unit
     const firstRegion = Object.values(data.regions).find(r => r.units.length > 0);
@@ -45,8 +47,8 @@ async function testCoalDataService() {
       console.log('   Last 5 days:');
       lastDays.forEach(date => {
         const energy = sampleUnit.data[date] || 0;
-        const cf = CoalDataUtils.calculateCapacityFactor(energy, sampleUnit.capacity);
-        const char = CoalDataUtils.getShadeCharacter(cf);
+        const cf = CoalDisplayUtils.calculateCapacityFactor(energy, sampleUnit.capacity);
+        const char = CoalDisplayUtils.getShadeCharacter(cf);
         console.log(`     ${date}: ${energy.toFixed(0).padStart(5)} MWh → ${cf.toFixed(1).padStart(5)}% ${char}`);
       });
     }
