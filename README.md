@@ -130,3 +130,4 @@ MIT License — feel free to use and modify as needed.
 - [@nc9](https://github.com/nc9) for the OpenElectricity client library and loving curation of OE's backend
 - Australian Energy Market Operator (AEMO) for underlying electricity market data
 - Next.js team for the excellent development framework
+- [Anthropic Claude Code](https://claude.ai/code) for development assistance and code generation
