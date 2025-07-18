@@ -235,7 +235,8 @@ header a {
 /* Responsive adjustments for x-axis */
 @media (max-width: 768px) {
   .opennem-region-x-axis {
-    margin-left: 80px; /* Match responsive facility label width */
+    margin-left: 0; /* Start at left edge on mobile */
+    margin-top: 3px; /* Reduce spacing on mobile */
   }
 }
 
@@ -356,10 +357,20 @@ header a {
     align-items: flex-start;
   }
   
+  /* Hide navigation links on mobile */
+  header nav.flex {
+    display: none !important;
+  }
+  
   .opennem-stripes-header {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
+  }
+  
+  /* Hide date range on mobile */
+  .opennem-date-range {
+    display: none;
   }
   
   .opennem-scale-bar {
@@ -367,8 +378,69 @@ header a {
   }
   
   .opennem-facility-label {
-    min-width: 80px;
+    min-width: 45px;
+    max-width: 45px;
+    font-size: 9px;
+    padding: 1px 2px;
+  }
+  
+  /* Push content to edges on mobile */
+  .opennem-stripes-container {
+    padding: 0 4px;
+  }
+  
+  /* Reduce region spacing */
+  .opennem-region {
+    margin: 20px 0 0 0;
+  }
+  
+  /* Reduce region header padding */
+  .opennem-region-header {
+    padding: 4px 0 2px 0;
+    font-size: 16px;
+  }
+  
+  /* Reduce facility group spacing */
+  .opennem-facility-group {
+    margin-bottom: 1px;
+  }
+  
+  /* Hide facility labels on mobile */
+  .opennem-facility-label {
+    display: none;
+  }
+  
+  /* Adjust stripe row for mobile */
+  .opennem-stripe-row {
+    display: flex;
+  }
+  
+  /* Ensure stripe data uses full width and enable relative positioning */
+  .opennem-stripe-data {
+    margin-left: 0;
+    width: 100%;
+    position: relative;
+  }
+  
+  /* Mobile facility overlay labels */
+  .opennem-mobile-facility-overlay {
+    position: absolute;
+    left: 4px;
+    top: 2px;
+    color: #333;
     font-size: 10px;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 5;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: calc(100% - 8px);
+    text-shadow: 
+      0 0 3px rgba(255,255,255,0.9),
+      0 0 6px rgba(255,255,255,0.7),
+      1px 1px 2px rgba(255,255,255,0.8),
+      -1px -1px 2px rgba(255,255,255,0.8);
   }
 }
 

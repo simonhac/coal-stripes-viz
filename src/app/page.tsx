@@ -141,7 +141,7 @@ export default function Home() {
     };
   }, [data, regionsWithData]);
 
-  const useShortLabels = windowWidth < 800; // Use single letters when window is narrow
+  const useShortLabels = windowWidth < 768; // Use single letters when window is narrow
 
 
   const updateFastTooltip = (tooltipData: any) => {
@@ -397,7 +397,8 @@ export default function Home() {
                 ) as [string, CoalUnit[]][]).map(([facilityName, facilityUnits]) => (
                   <div key={facilityName} className="opennem-facility-group">
                     {facilityUnits.map((unit: CoalUnit, unitIndex: number) => {
-                      const rowHeight = Math.max(12, Math.min(40, unit.capacity / 30));
+                      const minHeight = useShortLabels ? 16 : 12; // Minimum 16px on mobile for text overlay
+                      const rowHeight = Math.max(minHeight, Math.min(40, unit.capacity / 30));
                       
                       return (
                         <div 
@@ -406,9 +407,16 @@ export default function Home() {
                           style={{ height: `${rowHeight}px` }}
                         >
                           <div className="opennem-facility-label">
-                            {unitIndex === 0 ? facilityName : ''}
+                            {unitIndex === 0 && !useShortLabels ? facilityName : ''}
                           </div>
                           <div className="opennem-stripe-data">
+                            {/* Mobile facility name overlay on first unit */}
+                            {unitIndex === 0 && useShortLabels && (
+                              <div className="opennem-mobile-facility-overlay">
+                                {facilityName}
+                              </div>
+                            )}
+                            
                             {data.dates.map((date, index) => {
                               const energy = unit.data[date];
                               const capacityFactor = energy !== undefined ? CoalDataUtils.calculateCapacityFactor(energy, unit.capacity) : null;
