@@ -33,7 +33,7 @@ function formatDate(dateStr) {
 }
 
 async function generateHtmlOutput() {
-  console.log('🎨 Generating HTML coal stripes visualization...\n');
+  console.log('🎨 Generating HTML coal stripes visualisation...\n');
   
   try {
     const client = new OpenElectricityClient({ apiKey });
@@ -348,7 +348,7 @@ async function generateHtmlOutput() {
 </html>`;
     
     // Save HTML file
-    const htmlPath = path.join(__dirname, '../output/coal-stripes-visualization.html');
+    const htmlPath = path.join(__dirname, '../output/coal-stripes-visualisation.html');
     fs.writeFileSync(htmlPath, html);
     
     console.log(`✅ HTML file generated: ${htmlPath}`);

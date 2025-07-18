@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Coal Availability",
-  description: "Australian coal power plant capacity factor visualization",
+  description: "Australian coal power plant capacity factor visualisation",
   icons: {
     icon: '/favicon.svg',
   },

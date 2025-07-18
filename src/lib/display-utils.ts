@@ -17,7 +17,7 @@ export class CoalDisplayUtils {
   }
 
   /**
-   * Get shade character for capacity factor (for ASCII visualization)
+   * Get shade character for capacity factor (for ASCII visualisation)
    */
   static getShadeCharacter(capacityFactor: number): string {
     const SHADES = {

@@ -1,6 +1,6 @@
 # Coal Stripes API Tests
 
-This directory contains comprehensive tests for the OpenElectricity API integration used in the coal stripes visualization.
+This directory contains comprehensive tests for the OpenElectricity API integration used in the coal stripes visualisation.
 
 ## Test Files
 
@@ -82,4 +82,4 @@ The production strategy uses:
 3. **Comprehensive logging**: Every step tracked and timed
 4. **Error handling**: Graceful failures with detailed error logs
 
-This provides the optimal balance of performance, reliability, and maintainability for the coal stripes visualization.
+This provides the optimal balance of performance, reliability, and maintainability for the coal stripes visualisation.

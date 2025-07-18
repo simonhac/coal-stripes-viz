@@ -1,4 +1,4 @@
-// Type definitions for coal stripes visualization
+// Type definitions for coal stripes visualisation
 import { CalendarDate } from '@internationalized/date';
 
 export interface CoalUnit {

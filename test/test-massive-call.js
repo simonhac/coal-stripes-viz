@@ -122,7 +122,7 @@ async function testMassiveCall() {
         console.log(`📊 Total API calls needed: 2 (1 facilities + 1 data)`);
         console.log(`⚡ Total load time: ~${((Date.now() - fullStartTime) / 1000).toFixed(1)}s`);
         console.log(`💾 Data volume: ${actualRows.toLocaleString()} rows`);
-        console.log(`🎯 Perfect for coal stripes visualization!`);
+        console.log(`🎯 Perfect for coal stripes visualisation!`);
       }
       
     } else {

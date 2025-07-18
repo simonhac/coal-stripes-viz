@@ -1,4 +1,4 @@
-// Text-based coal stripes prototype - ASCII visualization for last 60 days
+// Text-based coal stripes prototype - ASCII visualisation for last 60 days
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 const { OpenElectricityClient } = require('openelectricity');
@@ -67,7 +67,7 @@ function groupByRegion(facilities) {
 }
 
 async function createTextStripes() {
-  console.log('🎨 Creating text-based coal stripes visualization...\n');
+  console.log('🎨 Creating text-based coal stripes visualisation...\n');
   
   try {
     const client = new OpenElectricityClient({ apiKey });

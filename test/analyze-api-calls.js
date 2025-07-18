@@ -1,4 +1,4 @@
-// Analyze API call requirements for coal stripes visualization
+// Analyze API call requirements for coal stripes visualisation
 require('dotenv').config({ path: '.env.local' });
 const { OpenElectricityClient } = require('openelectricity');
 
