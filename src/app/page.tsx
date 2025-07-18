@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesWithRegions } from '../hooks/useCoalStripes';
 import { CoalDisplayUtils } from '../lib/display-utils';
 import { CoalUnit } from '../lib/types';
+import { parseDate } from '@internationalized/date';
 import './opennem.css';
 
 function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: boolean = false) {
@@ -17,18 +18,18 @@ function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: bool
   
   // Group dates by month and track their positions
   dates.forEach((date, index) => {
-    const dateObj = new Date(date + 'T00:00:00+10:00');
-    const monthYear = dateObj.toLocaleDateString('en-AU', { 
+    const calendarDate = parseDate(date);
+    const monthYear = calendarDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
       month: 'long', 
       year: 'numeric',
       timeZone: 'Australia/Brisbane'
     });
-    const shortMonthYear = dateObj.toLocaleDateString('en-AU', { 
+    const shortMonthYear = calendarDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
       month: 'short', 
       year: 'numeric',
       timeZone: 'Australia/Brisbane'
     });
-    const monthKey = dateObj.toISOString().substring(0, 7); // YYYY-MM format
+    const monthKey = date.substring(0, 7); // YYYY-MM format from date string
     
     if (!monthGroups[monthKey]) {
       monthGroups[monthKey] = { 
@@ -85,27 +86,11 @@ function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: bool
 
 export default function Home() {
   const { data, loading, error, regionsWithData, totalUnits } = useCoalStripesWithRegions();
-  const [hoveredData, setHoveredData] = useState<{
-    date: string;
-    unit: string;
-    facility: string;
-    capacity: number;
-    energy: number;
-    capacityFactor: number;
-    x: number;
-    y: number;
-  } | null>(null);
-  const [hoveredMonth, setHoveredMonth] = useState<{
-    monthYear: string;
-    avgCapacityFactor: number | null;
-    region: string;
-    x: number;
-    y: number;
-  } | null>(null);
   const [hoveredDateIndex, setHoveredDateIndex] = useState<number | null>(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const mousePos = useRef({ x: 0, y: 0 });
   const isMouseOverStripes = useRef(false);
+  const isMouseOverMonth = useRef(false);
   const stripesContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
@@ -124,7 +109,7 @@ export default function Home() {
 
     // High-frequency update loop
     const updateLoop = () => {
-      if (isMouseOverStripes.current && stripesContainerRef.current && data) {
+      if (isMouseOverStripes.current && stripesContainerRef.current && data && !isMouseOverMonth.current) {
         updateTooltipFromMousePos();
       }
       animationFrameRef.current = requestAnimationFrame(updateLoop);
@@ -144,19 +129,19 @@ export default function Home() {
   const useShortLabels = windowWidth < 768; // Use single letters when window is narrow
 
 
-  const updateFastTooltip = (tooltipData: any) => {
-    let tooltip = document.getElementById('fast-tooltip');
+  const updateUnifiedTooltip = (tooltipData: any) => {
+    let tooltip = document.getElementById('unified-tooltip');
     if (!tooltip) {
       // Create tooltip element if it doesn't exist
       tooltip = document.createElement('div');
-      tooltip.id = 'fast-tooltip';
+      tooltip.id = 'unified-tooltip';
       tooltip.className = 'opennem-tooltip';
       document.body.appendChild(tooltip);
     }
 
     // Format the date
-    const dateObj = new Date(tooltipData.date + 'T00:00:00+10:00');
-    const formattedDate = dateObj.toLocaleDateString('en-AU', { 
+    const calendarDate = parseDate(tooltipData.date);
+    const formattedDate = calendarDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
       day: 'numeric', 
       month: 'long', 
       year: 'numeric',
@@ -204,8 +189,69 @@ export default function Home() {
     tooltip.style.opacity = '1';
   };
 
+  const updateMonthTooltip = (tooltipData: any) => {
+    let tooltip = document.getElementById('unified-tooltip');
+    if (!tooltip) {
+      // Create tooltip element if it doesn't exist
+      tooltip = document.createElement('div');
+      tooltip.id = 'unified-tooltip';
+      tooltip.className = 'opennem-tooltip';
+      document.body.appendChild(tooltip);
+    }
+
+    // Update content for month tooltip
+    const getCapacityText = (capacityFactor: number | null) => {
+      if (capacityFactor === null) return 'No data';
+      if (capacityFactor < 1) return 'Offline';
+      if (capacityFactor < 25) return `${capacityFactor.toFixed(1)}% (Low)`;
+      return `${capacityFactor.toFixed(1)}%`;
+    };
+
+    tooltip.innerHTML = `
+      <div class="opennem-tooltip-date">${tooltipData.monthYear}</div>
+      <div class="opennem-tooltip-facility">${tooltipData.region}</div>
+      <div class="opennem-tooltip-value">
+        ${getCapacityText(tooltipData.avgCapacityFactor)}
+      </div>
+    `;
+
+    // Position tooltip
+    const viewportWidth = window.innerWidth;
+    const margin = 5;
+    const tooltipWidth = 150;
+
+    let left = tooltipData.x;
+    let transform = 'translate(-50%, -100%)';
+
+    if (tooltipData.x + (tooltipWidth / 2) > viewportWidth - margin) {
+      left = viewportWidth - tooltipWidth - margin;
+      transform = 'translateY(-100%)';
+    }
+
+    if (tooltipData.x - (tooltipWidth / 2) < margin) {
+      left = margin;
+      transform = 'translateY(-100%)';
+    }
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = (tooltipData.y - 10) + 'px';
+    tooltip.style.transform = transform;
+    tooltip.style.display = 'block';
+    tooltip.style.opacity = '1';
+  };
+
+  const hideUnifiedTooltip = () => {
+    const tooltip = document.getElementById('unified-tooltip');
+    if (tooltip) {
+      tooltip.style.display = 'none';
+    }
+  };
+
   const updateTooltipFromMousePos = () => {
     if (!stripesContainerRef.current || !data) return;
+    
+    // Don't interfere with month tooltips
+    if (isMouseOverMonth.current) return;
 
     const container = stripesContainerRef.current;
     const containerRect = container.getBoundingClientRect();
@@ -214,20 +260,16 @@ export default function Home() {
     // Check if mouse is within the container
     if (x < containerRect.left || x > containerRect.right || y < containerRect.top || y > containerRect.bottom) {
       // Hide tooltip if outside container
-      const tooltip = document.getElementById('fast-tooltip');
-      if (tooltip) {
-        tooltip.style.display = 'none';
-      }
+      hideUnifiedTooltip();
       return;
     }
 
     // Find all stripe segments at the current mouse position
     const elementAtMouse = document.elementFromPoint(x, y);
     if (!elementAtMouse || !elementAtMouse.classList.contains('opennem-stripe-segment')) {
-      // Hide tooltip if not over a stripe
-      const tooltip = document.getElementById('fast-tooltip');
-      if (tooltip) {
-        tooltip.style.display = 'none';
+      // Hide tooltip if not over a stripe (but only if not over month)
+      if (!isMouseOverMonth.current) {
+        hideUnifiedTooltip();
       }
       return;
     }
@@ -245,7 +287,7 @@ export default function Home() {
       const rect = elementAtMouse.getBoundingClientRect();
       
       // Update tooltip directly in DOM - no React state!
-      updateFastTooltip({
+      updateUnifiedTooltip({
         date,
         unit: unitCode,
         facility: facilityName,
@@ -364,12 +406,10 @@ export default function Home() {
           onMouseEnter={() => { isMouseOverStripes.current = true; }}
           onMouseLeave={() => { 
             isMouseOverStripes.current = false; 
-            setHoveredData(null);
             setHoveredDateIndex(null);
-            // Hide fast tooltip
-            const tooltip = document.getElementById('fast-tooltip');
-            if (tooltip) {
-              tooltip.style.display = 'none';
+            // Hide unified tooltip only if not over month
+            if (!isMouseOverMonth.current) {
+              hideUnifiedTooltip();
             }
             // Hide hover lines
             const hoverLines = document.querySelectorAll('.opennem-hover-line');
@@ -466,9 +506,13 @@ export default function Home() {
                         width: `${month.width}%`,
                         left: `${month.startPosition}%`
                       }}
+                      onMouseEnter={() => {
+                        isMouseOverMonth.current = true;
+                      }}
                       onMouseMove={(e) => {
+                        isMouseOverMonth.current = true;
                         const rect = e.currentTarget.getBoundingClientRect();
-                        setHoveredMonth({
+                        updateMonthTooltip({
                           monthYear: month.monthYear,
                           avgCapacityFactor: month.avgCapacityFactor,
                           region: region.name,
@@ -477,7 +521,8 @@ export default function Home() {
                         });
                       }}
                       onMouseLeave={() => {
-                        setHoveredMonth(null);
+                        isMouseOverMonth.current = false;
+                        hideUnifiedTooltip();
                       }}
                     >
                       {month.label}
@@ -489,30 +534,22 @@ export default function Home() {
           ))}
         </div>
       </div>
-      
-      {/* Tooltip */}
-      {hoveredData && (
-        <TooltipWithBounds hoveredData={hoveredData} />
-      )}
-      {hoveredMonth && (
-        <MonthTooltipWithBounds hoveredMonth={hoveredMonth} />
-      )}
     </>
   );
 }
 
 function formatDateRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate + 'T00:00:00+10:00');
-  const end = new Date(endDate + 'T00:00:00+10:00');
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
   
-  const startFormatted = start.toLocaleDateString('en-AU', { 
+  const startFormatted = start.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
     day: 'numeric',
     month: 'long', 
     year: 'numeric',
     timeZone: 'Australia/Brisbane'
   });
   
-  const endFormatted = end.toLocaleDateString('en-AU', { 
+  const endFormatted = end.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
     day: 'numeric',
     month: 'long', 
     year: 'numeric',
@@ -523,8 +560,8 @@ function formatDateRange(startDate: string, endDate: string): string {
 }
 
 function formatTooltipDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00+10:00');
-  return date.toLocaleDateString('en-AU', { 
+  const calendarDate = parseDate(dateStr);
+  return calendarDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
     day: 'numeric', 
     month: 'long', 
     year: 'numeric',
@@ -550,100 +587,3 @@ function getCoalProportionColor(capacityFactor: number | null): string {
   return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
 }
 
-function TooltipWithBounds({ hoveredData }: { hoveredData: any }) {
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  // Calculate position immediately without useEffect or delays
-  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const margin = 5;
-  const tooltipWidth = 150; // Approximate tooltip width
-
-  let left = hoveredData.x;
-  let transform = 'translate(-50%, -100%)';
-
-  // Check if tooltip would go outside right edge when centered
-  const tooltipRightEdge = hoveredData.x + (tooltipWidth / 2);
-  if (tooltipRightEdge > viewportWidth - margin) {
-    // Position tooltip fully to the left of the hover point
-    left = viewportWidth - tooltipWidth - margin;
-    transform = 'translateY(-100%)';
-  }
-
-  // Check if tooltip would go outside left edge when centered
-  const tooltipLeftEdge = hoveredData.x - (tooltipWidth / 2);
-  if (tooltipLeftEdge < margin) {
-    // Position tooltip fully to the right of the hover point
-    left = margin;
-    transform = 'translateY(-100%)';
-  }
-
-  return (
-    <div
-      ref={tooltipRef}
-      className="opennem-tooltip"
-      style={{
-        left,
-        top: hoveredData.y - 10,
-        transform,
-        opacity: 1
-      }}
-    >
-      <div className="opennem-tooltip-date">{formatTooltipDate(hoveredData.date)}</div>
-      <div className="opennem-tooltip-facility">{hoveredData.facility}: {hoveredData.unit}</div>
-      <div className="opennem-tooltip-value">
-        {hoveredData.capacityFactor === null ? 'No data' : 
-         hoveredData.capacityFactor < 1 ? 'Offline' :
-         hoveredData.capacityFactor < 25 ? `${hoveredData.capacityFactor.toFixed(1)}% (Low)` : `${hoveredData.capacityFactor.toFixed(1)}%`}
-      </div>
-    </div>
-  );
-}
-
-function MonthTooltipWithBounds({ hoveredMonth }: { hoveredMonth: any }) {
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  // Calculate position immediately without useEffect or delays
-  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-  const margin = 5;
-  const tooltipWidth = 150; // Approximate tooltip width
-
-  let left = hoveredMonth.x;
-  let transform = 'translate(-50%, -100%)';
-
-  // Check if tooltip would go outside right edge when centered
-  const tooltipRightEdge = hoveredMonth.x + (tooltipWidth / 2);
-  if (tooltipRightEdge > viewportWidth - margin) {
-    // Position tooltip fully to the left of the hover point
-    left = viewportWidth - tooltipWidth - margin;
-    transform = 'translateY(-100%)';
-  }
-
-  // Check if tooltip would go outside left edge when centered
-  const tooltipLeftEdge = hoveredMonth.x - (tooltipWidth / 2);
-  if (tooltipLeftEdge < margin) {
-    // Position tooltip fully to the right of the hover point
-    left = margin;
-    transform = 'translateY(-100%)';
-  }
-
-  return (
-    <div
-      ref={tooltipRef}
-      className="opennem-tooltip"
-      style={{
-        left,
-        top: hoveredMonth.y - 10,
-        transform,
-        opacity: 1
-      }}
-    >
-      <div className="opennem-tooltip-date">{hoveredMonth.monthYear}</div>
-      <div className="opennem-tooltip-facility">{hoveredMonth.region}</div>
-      <div className="opennem-tooltip-value">
-        {hoveredMonth.avgCapacityFactor === null ? 'No data' : 
-         hoveredMonth.avgCapacityFactor < 1 ? 'Offline' :
-         hoveredMonth.avgCapacityFactor < 25 ? `${hoveredMonth.avgCapacityFactor.toFixed(1)}% (Low)` : `${hoveredMonth.avgCapacityFactor.toFixed(1)}%`}
-      </div>
-    </div>
-  );
-}
