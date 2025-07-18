@@ -177,12 +177,12 @@ export class CoalDataService {
     
     const minDataThreshold = Math.floor(expectedDataPoints * 0.5); // 50% threshold
     
-    // Find the last day with substantial data
+    // Find the last day with ANY data (not requiring substantial data)
     let lastGoodDay = null;
     for (let i = allDates.length - 1; i >= 0; i--) {
       const date = allDates[i];
       const dataCount = dailyDataCount[date] || 0;
-      if (dataCount >= minDataThreshold) {
+      if (dataCount > 0) {
         lastGoodDay = date;
         break;
       }
@@ -246,10 +246,10 @@ export class CoalDataService {
     
     // Create date array for the final 365 days
     const allDates: string[] = [];
-    const finalStartDate = new Date(actualRange.start);
-    const finalEndDate = new Date(actualRange.end);
+    const finalStartDate = new Date(actualRange.start + 'T00:00:00Z');
+    const finalEndDate = new Date(actualRange.end + 'T00:00:00Z');
     
-    for (let d = new Date(finalStartDate); d <= finalEndDate; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(finalStartDate); d <= finalEndDate; d.setUTCDate(d.getUTCDate() + 1)) {
       allDates.push(d.toISOString().split('T')[0]);
     }
     
@@ -269,8 +269,9 @@ export class CoalDataService {
       }
     }
     
-    // Create final dates array starting from first good date
-    const dates = allDates.filter(date => date >= firstGoodDate);
+    // Create final dates array - use the full actualRange to ensure we get exactly 365 days
+    // Don't filter by firstGoodDate as this would truncate the range
+    const dates = allDates;
     
     // Group units by region
     const regions: Regions = {
@@ -331,7 +332,7 @@ export class CoalDataService {
     return {
       regions,
       dates,
-      actualDateStart: firstGoodDate,
+      actualDateStart: actualRange.start,
       actualDateEnd: actualRange.end,
       lastGoodDay: availabilityInfo.lastGoodDay,
       totalUnits,

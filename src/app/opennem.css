@@ -210,7 +210,7 @@ header a {
   background: #faf9f6;
   color: black;
   padding: 8px 0;
-  font-size: 16.8px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: 0.5px;
   padding-left: 6px;
@@ -220,7 +220,7 @@ header a {
 .opennem-region-content {
   position: relative;
   min-height: 40px;
-  padding-top: 16px;
+  padding-top: 10px;
 }
 
 /* Individual stripe rows */
@@ -233,7 +233,7 @@ header a {
 
 /* Add space between facilities */
 .opennem-facility-group {
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .opennem-facility-group:last-child {
@@ -278,8 +278,7 @@ header a {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 1px;
-  background: #ef4444;
+  background: rgba(239, 68, 68, 0.3); /* Translucent red */
   pointer-events: none;
   z-index: 10;
 }
@@ -295,7 +294,9 @@ header a {
   line-height: 1.4;
   pointer-events: none;
   z-index: 1000;
+  min-width: 150px;
   max-width: 200px;
+  white-space: nowrap;
 }
 
 .opennem-tooltip-date {

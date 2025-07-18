@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesWithRegions } from '../hooks/useCoalStripes';
 import { CoalDataUtils } from '../lib/coal-data-service';
 import { CoalUnit } from '../lib/types';
@@ -105,7 +105,7 @@ export default function Home() {
       <div className="opennem-stripes-container">
         <div className="opennem-stripes-header">
           <div className="opennem-date-range">
-            {formatDateRange(data.actualDateStart, data.actualDateEnd)}
+            {formatDateRange(data.dates[0], data.dates[data.dates.length - 1])}
           </div>
         </div>
 
@@ -143,8 +143,8 @@ export default function Home() {
                           </div>
                           <div className="opennem-stripe-data">
                             {data.dates.map((date, index) => {
-                              const energy = unit.data[date] || 0;
-                              const capacityFactor = CoalDataUtils.calculateCapacityFactor(energy, unit.capacity);
+                              const energy = unit.data[date];
+                              const capacityFactor = energy !== undefined ? CoalDataUtils.calculateCapacityFactor(energy, unit.capacity) : null;
                               const color = getCoalProportionColor(capacityFactor);
                               
                               return (
@@ -159,7 +159,7 @@ export default function Home() {
                                       unit: unit.code,
                                       facility: unit.facility_name,
                                       capacity: unit.capacity,
-                                      energy,
+                                      energy: energy !== undefined ? energy : null,
                                       capacityFactor,
                                       x: rect.left + rect.width / 2,
                                       y: rect.top
@@ -179,7 +179,8 @@ export default function Home() {
                               <div
                                 className="opennem-hover-line"
                                 style={{
-                                  left: `${(hoveredDateIndex / data.dates.length) * 100}%`
+                                  left: `${(hoveredDateIndex / data.dates.length) * 100}%`,
+                                  width: `${100 / data.dates.length}%`
                                 }}
                               />
                             )}
@@ -197,69 +198,111 @@ export default function Home() {
       
       {/* Tooltip */}
       {hoveredData && (
-        <div
-          className="opennem-tooltip"
-          style={{
-            left: hoveredData.x,
-            top: hoveredData.y - 10,
-            transform: 'translate(-50%, -100%)'
-          }}
-        >
-          <div className="opennem-tooltip-date">{formatTooltipDate(hoveredData.date)}</div>
-          <div className="opennem-tooltip-facility">{hoveredData.facility}: {hoveredData.unit}</div>
-          <div className="opennem-tooltip-value">
-            {hoveredData.capacityFactor < 0.5 ? 'Offline' : `${hoveredData.capacityFactor.toFixed(1)}%`}
-          </div>
-        </div>
+        <TooltipWithBounds hoveredData={hoveredData} />
       )}
     </>
   );
 }
 
 function formatDateRange(startDate: string, endDate: string): string {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(startDate + 'T00:00:00+10:00');
+  const end = new Date(endDate + 'T00:00:00+10:00');
   
   const startFormatted = start.toLocaleDateString('en-AU', { 
     day: 'numeric',
     month: 'long', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'Australia/Brisbane'
   });
   
   const endFormatted = end.toLocaleDateString('en-AU', { 
     day: 'numeric',
     month: 'long', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'Australia/Brisbane'
   });
   
   return `${startFormatted} – ${endFormatted}`;
 }
 
 function formatTooltipDate(dateStr: string): string {
-  const date = new Date(dateStr);
+  const date = new Date(dateStr + 'T00:00:00+10:00');
   return date.toLocaleDateString('en-AU', { 
     day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
+    month: 'long', 
+    year: 'numeric',
+    timeZone: 'Australia/Brisbane'
   });
 }
 
-function getCoalProportionColor(capacityFactor: number): string {
-  if (capacityFactor < 0.5) return '#ef4444'; // Red for offline/very low capacity
+function getCoalProportionColor(capacityFactor: number | null): string {
+  // Light blue for missing data
+  if (capacityFactor === null || capacityFactor === undefined) return '#e6f3ff';
   
-  // Map 0.5% to 100% capacity factor to 256 shades of grey
-  // 0.5% -> light grey (255), 100% -> black (0)
-  const minCapacity = 0.5;
-  const maxCapacity = 100;
+  // Red for anything under 25%
+  if (capacityFactor < 25) return '#ef4444';
   
-  // Clamp the capacity factor to our range
-  const clampedCapacity = Math.min(maxCapacity, Math.max(minCapacity, capacityFactor));
-  
-  // Convert to 0-1 range where 0 = 0.5% and 1 = 100%
-  const normalizedCapacity = (clampedCapacity - minCapacity) / (maxCapacity - minCapacity);
+  // Map capacity factor directly to grey scale
+  // 25% -> 75% grey (light), 100% -> 0% grey (black)
+  // Grey value = 255 * (1 - capacityFactor/100)
+  const clampedCapacity = Math.min(100, Math.max(25, capacityFactor));
   
   // Invert so that higher capacity = darker (lower grey value)
-  const greyValue = Math.round(255 * (1 - normalizedCapacity));
+  const greyValue = Math.round(255 * (1 - clampedCapacity / 100));
   
   return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
+}
+
+function TooltipWithBounds({ hoveredData }: { hoveredData: any }) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ left: 0, top: 0, transform: '' });
+
+  useEffect(() => {
+    if (!tooltipRef.current) return;
+
+    const tooltip = tooltipRef.current;
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const margin = 5;
+
+    let left = hoveredData.x;
+    let transform = 'translate(-50%, -100%)';
+
+    // Check if tooltip would go outside right edge when centered
+    const tooltipRightEdge = hoveredData.x + (tooltipRect.width / 2);
+    if (tooltipRightEdge > viewportWidth - margin) {
+      // Position tooltip fully to the left of the hover point
+      left = viewportWidth - tooltipRect.width - margin;
+      transform = 'translateY(-100%)';
+    }
+
+    // Check if tooltip would go outside left edge when centered
+    const tooltipLeftEdge = hoveredData.x - (tooltipRect.width / 2);
+    if (tooltipLeftEdge < margin) {
+      // Position tooltip fully to the right of the hover point
+      left = margin;
+      transform = 'translateY(-100%)';
+    }
+
+    setPosition({
+      left,
+      top: hoveredData.y - 10,
+      transform
+    });
+  }, [hoveredData]);
+
+  return (
+    <div
+      ref={tooltipRef}
+      className="opennem-tooltip"
+      style={position}
+    >
+      <div className="opennem-tooltip-date">{formatTooltipDate(hoveredData.date)}</div>
+      <div className="opennem-tooltip-facility">{hoveredData.facility}: {hoveredData.unit}</div>
+      <div className="opennem-tooltip-value">
+        {hoveredData.capacityFactor === null ? 'No data' : 
+         hoveredData.capacityFactor < 25 ? `${hoveredData.capacityFactor.toFixed(1)}% (Low)` : `${hoveredData.capacityFactor.toFixed(1)}%`}
+      </div>
+    </div>
+  );
 }
