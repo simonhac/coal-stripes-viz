@@ -6,6 +6,8 @@ import { CoalStripesData } from '../../lib/types';
 interface ErrorResponse {
   error: string;
   message: string;
+  source?: string;
+  timestamp?: string;
 }
 
 export default async function handler(
