@@ -7,8 +7,5 @@
     "src/pages/api/**/*.ts": {
       "maxDuration": 60
     }
-  },
-  "env": {
-    "OPENELECTRICITY_API_KEY": "@openelectricity-api-key"
   }
 }
