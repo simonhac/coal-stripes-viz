@@ -1,7 +1,8 @@
 import React from 'react';
 import { useCoalStripesWithRegions } from '../hooks/useCoalStripes';
-import { CoalDataUtils } from '../lib/coal-data-service';
+import { CoalDisplayUtils } from '../lib/display-utils';
 import { CoalUnit } from '../lib/types';
+import { parseDate } from '@internationalized/date';
 
 export default function ApiTestPage() {
   const { data, loading, error, regionsWithData, totalUnits, dateRange, lastGoodDay } = useCoalStripesWithRegions();
@@ -86,8 +87,8 @@ export default function ApiTestPage() {
                     <div className="font-mono text-xs">
                       {data.dates.slice(-7).map(date => {
                         const energy = unit.data[date] || 0;
-                        const cf = CoalDataUtils.calculateCapacityFactor(energy, unit.capacity);
-                        const char = CoalDataUtils.getShadeCharacter(cf);
+                        const cf = CoalDisplayUtils.calculateCapacityFactor(energy, unit.capacity);
+                        const char = CoalDisplayUtils.getShadeCharacter(cf);
                         return <span key={date} className="inline-block w-3 text-center">{char}</span>;
                       })}
                     </div>
@@ -115,7 +116,7 @@ export default function ApiTestPage() {
             </div>
             <div>
               <p className="text-gray-400">Sample Date Headers</p>
-              <p className="font-mono text-xs">{CoalDataUtils.createWeeklyHeaders(data.dates.slice(0, 28))}</p>
+              <p className="font-mono text-xs">{CoalDisplayUtils.createWeeklyHeaders(data.dates.slice(0, 28).map(d => parseDate(d)))}</p>
             </div>
             <div>
               <p className="text-gray-400">Total Data Points</p>

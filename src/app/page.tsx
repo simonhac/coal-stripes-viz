@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesWithRegions } from '../hooks/useCoalStripes';
-import { CoalDataUtils } from '../lib/coal-data-service';
+import { CoalDisplayUtils } from '../lib/display-utils';
 import { CoalUnit } from '../lib/types';
 import './opennem.css';
 
@@ -56,7 +56,7 @@ function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: bool
       group.dates.forEach(date => {
         const energy = unit.data[date];
         if (energy !== undefined) {
-          const capacityFactor = CoalDataUtils.calculateCapacityFactor(energy, unit.capacity);
+          const capacityFactor = CoalDisplayUtils.calculateCapacityFactor(energy, unit.capacity);
           totalCapacityFactor += capacityFactor;
           dataPoints++;
         }
@@ -419,7 +419,7 @@ export default function Home() {
                             
                             {data.dates.map((date, index) => {
                               const energy = unit.data[date];
-                              const capacityFactor = energy !== undefined ? CoalDataUtils.calculateCapacityFactor(energy, unit.capacity) : null;
+                              const capacityFactor = energy !== undefined ? CoalDisplayUtils.calculateCapacityFactor(energy, unit.capacity) : null;
                               const color = getCoalProportionColor(capacityFactor);
                               
                               return (
