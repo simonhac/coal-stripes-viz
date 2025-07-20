@@ -133,7 +133,7 @@ describe('Leap Year Handling', () => {
     let smartCache: SmartCache;
 
     beforeEach(() => {
-      smartCache = new SmartCache();
+      smartCache = new SmartCache(5, false); // Disable preloading in tests
       (global.fetch as jest.Mock).mockClear();
     });
 
@@ -173,9 +173,9 @@ describe('Leap Year Handling', () => {
       // Should request full year
       expect(global.fetch).toHaveBeenCalledWith('/api/coal-stripes?year=2024');
       
-      // Should log leap year detection
+      // Should log API fetch
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔄 Fetching year 2024 from server... (366 days - LEAP YEAR)')
+        expect.stringContaining('🌐 API fetching 2024')
       );
     });
 
@@ -229,7 +229,7 @@ describe('Leap Year Handling', () => {
       expect(global.fetch).not.toHaveBeenCalled();
       expect(result.data[0].history.data.length).toBe(30); // June has 30 days
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('✅ Cache hit')
+        expect.stringContaining('🔍 Cache lookup: 2024-06-01 → 2024-06-30 ✅ hit')
       );
     });
   });
@@ -250,7 +250,7 @@ describe('Leap Year Handling', () => {
     });
 
     test('should handle leap year data correctly in cache filtering', async () => {
-      const smartCache = new SmartCache();
+      const smartCache = new SmartCache(5, false); // Disable preloading in tests
 
       // Mock full leap year data
       (global.fetch as jest.Mock).mockResolvedValueOnce({

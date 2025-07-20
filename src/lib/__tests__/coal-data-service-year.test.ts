@@ -32,15 +32,15 @@ jest.mock('openelectricity', () => ({
         ]
       }
     }),
-    getFacilityData: jest.fn().mockImplementation((network, facilityCodes, metrics, options) => {
+    getFacilityData: jest.fn().mockImplementation((network: any, facilityCodes: string[], metrics: any, options: any) => {
       // Generate mock data for the requested date range
       const startDate = parseDate(options.dateStart);
       const endDate = parseDate(options.dateEnd);
-      const rows = [];
+      const rows: any[] = [];
       
       let currentDate = startDate;
       while (currentDate.compare(endDate) <= 0) {
-        facilityCodes.forEach(facilityCode => {
+        facilityCodes.forEach((facilityCode: string) => {
           const unitCode = facilityCode === 'ERARING' ? 'ER01' : 'BW01';
           rows.push({
             interval: new Date(`${currentDate.toString()}T00:00:00+10:00`),
@@ -138,7 +138,7 @@ describe('CoalDataService - Year-based Fetching', () => {
       
       // Should hit cache
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('✅ Cache hit')
+        expect.stringContaining('✅ Complete cache hit')
       );
       
       // Should NOT fetch again

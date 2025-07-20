@@ -272,50 +272,56 @@ describe('TimeSeriesCache', () => {
       cache.addChunk(2023, data);
       
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('💾 Cached year 2023')
+        expect.stringContaining('💾 Cached 2023')
       );
       
+      // TimeSeriesCache no longer logs lookup operations - that's handled by SmartCache
       cache.getDataForDateRange(parseDate('2023-06-01'), parseDate('2023-06-30'));
       
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 Cache lookup:')
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('✅ Cache hit:')
-      );
+      // Just verify the caching message was called
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
     });
 
-    test('should log cache misses', () => {
-      cache.getDataForDateRange(parseDate('2023-06-01'), parseDate('2023-06-30'));
-      
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Cache miss: No years available for range')
-      );
+    test('should handle cache misses silently', () => {
+      const result = cache.getDataForDateRange(parseDate('2023-06-01'), parseDate('2023-06-30'));
+      expect(result).toBeNull();
     });
     
-    test('should log partial cache hits when years missing', () => {
+    test('should return partial data when years missing', () => {
       // Add 2023 but not 2024, then request cross-year range
       cache.addChunk(2023, createMockData(2023));
       
-      cache.getDataForDateRange(parseDate('2023-11-01'), parseDate('2024-02-28'));
+      const result = cache.getDataForDateRange(parseDate('2023-11-01'), parseDate('2024-02-28'));
       
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('📦 Partial cache hit: 1/2 years available')
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Missing years: [2024]')
-      );
+      // Should return partial result
+      expect(result).toBeTruthy();
+      expect('isPartial' in result!).toBe(true);
+      if ('isPartial' in result!) {
+        expect(result.isPartial).toBe(true);
+        expect(result.missingYears).toEqual([2024]);
+        expect(result.availableYears).toEqual([2023]);
+      }
     });
     
-    test('should log successful data combining when all years cached', () => {
+    test('should combine data when all years cached', () => {
       // Add both years to cache
       cache.addChunk(2022, createMockData(2022));
       cache.addChunk(2023, createMockData(2023));
       
-      cache.getDataForDateRange(parseDate('2022-11-01'), parseDate('2023-02-28'));
+      const result = cache.getDataForDateRange(parseDate('2022-11-01'), parseDate('2023-02-28'));
       
+      // Should successfully combine the data
+      expect(result).toBeTruthy();
+      expect('isPartial' in result!).toBe(false);
+      // Should have units from the cache
+      expect(result!.data.length).toBeGreaterThan(0);
+      
+      // Verify both caching messages were logged
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔗 Combining 2 years of cached data')
+        expect.stringContaining('💾 Cached 2022')
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('💾 Cached 2023')
       );
     });
 

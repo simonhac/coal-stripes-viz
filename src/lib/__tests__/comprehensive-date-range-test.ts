@@ -8,7 +8,7 @@ describe('Comprehensive Date Range Tests', () => {
   let smartCache: SmartCache;
   
   beforeEach(() => {
-    smartCache = new SmartCache(5);
+    smartCache = new SmartCache(5, false); // Disable preloading in tests
     jest.clearAllMocks();
     
     // Mock fetch to simulate server behavior

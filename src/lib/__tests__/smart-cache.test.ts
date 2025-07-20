@@ -32,7 +32,7 @@ describe('SmartCache Architecture', () => {
   let smartCache: SmartCache;
   
   beforeEach(() => {
-    smartCache = new SmartCache(3);
+    smartCache = new SmartCache(3, false); // Disable preloading in tests
     jest.clearAllMocks();
   });
 
@@ -134,8 +134,8 @@ describe('SmartCache Architecture', () => {
     expect(result).toBeTruthy();
     expect('isPartial' in result).toBe(true);
     
-    // Wait a bit for background fetch to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait a bit for background fetch to complete - rate limited to 1.5s
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     expect(global.fetch).toHaveBeenCalledTimes(2); // 2023 (1 call) + 2024 (1 call - leap year handled server-side)
   });

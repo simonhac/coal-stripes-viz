@@ -13,9 +13,11 @@ export class SmartCache {
   private lastFetchTime = 0;
   private readonly RATE_LIMIT_DELAY = 1500; // 1.5 seconds between API calls
   private lastRequestRange: { start: CalendarDate; end: CalendarDate } | null = null;
+  private enablePreloading: boolean;
 
-  constructor(maxChunks: number = 5) {
+  constructor(maxChunks: number = 5, enablePreloading: boolean = true) {
     this.cache = new TimeSeriesCache(maxChunks);
+    this.enablePreloading = enablePreloading;
   }
   
   /**
@@ -188,8 +190,10 @@ export class SmartCache {
         if (isUIRequest) {
           console.log(`🔍 Cache lookup: ${start.toString()} → ${end.toString()} ✅ hit (${elapsed}ms)`);
           
-          // Auto-detect direction and preload
-          this.autoPreload(start, end);
+          // Auto-detect direction and preload if enabled
+          if (this.enablePreloading) {
+            this.autoPreload(start, end);
+          }
         }
         return cachedResult;
       }
@@ -247,8 +251,8 @@ export class SmartCache {
         }
       }
       
-      // Store this request for direction detection and preload
-      if (isUIRequest) {
+      // Store this request for direction detection and preload if enabled
+      if (isUIRequest && this.enablePreloading) {
         this.autoPreload(start, end);
       }
       
