@@ -43,6 +43,7 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastHoveredIndex = useRef<number | null>(null);
+  const hoveredIndexRef = useRef<number | null>(null);
   const canvasWidthRef = useRef<number>(0);
   
   // Create stable data key for dependency tracking

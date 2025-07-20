@@ -29,12 +29,11 @@ interface UseCoalStripesRangeResult {
   isPartial: boolean;
   missingYears: number[];
   refetch: () => void;
-  setDateRange: (start: CalendarDate, end: CalendarDate) => void;
+  setDateRange: (start: CalendarDate, end: CalendarDate, direction?: 'forward' | 'backward') => void;
   // Current date range being displayed
   currentDateRange: { start: CalendarDate; end: CalendarDate };
   // Drag interaction support
   isDragging: boolean;
-  dragOffset: number;
   onDragStart: (clientX: number) => void;
   onDragMove: (clientX: number) => void;
   onDragEnd: () => void;
