@@ -190,6 +190,13 @@ describe('CoalDataService - Year-based Fetching', () => {
       expect(result.data).toBeInstanceOf(Array);
       expect(result.data.length).toBeGreaterThan(0);
       
+      // Check created_at is in AEST timezone format (without timezone identifier or milliseconds)
+      expect(result.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+10:00$/);
+      // Verify it contains the timezone offset
+      expect(result.created_at).toContain('+10:00');
+      expect(result.created_at).not.toContain('[Australia/Brisbane]');
+      expect(result.created_at).not.toContain('.');
+      
       // Check first unit structure
       const firstUnit = result.data[0];
       expect(firstUnit).toHaveProperty('network');

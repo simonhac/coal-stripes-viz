@@ -9,6 +9,7 @@ import {
 } from './types';
 import { CalendarDate, today, parseDate, fromDate, toCalendarDate, getLocalTimeZone } from '@internationalized/date';
 import { TimeSeriesCache } from './time-series-cache';
+import { getCurrentTimeInAEST } from './date-utils';
 
 export class CoalDataService {
   private client: OpenElectricityClient;
@@ -515,19 +516,8 @@ export class CoalDataService {
       return a.duid.localeCompare(b.duid);
     });
     
-    // Get current time in AEST
-    const now = new Date();
-    const aestFormatter = new Intl.DateTimeFormat('en-AU', {
-      timeZone: 'Australia/Brisbane',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    const aestTime = aestFormatter.format(now).replace(/\//g, '-').replace(', ', 'T');
+    // Get current time in AEST timezone format
+    const aestTime = getCurrentTimeInAEST();
     
     return {
       type: "capacity_factors" as const,

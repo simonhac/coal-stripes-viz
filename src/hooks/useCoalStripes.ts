@@ -30,6 +30,8 @@ interface UseCoalStripesRangeResult {
   missingYears: number[];
   refetch: () => void;
   setDateRange: (start: CalendarDate, end: CalendarDate) => void;
+  // Current date range being displayed
+  currentDateRange: { start: CalendarDate; end: CalendarDate };
   // Drag interaction support
   isDragging: boolean;
   dragOffset: number;
@@ -105,18 +107,19 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({ start: initialStartDate, end: initialEndDate });
+  const [visualDateRange, setVisualDateRange] = useState({ start: initialStartDate, end: initialEndDate });
   
   // Drag interaction state
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
   const dragStartX = useRef<number>(0);
-  const dragStartOffset = useRef<number>(0);
   const originalDateRange = useRef<{ start: CalendarDate, end: CalendarDate } | null>(null);
+  const lastDaysDelta = useRef<number>(0);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Create SmartCache instance (only once) - this is our ONLY interface to data
   const smartCacheRef = useRef<SmartCache | null>(null);
   if (!smartCacheRef.current) {
-    smartCacheRef.current = new SmartCache(5); // Max 5 year chunks
+    smartCacheRef.current = new SmartCache(10); // Max 10 year chunks for better performance
   }
 
   const fetchData = async (start: CalendarDate, end: CalendarDate) => {
@@ -126,8 +129,8 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
     setError(null);
     
     try {
-      // SmartCache handles EVERYTHING: cache hits, misses, server calls, partial data
-      const result = await smartCacheRef.current.getDataForDateRange(start, end);
+      // SmartCache handles EVERYTHING: cache hits, misses, server calls, partial data, preloading
+      const result = await smartCacheRef.current.getDataForDateRange(start, end, true);
       setData(result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
@@ -142,58 +145,99 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
     fetchData(dateRange.start, dateRange.end);
   };
 
-  const setDateRangeAndFetch = (start: CalendarDate, end: CalendarDate) => {
+  const setDateRangeAndFetch = (start: CalendarDate, end: CalendarDate, direction?: 'forward' | 'backward') => {
     setDateRange({ start, end });
-    fetchData(start, end);
+    setVisualDateRange({ start, end });
+    // The useEffect will handle fetching when dateRange changes
+    // Cache will auto-detect direction for preloading
   };
 
   // Drag interaction handlers
   const onDragStart = (clientX: number) => {
     setIsDragging(true);
     dragStartX.current = clientX;
-    dragStartOffset.current = dragOffset;
     originalDateRange.current = { ...dateRange };
+    lastDaysDelta.current = 0;
     
-    // Note: we'd need the container rect to accurately calculate the date
-    // For now, just log the clientX position
-    console.log(`🖱️  Drag started at ${clientX}`);
-    // TODO: Pass container rect from component to calculate exact date
+    // Add dragging class to body to prevent scrolling
+    document.body.classList.add('dragging');
+    
   };
 
   const onDragMove = (clientX: number) => {
     if (!isDragging) return;
     
     const deltaX = clientX - dragStartX.current;
-    const newOffset = dragStartOffset.current + deltaX;
     
     // Calculate accurate pixels per day based on container width and current data
     const daysDisplayed = data && data.data && data.data.length > 0 && data.data[0].history 
       ? data.data[0].history.data.length 
       : 365;
     const pixelsPerDay = containerWidth / daysDisplayed;
-    const daysDelta = Math.round(deltaX / pixelsPerDay);
+    const daysDelta = Math.round(-deltaX / pixelsPerDay); // Negative because dragging right goes back in time
     
-    setDragOffset(newOffset);
-    
-    // Only update date range if we've moved at least one day's worth
-    if (originalDateRange.current && Math.abs(daysDelta) > 0) {
-      const newStart = originalDateRange.current.start.add({ days: -daysDelta });
-      const newEnd = originalDateRange.current.end.add({ days: -daysDelta });
+    // Only update if we've moved at least one day
+    if (originalDateRange.current && daysDelta !== lastDaysDelta.current) {
+      const newStart = originalDateRange.current.start.add({ days: daysDelta });
+      const newEnd = originalDateRange.current.end.add({ days: daysDelta });
       
-      console.log(`🖱️  Drag: ${deltaX}px = ${daysDelta} days (${pixelsPerDay.toFixed(1)} px/day)`);
+      // Get yesterday as the latest possible date
+      const yesterday = today('Australia/Brisbane').subtract({ days: 1 });
       
-      // Update date range (this will trigger cache/fetch via useEffect)
-      setDateRange({ start: newStart, end: newEnd });
+      // Check boundaries
+      let constrainedStart = newStart;
+      let constrainedEnd = newEnd;
+      
+      // Prevent panning past yesterday
+      if (newEnd.compare(yesterday) > 0) {
+        const daysOverYesterday = newEnd.compare(yesterday);
+        constrainedEnd = yesterday;
+        constrainedStart = newStart.subtract({ days: daysOverYesterday });
+      }
+      
+      // Update visual date range immediately for smooth feedback
+      setVisualDateRange({ start: constrainedStart, end: constrainedEnd });
+      
+      // Cache will auto-detect pan direction for preloading
+      
+      // Clear any existing debounce timer
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+      
+      // Debounce the actual data fetch
+      updateTimeoutRef.current = setTimeout(() => {
+        // Just update the date range - the useEffect will handle fetching and preloading
+        setDateRange({ start: constrainedStart, end: constrainedEnd });
+      }, 150); // 150ms debounce for smooth updates
+      
+      lastDaysDelta.current = daysDelta;
+      
     }
   };
 
   const onDragEnd = () => {
     setIsDragging(false);
-    setDragOffset(0);
+    
+    // Clear any pending timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
+    }
+    
+    // Ensure final data is fetched if needed
+    if (visualDateRange.start !== dateRange.start || visualDateRange.end !== dateRange.end) {
+      // Just update the date range - the useEffect will handle fetching
+      setDateRange({ start: visualDateRange.start, end: visualDateRange.end });
+    }
+    
     dragStartX.current = 0;
-    dragStartOffset.current = 0;
     originalDateRange.current = null;
-    console.log('🖱️  Drag ended');
+    lastDaysDelta.current = 0;
+    
+    // Remove dragging class from body
+    document.body.classList.remove('dragging');
+    
   };
 
   useEffect(() => {
@@ -201,6 +245,18 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
       fetchData(dateRange.start, dateRange.end);
     }
   }, [dateRange.start.toString(), dateRange.end.toString(), autoFetch]);
+  
+  // Subscribe to background updates
+  useEffect(() => {
+    if (!smartCacheRef.current) return;
+    
+    const unsubscribe = smartCacheRef.current.onBackgroundUpdate((year) => {
+      // Refetch the current date range to get the updated data
+      fetchData(dateRange.start, dateRange.end);
+    });
+    
+    return unsubscribe;
+  }, [dateRange.start, dateRange.end]);
 
   // Compute derived state
   const isPartial = data ? 'isPartial' in data && data.isPartial : false;
@@ -214,9 +270,9 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
     missingYears,
     refetch,
     setDateRange: setDateRangeAndFetch,
+    currentDateRange: visualDateRange, // Use visual date range for display
     // Drag interaction support
     isDragging,
-    dragOffset,
     onDragStart,
     onDragMove,
     onDragEnd

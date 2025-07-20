@@ -8,7 +8,7 @@ global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 const createMockUnitData = (year: number, unitCount: number = 1) => ({
   type: 'capacity_factors' as const,
   version: '1.0',
-  created_at: new Date().toISOString(),
+  created_at: '2023-07-21T16:00:00+10:00',
   data: Array(unitCount).fill(null).map((_, i) => ({
     network: 'nem',
     region: 'NSW1',
@@ -47,7 +47,7 @@ describe('SmartCache Architecture', () => {
       json: async () => ({
         type: 'capacity_factors' as const,
         version: '1.0',
-        created_at: new Date().toISOString(),
+        created_at: '2023-07-21T16:00:00+10:00',
         data: [{
           network: 'nem',
           region: 'NSW1',

@@ -209,6 +209,7 @@ header a {
   background: #faf9f6;
   user-select: none; /* Prevent text selection during drag */
   touch-action: pan-y; /* Allow vertical scroll but handle horizontal drag */
+  overflow: hidden; /* Prevent horizontal scroll */
 }
 
 .opennem-stripes-viz.dragging {
@@ -224,6 +225,11 @@ header a {
 .opennem-stripes-viz.dragging {
   opacity: 0.9;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Visual feedback when at today's date boundary */
+.opennem-stripes-viz.at-boundary {
+  border-right: 3px solid var(--opennem-primary);
 }
 
 .opennem-region {
@@ -258,6 +264,13 @@ header a {
   margin-top: 5px;
   margin-left: 140px; /* Align with facility data */
   flex: 1; /* Match the stripe data width */
+  overflow: hidden; /* Clip content */
+}
+
+.opennem-region-x-axis-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 /* Responsive adjustments for x-axis */
@@ -291,17 +304,32 @@ header a {
 .opennem-stripe-row {
   display: flex;
   align-items: stretch;
-  border-bottom: none; /* Remove borders between units */
+  border: none;
   min-height: 12px; /* Minimum height, but can be larger based on capacity */
+  position: relative;
+  /* Ensure no gaps between rows */
+  margin: 0;
+  padding: 0;
 }
 
 /* Add space between facilities */
 .opennem-facility-group {
   margin-bottom: 2px;
+  position: relative;
 }
 
 .opennem-facility-group:last-child {
   margin-bottom: 0;
+}
+
+/* Ensure stripe data fills completely */
+.opennem-stripe-data-inner {
+  display: flex;
+  width: 100%;
+  position: relative;
+  /* Overlap slightly to prevent gaps */
+  margin-top: -1px;
+  padding-top: 1px;
 }
 
 .opennem-facility-label {
@@ -323,6 +351,13 @@ header a {
   flex: 1;
   display: flex;
   position: relative;
+  overflow: hidden;
+}
+
+.opennem-stripe-data-inner {
+  display: flex;
+  width: 100%;
+  position: relative;
 }
 
 .opennem-stripe-segment {
@@ -335,6 +370,13 @@ header a {
 
 .opennem-stripe-segment:hover {
   opacity: 0.8;
+}
+
+/* Canvas-based stripes */
+.opennem-stripe-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* Hover indicator line */

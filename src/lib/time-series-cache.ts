@@ -1,5 +1,6 @@
 import { CalendarDate, parseDate } from '@internationalized/date';
 import { CoalStripesData, PartialCoalStripesData, CoalUnit } from './types';
+import { getCurrentTimeInAEST } from './date-utils';
 
 export interface CacheEntry {
   year: number; // e.g., 2024
@@ -25,7 +26,6 @@ export class TimeSeriesCache {
    * V1: Combine cached years OR return partial data with missing info
    */
   getDataForDateRange(start: CalendarDate, end: CalendarDate): CoalStripesData | PartialCoalStripesData | null {
-    console.log(`🔍 Cache lookup: ${start.toString()} → ${end.toString()} (${end.compare(start) + 1} days)`);
     
     // Get all required years for this range
     const requiredYears = this.getRequiredYears(start, end);
@@ -48,7 +48,7 @@ export class TimeSeriesCache {
     
     // If no data at all, return null
     if (availableEntries.length === 0) {
-      console.log(`❌ Cache miss: No years available for range`);
+      // Don't log here - SmartCache will handle logging
       return null;
     }
     
@@ -57,19 +57,16 @@ export class TimeSeriesCache {
       const entry = availableEntries[0];
       const filteredData = this.filterDataToRange(entry.data, start, end);
       const days = end.compare(start) + 1;
-      console.log(`✅ Cache hit: Retrieved ${days} days from cache (single year)`);
       return filteredData;
     }
     
     // Multi-year case
     if (missingYears.length === 0) {
       // All years available - combine them!
-      console.log(`🔗 Combining ${availableEntries.length} years of cached data`);
       return this.combineYearData(availableEntries, start, end);
     } else {
       // Partial data available - return what we have with metadata
-      console.log(`📦 Partial cache hit: ${availableEntries.length}/${requiredYears.length} years available`);
-      console.log(`❌ Missing years: [${missingYears.join(', ')}]`);
+      // Don't log missing years here - it's handled by SmartCache
       return this.createPartialData(availableEntries, start, end, missingYears);
     }
   }
@@ -90,9 +87,7 @@ export class TimeSeriesCache {
     // Evict oldest if over limit
     this.evictIfOverLimit();
     
-    const stats = this.getCacheStats();
-    const days = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 366 : 365;
-    console.log(`💾 Cached year ${year}: ${days} days | Cache: ${stats.sizeMB}MB (${stats.chunkCount} chunks)`);
+    console.log(`💾 Cached ${year} [${this.cache.size}/${this.maxChunks}]`);
   }
 
   /**
@@ -106,6 +101,13 @@ export class TimeSeriesCache {
     
     // Check if date falls within the cached year
     return date.year === entry.year;
+  }
+
+  /**
+   * Check if we have data for a specific year
+   */
+  hasYear(year: number): boolean {
+    return this.cache.has(year.toString());
   }
 
   /**
@@ -233,19 +235,8 @@ export class TimeSeriesCache {
       return a.duid.localeCompare(b.duid);
     });
     
-    // Get current time in AEST for the combined data
-    const now = new Date();
-    const aestFormatter = new Intl.DateTimeFormat('en-AU', {
-      timeZone: 'Australia/Brisbane',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-    const aestTime = aestFormatter.format(now).replace(/\//g, '-').replace(', ', 'T');
+    // Get current time in AEST timezone format
+    const aestTime = getCurrentTimeInAEST();
     
     return {
       type: "capacity_factors" as const,

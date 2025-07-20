@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesRange } from '../hooks/useCoalStripes';
 import { CoalUnit } from '../lib/types';
-import { parseDate } from '@internationalized/date';
+import { parseDate, today } from '@internationalized/date';
+import { StripeCanvas, setPaintCountCallback } from '../components/StripeCanvas';
 import './opennem.css';
 
 // Get color based on capacity factor
@@ -157,6 +158,7 @@ export default function Home() {
   
   // Calculate container width for accurate drag sensitivity
   const [containerWidth, setContainerWidth] = useState(1200);
+  const [stripeDataWidth, setStripeDataWidth] = useState(1060);
   
   const { 
     data, 
@@ -164,17 +166,17 @@ export default function Home() {
     error, 
     isPartial, 
     missingYears,
+    currentDateRange,
     isDragging,
-    dragOffset,
     onDragStart,
     onDragMove,
-    onDragEnd
-  } = useCoalStripesRange({ containerWidth });
-  const [hoveredDateIndex, setHoveredDateIndex] = useState<number | null>(null);
-  const mousePos = useRef({ x: 0, y: 0 });
+    onDragEnd,
+    setDateRange
+  } = useCoalStripesRange({ containerWidth: stripeDataWidth });
   const isMouseOverStripes = useRef(false);
   const isMouseOverMonth = useRef(false);
-  const animationFrameRef = useRef<number | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [paintCount, setPaintCount] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -184,6 +186,13 @@ export default function Home() {
       if (stripesContainerRef.current) {
         const rect = stripesContainerRef.current.getBoundingClientRect();
         setContainerWidth(rect.width);
+        
+        // Also measure the actual stripe data width
+        const stripeData = stripesContainerRef.current.querySelector('.opennem-stripe-data');
+        if (stripeData) {
+          const stripeDataRect = stripeData.getBoundingClientRect();
+          setStripeDataWidth(stripeDataRect.width);
+        }
       }
     };
     
@@ -201,31 +210,111 @@ export default function Home() {
   // Handle mouse position updates efficiently
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      mousePos.current = { x: e.clientX, y: e.clientY };
-      
-      // Only process if we're over the stripes
-      if (isMouseOverStripes.current || isMouseOverMonth.current) {
-        // Cancel any pending animation frame
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-        
-        // Request a new animation frame
-        animationFrameRef.current = requestAnimationFrame(() => {
-          updateTooltipFromMousePos();
-        });
+      // Handle dragging globally
+      if (isDragging) {
+        e.preventDefault();
+        onDragMove(e.clientX);
       }
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    const handleMouseUp = () => {
+      if (isDragging) {
+        onDragEnd();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging && e.touches.length > 0) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        onDragMove(touch.clientX);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (isDragging) {
+        onDragEnd();
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove, { passive: false });
+    document.addEventListener('mouseup', handleMouseUp, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
     
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDragging, onDragMove, onDragEnd]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (!currentDateRange) return;
+
+      const isShift = e.shiftKey;
+      const monthsToMove = isShift ? 6 : 1;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        // Left arrow - pan backward in time (older)
+        const newStart = currentDateRange.start.subtract({ months: monthsToMove });
+        const newEnd = currentDateRange.end.subtract({ months: monthsToMove });
+        
+        // Show loading state immediately
+        setIsNavigating(true);
+        setDateRange(newStart, newEnd, 'backward');
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        // Right arrow - pan forward in time (more recent)
+        const newStart = currentDateRange.start.add({ months: monthsToMove });
+        const newEnd = currentDateRange.end.add({ months: monthsToMove });
+        
+        // Get yesterday as the latest possible date
+        const yesterday = today('Australia/Brisbane').subtract({ days: 1 });
+        
+        // Check boundaries - don't go past yesterday
+        if (newEnd.compare(yesterday) > 0) {
+          // Adjust to end at yesterday
+          const daysOverYesterday = newEnd.toDate('Australia/Brisbane').getTime() - yesterday.toDate('Australia/Brisbane').getTime();
+          const daysOver = Math.ceil(daysOverYesterday / (1000 * 60 * 60 * 24));
+          const constrainedEnd = yesterday;
+          const constrainedStart = newStart.subtract({ days: daysOver });
+          
+          // Show loading state immediately
+          setIsNavigating(true);
+          setDateRange(constrainedStart, constrainedEnd, 'forward');
+        } else {
+          // Show loading state immediately
+          setIsNavigating(true);
+          setDateRange(newStart, newEnd, 'forward');
+        }
       }
     };
-  }, [data]);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentDateRange, setDateRange]);
+
+  // Clear navigating state when loading completes
+  useEffect(() => {
+    if (!loading && isNavigating) {
+      setIsNavigating(false);
+    }
+  }, [loading, isNavigating]);
+  
+  // Set up paint count callback
+  useEffect(() => {
+    setPaintCountCallback(setPaintCount);
+  }, []);
 
   const updateUnifiedTooltip = (tooltipData: any) => {
     let tooltip = document.getElementById('unified-tooltip');
@@ -346,75 +435,12 @@ export default function Home() {
     }
   };
 
-  const updateTooltipFromMousePos = () => {
-    if (!stripesContainerRef.current || !data) return;
-    
-    // Don't interfere with month tooltips
-    if (isMouseOverMonth.current) return;
-
-    const container = stripesContainerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const { x, y } = mousePos.current;
-
-    // Check if mouse is within the container
-    if (x < containerRect.left || x > containerRect.right || y < containerRect.top || y > containerRect.bottom) {
-      // Hide tooltip if outside container
-      hideUnifiedTooltip();
-      return;
-    }
-
-    // Find all stripe segments at the current mouse position
-    const elementAtMouse = document.elementFromPoint(x, y);
-    if (!elementAtMouse || !elementAtMouse.classList.contains('opennem-stripe-segment')) {
-      // Hide tooltip if not over a stripe (but only if not over month)
-      if (!isMouseOverMonth.current) {
-        hideUnifiedTooltip();
-      }
-      return;
-    }
-
-    // Extract data from the element's data attributes
-    const date = elementAtMouse.getAttribute('data-date');
-    const unitCode = elementAtMouse.getAttribute('data-unit');
-    const facilityName = elementAtMouse.getAttribute('data-facility');
-    const capacityFactor = elementAtMouse.getAttribute('data-capacity-factor');
-    const capacityFactorValue = capacityFactor ? parseFloat(capacityFactor) : null;
-    const dateIndex = parseInt(elementAtMouse.getAttribute('data-date-index') || '0');
-
-    if (date && unitCode && facilityName) {
-      const rect = elementAtMouse.getBoundingClientRect();
-      
-      // Update tooltip directly in DOM - no React state!
-      updateUnifiedTooltip({
-        date,
-        unit: unitCode,
-        facility: facilityName,
-        capacityFactor: capacityFactorValue,
-        x: x,
-        y: rect.top
-      });
-      
-      // Update hover line position  
-      if (data.data.length > 0) {
-        const firstUnit = data.data[0];
-        const numDates = firstUnit.history.data.length;
-        
-        const hoverLines = document.querySelectorAll('.opennem-hover-line');
-        hoverLines.forEach(line => {
-          const lineElement = line as HTMLElement;
-          lineElement.style.left = `${(dateIndex / numDates) * 100}%`;
-          lineElement.style.width = `${100 / numDates}%`;
-          lineElement.style.display = 'block';
-        });
-      }
-    }
-  };
-
-  if (loading) {
+  // Show loading state but don't block if we have existing data
+  if (loading && !data) {
     return (
       <div className="opennem-loading">
         <div className="opennem-loading-spinner"></div>
-        Loading coal stripes data...
+        Loading stripes data...
       </div>
     );
   }
@@ -507,23 +533,71 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Paint Counter */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        background: 'rgba(0, 0, 0, 0.8)',
+        color: 'white',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        zIndex: 1000
+      }}>
+        Canvas paints: {paintCount}
+      </div>
+      
       {/* Date Range Header */}
       <div className="opennem-stripes-container">
         <div className="opennem-stripes-header">
           <div className="opennem-date-range">
-            {formatDateRange(dates[0], dates[dates.length - 1])}
+            {currentDateRange 
+              ? formatDateRange(currentDateRange.start.toString(), currentDateRange.end.toString())
+              : dates.length > 0 
+                ? formatDateRange(dates[0], dates[dates.length - 1])
+                : 'Loading...'}
           </div>
         </div>
 
         {/* Main Stripes Visualization */}
         <div 
+          style={{ 
+            position: 'relative',
+            opacity: isNavigating ? 0.6 : 1,
+            transition: 'opacity 100ms ease-out'
+          }}
+        >
+          <div 
           ref={stripesContainerRef}
           className="opennem-stripes-viz"
-          style={{ transform: `translateX(${dragOffset}px)`, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
-          onMouseDown={(e) => onDragStart(e.clientX)}
-          onMouseMove={(e) => isDragging && onDragMove(e.clientX)}
-          onMouseUp={onDragEnd}
-          onMouseLeave={onDragEnd}
+          style={{ 
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none'
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Prevent text selection
+            if (e.detail > 1) {
+              e.preventDefault();
+            }
+            onDragStart(e.clientX);
+          }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const touch = e.touches[0];
+            onDragStart(touch.clientX);
+          }}
+          onClick={(e) => {
+            // Prevent any click actions during drag
+            if (isDragging) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }}
           onMouseEnter={() => { isMouseOverStripes.current = true; }}
           onMouseOut={(e) => {
             if (!e.currentTarget.contains(e.relatedTarget as Node)) {
@@ -561,47 +635,60 @@ export default function Home() {
                         <div 
                           key={unit.duid} 
                           className="opennem-stripe-row"
-                          style={{ height: `${rowHeight}px` }}
+                          style={{ 
+                            height: `${rowHeight}px`,
+                            marginBottom: '-1px' // Overlap rows to prevent hairlines
+                          }}
                         >
                           <div className="opennem-facility-label">
                             {unitIndex === 0 && !useShortLabels ? facilityName : ''}
                           </div>
                           <div className="opennem-stripe-data">
-                            {/* Mobile facility name overlay on first unit */}
-                            {unitIndex === 0 && useShortLabels && (
-                              <div className="opennem-mobile-facility-overlay">
-                                {facilityName}
-                              </div>
-                            )}
-                            
-                            {dates.map((date, index) => {
-                              const capacityFactor = unit.history.data[index];
-                              const color = getCoalProportionColor(capacityFactor);
+                            <div className="opennem-stripe-data-inner">
+                              {/* Mobile facility name overlay on first unit */}
+                              {unitIndex === 0 && useShortLabels && (
+                                <div className="opennem-mobile-facility-overlay">
+                                  {facilityName}
+                                </div>
+                              )}
                               
-                              return (
-                                <div
-                                  key={date}
-                                  className="opennem-stripe-segment"
-                                  style={{ backgroundColor: color }}
-                                  data-date={date}
-                                  data-unit={unit.duid}
-                                  data-facility={unit.facility_name}
-                                  data-capacity-factor={capacityFactor !== null ? capacityFactor : ''}
-                                  data-date-index={index}
-                                />
-                              );
-                            })}
-                            
-                            {/* Red vertical line on hover */}
-                            {hoveredDateIndex !== null && (
+                              <StripeCanvas
+                                unit={unit}
+                                dates={dates}
+                                height={rowHeight}
+                                onHover={(dateIndex, pixelX, stripeWidth) => {
+                                  // Don't update React state on every mouse move for performance
+                                  // Just update the hover line directly
+                                  if (dateIndex !== null && pixelX !== undefined && stripeWidth !== undefined) {
+                                    const hoverLines = document.querySelectorAll('.opennem-hover-line');
+                                    hoverLines.forEach(line => {
+                                      const lineElement = line as HTMLElement;
+                                      // Use pixel positioning for accurate alignment
+                                      lineElement.style.left = `${pixelX - stripeWidth / 2}px`;
+                                      lineElement.style.width = `${stripeWidth}px`;
+                                      lineElement.style.display = 'block';
+                                    });
+                                  } else {
+                                    const hoverLines = document.querySelectorAll('.opennem-hover-line');
+                                    hoverLines.forEach(line => {
+                                      (line as HTMLElement).style.display = 'none';
+                                    });
+                                  }
+                                }}
+                              />
+                              
+                              {/* Red vertical line on hover */}
                               <div
                                 className="opennem-hover-line"
                                 style={{
-                                  left: `${(hoveredDateIndex / dates.length) * 100}%`,
-                                  width: `${100 / dates.length}%`
+                                  display: 'none',
+                                  position: 'absolute',
+                                  top: 0,
+                                  bottom: 0,
+                                  pointerEvents: 'none'
                                 }}
                               />
-                            )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -611,15 +698,16 @@ export default function Home() {
                 
                 {/* X-axis with month labels */}
                 <div className="opennem-region-x-axis">
-                  {getMonthLabels(dates, region.units, useShortLabels).map((month) => (
-                    <div
-                      key={month.monthYear}
-                      className="opennem-month-label"
-                      style={{ 
-                        backgroundColor: getCoalProportionColor(month.avgCapacityFactor),
-                        width: `${month.width}%`,
-                        left: `${month.startPosition}%`
-                      }}
+                  <div className="opennem-region-x-axis-inner">
+                    {getMonthLabels(dates, region.units, useShortLabels).map((month) => (
+                      <div
+                        key={month.monthYear}
+                        className="opennem-month-label"
+                        style={{ 
+                          backgroundColor: getCoalProportionColor(month.avgCapacityFactor),
+                          width: `${month.width}%`,
+                          left: `${month.startPosition}%`
+                        }}
                       onMouseEnter={() => {
                         isMouseOverMonth.current = true;
                       }}
@@ -642,6 +730,7 @@ export default function Home() {
                       {month.label}
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -657,6 +746,7 @@ export default function Home() {
             </p>
           </div>
         )}
+        </div>
       </div>
     </>
   );
