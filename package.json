@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "jest --config jest.config.unit.js",
+    "test:all": "jest",
+    "test:integration": "jest --config jest.config.integration.js",
+    "test:watch": "jest --config jest.config.unit.js --watch"
   },
   "dependencies": {
     "@internationalized/date": "^3.8.2",

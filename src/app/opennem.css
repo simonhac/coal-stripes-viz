@@ -164,6 +164,17 @@ header a {
   font-family: var(--font-stack);
 }
 
+.opennem-partial-data-indicator {
+  font-size: 12px;
+  color: var(--opennem-primary);
+  font-weight: 500;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background-color: rgba(227, 74, 51, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(227, 74, 51, 0.3);
+}
+
 /* Scale bar */
 .opennem-scale-bar {
   display: flex;
@@ -196,6 +207,23 @@ header a {
 /* Stripes visualisation */
 .opennem-stripes-viz {
   background: #faf9f6;
+  user-select: none; /* Prevent text selection during drag */
+  touch-action: pan-y; /* Allow vertical scroll but handle horizontal drag */
+}
+
+.opennem-stripes-viz.dragging {
+  cursor: grabbing !important;
+}
+
+.opennem-stripes-viz.dragging * {
+  cursor: grabbing !important;
+  pointer-events: none; /* Disable interactions during drag */
+}
+
+/* Drag visual feedback */
+.opennem-stripes-viz.dragging {
+  opacity: 0.9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .opennem-region {

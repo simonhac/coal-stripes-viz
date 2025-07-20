@@ -13,12 +13,10 @@ describe('CoalDataService - Facility Filtering', () => {
   });
 
   test('should only return facilities with coal units', async () => {
-    console.log('Testing facility filtering...');
-    
     // Access the private method through reflection for testing
     const coalFacilities = await (service as any).getAllCoalFacilities();
     
-    console.log(`Found ${coalFacilities.length} coal facilities`);
+    console.log(`Facility filter test: Found ${coalFacilities.length} coal facilities`);
     
     // Check that every facility has at least one coal unit
     const facilitiesWithoutCoal = coalFacilities.filter((facility: any) => {
@@ -28,82 +26,45 @@ describe('CoalDataService - Facility Filtering', () => {
       return coalUnits.length === 0;
     });
     
-    if (facilitiesWithoutCoal.length > 0) {
-      console.log('❌ Found facilities without coal units:');
-      facilitiesWithoutCoal.forEach((facility: any) => {
-        console.log(`  - ${facility.name} (${facility.code})`);
-        console.log(`    Units: ${facility.units.map((u: any) => `${u.code}:${u.fueltech_id}`).join(', ')}`);
-      });
-    }
-    
     expect(facilitiesWithoutCoal).toHaveLength(0);
   });
 
-  test('should show detailed facility and unit information', async () => {
-    console.log('\\n=== DETAILED FACILITY ANALYSIS ===');
-    
+  test('should analyze facility data', async () => {
     const coalFacilities = await (service as any).getAllCoalFacilities();
-    
-    console.log(`Total coal facilities: ${coalFacilities.length}`);
     
     // Group by region
     const regionGroups: Record<string, any[]> = {};
+    let nonCoalCount = 0;
+    let mixedFuelCount = 0;
+    
     coalFacilities.forEach((facility: any) => {
       const region = facility.network_region;
       if (!regionGroups[region]) regionGroups[region] = [];
       regionGroups[region].push(facility);
-    });
-    
-    console.log('\\n=== FACILITIES BY REGION ===');
-    Object.entries(regionGroups).forEach(([region, facilities]) => {
-      console.log(`\\n${region}: ${facilities.length} facilities`);
-      facilities.forEach((facility: any) => {
-        console.log(`  ${facility.name} (${facility.code})`);
-        facility.units.forEach((unit: any) => {
-          console.log(`    - ${unit.code}: ${unit.fueltech_id} (${unit.capacity_registered}MW, ${unit.status_id})`);
-        });
-      });
-    });
-    
-    // Check for suspicious units
-    console.log('\\n=== SUSPICIOUS UNIT ANALYSIS ===');
-    let suspiciousUnits: any[] = [];
-    
-    coalFacilities.forEach((facility: any) => {
+      
+      // Check for mixed fueltechs
+      const fueltechs = [...new Set(facility.units.map((u: any) => u.fueltech_id))];
+      if (fueltechs.length > 1) mixedFuelCount++;
+      
+      // Count non-coal units
       facility.units.forEach((unit: any) => {
-        // Check if fueltech matches what we expect
         if (unit.fueltech_id !== 'coal_black' && unit.fueltech_id !== 'coal_brown') {
-          suspiciousUnits.push({
-            facility: facility.name,
-            facilityCode: facility.code,
-            unitCode: unit.code,
-            fueltech: unit.fueltech_id,
-            capacity: unit.capacity_registered,
-            status: unit.status_id
-          });
+          nonCoalCount++;
         }
       });
     });
     
-    if (suspiciousUnits.length > 0) {
-      console.log('❓ Found units with non-coal fueltech:');
-      suspiciousUnits.forEach(unit => {
-        console.log(`  - ${unit.facility}: ${unit.unitCode} (${unit.fueltech})`);
-      });
-    } else {
-      console.log('✅ All units have coal fueltech');
+    // Summary
+    const regionSummary = Object.entries(regionGroups)
+      .map(([region, facilities]) => `${region}: ${facilities.length}`)
+      .join(', ');
+    
+    console.log(`Facility analysis: ${coalFacilities.length} total (${regionSummary})`);
+    
+    if (nonCoalCount > 0 || mixedFuelCount > 0) {
+      console.log(`  • ${nonCoalCount} non-coal units in ${mixedFuelCount} mixed-fuel facilities`);
     }
     
-    // Check for facilities with mixed fueltechs
-    console.log('\\n=== MIXED FUELTECH ANALYSIS ===');
-    coalFacilities.forEach((facility: any) => {
-      const fueltechs = [...new Set(facility.units.map((u: any) => u.fueltech_id))];
-      if (fueltechs.length > 1) {
-        console.log(`${facility.name}: ${fueltechs.join(', ')}`);
-      }
-    });
-    
-    // This test always passes, it's just for analysis
-    expect(true).toBe(true);
+    expect(coalFacilities.length).toBe(32);
   });
 });

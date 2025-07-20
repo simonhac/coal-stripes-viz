@@ -1,11 +1,54 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useCoalStripesWithRegions } from '../hooks/useCoalStripes';
-import { CoalDisplayUtils } from '../lib/display-utils';
+import { useCoalStripesRange } from '../hooks/useCoalStripes';
 import { CoalUnit } from '../lib/types';
 import { parseDate } from '@internationalized/date';
 import './opennem.css';
+
+// Get color based on capacity factor
+function getCoalProportionColor(capacityFactor: number | null): string {
+  // Light blue for missing data
+  if (capacityFactor === null || capacityFactor === undefined) return '#e6f3ff';
+  
+  // Red for anything under 25%
+  if (capacityFactor < 25) return '#ef4444';
+  
+  // Map capacity factor directly to grey scale
+  // 25% -> 75% grey (light), 100% -> 0% grey (black)
+  // Grey value = 255 * (1 - capacityFactor/100)
+  const clampedCapacity = Math.min(100, Math.max(25, capacityFactor));
+  
+  // Invert so that higher capacity = darker (lower grey value)
+  const greyValue = Math.round(255 * (1 - clampedCapacity / 100));
+  
+  return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
+}
+
+// Group units by region
+interface RegionGroup {
+  name: string;
+  units: CoalUnit[];
+}
+
+function groupUnitsByRegion(units: CoalUnit[]): RegionGroup[] {
+  const regions: Record<string, RegionGroup> = {
+    NSW1: { name: 'New South Wales', units: [] },
+    QLD1: { name: 'Queensland', units: [] },
+    VIC1: { name: 'Victoria', units: [] },
+    SA1: { name: 'South Australia', units: [] },
+    WEM: { name: 'Western Australia', units: [] }
+  };
+  
+  units.forEach(unit => {
+    const regionKey = unit.network === 'wem' ? 'WEM' : (unit.region || 'NSW1');
+    if (regions[regionKey]) {
+      regions[regionKey].units.push(unit);
+    }
+  });
+  
+  return Object.values(regions).filter(r => r.units.length > 0);
+}
 
 function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: boolean = false) {
   const monthGroups: Record<string, { 
@@ -54,12 +97,15 @@ function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: bool
     let dataPoints = 0;
     
     units.forEach(unit => {
-      group.dates.forEach(date => {
-        const energy = unit.data[date];
-        if (energy !== undefined) {
-          const capacityFactor = CoalDisplayUtils.calculateCapacityFactor(energy, unit.capacity);
-          totalCapacityFactor += capacityFactor;
-          dataPoints++;
+      group.dates.forEach((date) => {
+        // Find the index of this date in the unit's data
+        const dateIndex = dates.indexOf(date);
+        if (dateIndex >= 0 && dateIndex < unit.history.data.length) {
+          const capacityFactor = unit.history.data[dateIndex];
+          if (capacityFactor !== null && capacityFactor !== undefined) {
+            totalCapacityFactor += capacityFactor;
+            dataPoints++;
+          }
         }
       });
     });
@@ -84,50 +130,102 @@ function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: bool
   });
 }
 
+function formatDateRange(startDate: string, endDate: string): string {
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  
+  const startFormatted = start.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
+    day: 'numeric',
+    month: 'long', 
+    year: 'numeric',
+    timeZone: 'Australia/Brisbane'
+  });
+  
+  const endFormatted = end.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
+    day: 'numeric',
+    month: 'long', 
+    year: 'numeric',
+    timeZone: 'Australia/Brisbane'
+  });
+  
+  return `${startFormatted} – ${endFormatted}`;
+}
+
 export default function Home() {
-  const { data, loading, error, regionsWithData, totalUnits } = useCoalStripesWithRegions();
-  const [hoveredDateIndex, setHoveredDateIndex] = useState<number | null>(null);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const stripesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Calculate container width for accurate drag sensitivity
+  const [containerWidth, setContainerWidth] = useState(1200);
+  
+  const { 
+    data, 
+    loading, 
+    error, 
+    isPartial, 
+    missingYears,
+    isDragging,
+    dragOffset,
+    onDragStart,
+    onDragMove,
+    onDragEnd
+  } = useCoalStripesRange({ containerWidth });
+  const [hoveredDateIndex, setHoveredDateIndex] = useState<number | null>(null);
   const mousePos = useRef({ x: 0, y: 0 });
   const isMouseOverStripes = useRef(false);
   const isMouseOverMonth = useRef(false);
-  const stripesContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      
+      // Update container width for accurate drag calculations
+      if (stripesContainerRef.current) {
+        const rect = stripesContainerRef.current.getBoundingClientRect();
+        setContainerWidth(rect.width);
+      }
+    };
+    
+    // Initial measurement
+    handleResize();
+    
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Mobile breakpoint
+  const isMobile = windowWidth < 768;
+  const useShortLabels = windowWidth < 600;
 
+  // Handle mouse position updates efficiently
   useEffect(() => {
-    // Global mouse tracking
     const handleMouseMove = (e: MouseEvent) => {
       mousePos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    // High-frequency update loop
-    const updateLoop = () => {
-      if (isMouseOverStripes.current && stripesContainerRef.current && data && !isMouseOverMonth.current) {
-        updateTooltipFromMousePos();
+      
+      // Only process if we're over the stripes
+      if (isMouseOverStripes.current || isMouseOverMonth.current) {
+        // Cancel any pending animation frame
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        // Request a new animation frame
+        animationFrameRef.current = requestAnimationFrame(() => {
+          updateTooltipFromMousePos();
+        });
       }
-      animationFrameRef.current = requestAnimationFrame(updateLoop);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
-    animationFrameRef.current = requestAnimationFrame(updateLoop);
-
+    
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [data, regionsWithData]);
-
-  const useShortLabels = windowWidth < 768; // Use single letters when window is narrow
-
+  }, [data]);
 
   const updateUnifiedTooltip = (tooltipData: any) => {
     let tooltip = document.getElementById('unified-tooltip');
@@ -139,16 +237,17 @@ export default function Home() {
       document.body.appendChild(tooltip);
     }
 
-    // Format the date
-    const calendarDate = parseDate(tooltipData.date);
-    const formattedDate = calendarDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-      day: 'numeric', 
-      month: 'long', 
+    // Format date
+    const date = parseDate(tooltipData.date);
+    const formattedDate = date.toDate('Australia/Brisbane').toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
       year: 'numeric',
       timeZone: 'Australia/Brisbane'
     });
 
-    // Update content
+    // Format capacity factor
     const getCapacityText = (capacityFactor: number | null) => {
       if (capacityFactor === null) return 'No data';
       if (capacityFactor < 1) return 'Offline';
@@ -278,9 +377,8 @@ export default function Home() {
     const date = elementAtMouse.getAttribute('data-date');
     const unitCode = elementAtMouse.getAttribute('data-unit');
     const facilityName = elementAtMouse.getAttribute('data-facility');
-    const capacity = parseFloat(elementAtMouse.getAttribute('data-capacity') || '0');
-    const energy = parseFloat(elementAtMouse.getAttribute('data-energy') || '0');
-    const capacityFactor = parseFloat(elementAtMouse.getAttribute('data-capacity-factor') || '0');
+    const capacityFactor = elementAtMouse.getAttribute('data-capacity-factor');
+    const capacityFactorValue = capacityFactor ? parseFloat(capacityFactor) : null;
     const dateIndex = parseInt(elementAtMouse.getAttribute('data-date-index') || '0');
 
     if (date && unitCode && facilityName) {
@@ -291,21 +389,24 @@ export default function Home() {
         date,
         unit: unitCode,
         facility: facilityName,
-        capacity,
-        energy: isNaN(energy) ? null : energy,
-        capacityFactor: isNaN(capacityFactor) ? null : capacityFactor,
+        capacityFactor: capacityFactorValue,
         x: x,
         y: rect.top
       });
       
-      // Update hover line position
-      const hoverLines = document.querySelectorAll('.opennem-hover-line');
-      hoverLines.forEach(line => {
-        const lineElement = line as HTMLElement;
-        lineElement.style.left = `${(dateIndex / data.dates.length) * 100}%`;
-        lineElement.style.width = `${100 / data.dates.length}%`;
-        lineElement.style.display = 'block';
-      });
+      // Update hover line position  
+      if (data.data.length > 0) {
+        const firstUnit = data.data[0];
+        const numDates = firstUnit.history.data.length;
+        
+        const hoverLines = document.querySelectorAll('.opennem-hover-line');
+        hoverLines.forEach(line => {
+          const lineElement = line as HTMLElement;
+          lineElement.style.left = `${(dateIndex / numDates) * 100}%`;
+          lineElement.style.width = `${100 / numDates}%`;
+          lineElement.style.display = 'block';
+        });
+      }
     }
   };
 
@@ -332,13 +433,29 @@ export default function Home() {
     );
   }
 
-  if (!data) {
+  if (!data || !data.data || data.data.length === 0) {
     return (
       <div className="opennem-error">
         <p>No data available</p>
       </div>
     );
   }
+
+  // Extract dates from first unit
+  const dates: string[] = [];
+  const firstUnit = data.data[0];
+  const startDate = parseDate(firstUnit.history.start);
+  const endDate = parseDate(firstUnit.history.last);
+  
+  let currentDate = startDate;
+  while (currentDate.compare(endDate) <= 0) {
+    dates.push(currentDate.toString());
+    currentDate = currentDate.add({ days: 1 });
+  }
+
+  // Group units by region
+  const regionsWithData = groupUnitsByRegion(data.data);
+  const totalUnits = data.data.length;
 
   return (
     <>
@@ -394,29 +511,29 @@ export default function Home() {
       <div className="opennem-stripes-container">
         <div className="opennem-stripes-header">
           <div className="opennem-date-range">
-            {formatDateRange(data.dates[0], data.dates[data.dates.length - 1])}
+            {formatDateRange(dates[0], dates[dates.length - 1])}
           </div>
         </div>
-
 
         {/* Main Stripes Visualization */}
         <div 
           ref={stripesContainerRef}
           className="opennem-stripes-viz"
+          style={{ transform: `translateX(${dragOffset}px)`, transition: isDragging ? 'none' : 'transform 0.3s ease-out' }}
+          onMouseDown={(e) => onDragStart(e.clientX)}
+          onMouseMove={(e) => isDragging && onDragMove(e.clientX)}
+          onMouseUp={onDragEnd}
+          onMouseLeave={onDragEnd}
           onMouseEnter={() => { isMouseOverStripes.current = true; }}
-          onMouseLeave={() => { 
-            isMouseOverStripes.current = false; 
-            setHoveredDateIndex(null);
-            // Hide unified tooltip only if not over month
-            if (!isMouseOverMonth.current) {
+          onMouseOut={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              isMouseOverStripes.current = false;
               hideUnifiedTooltip();
+              const hoverLines = document.querySelectorAll('.opennem-hover-line');
+              hoverLines.forEach(line => {
+                (line as HTMLElement).style.display = 'none';
+              });
             }
-            // Hide hover lines
-            const hoverLines = document.querySelectorAll('.opennem-hover-line');
-            hoverLines.forEach(line => {
-              const lineElement = line as HTMLElement;
-              lineElement.style.display = 'none';
-            });
           }}
         >
           {regionsWithData.map((region) => (
@@ -426,23 +543,23 @@ export default function Home() {
               </div>
               <div className="opennem-region-content">
                 {/* Group units by facility */}
-                {(Object.entries(
-                  region.units.reduce((facilities: Record<string, CoalUnit[]>, unit: CoalUnit) => {
+                {Object.entries(
+                  region.units.reduce((facilities, unit) => {
                     if (!facilities[unit.facility_name]) {
                       facilities[unit.facility_name] = [];
                     }
                     facilities[unit.facility_name].push(unit);
                     return facilities;
                   }, {} as Record<string, CoalUnit[]>)
-                ) as [string, CoalUnit[]][]).map(([facilityName, facilityUnits]) => (
+                ).map(([facilityName, facilityUnits]) => (
                   <div key={facilityName} className="opennem-facility-group">
-                    {facilityUnits.map((unit: CoalUnit, unitIndex: number) => {
+                    {facilityUnits.map((unit, unitIndex) => {
                       const minHeight = useShortLabels ? 16 : 12; // Minimum 16px on mobile for text overlay
                       const rowHeight = Math.max(minHeight, Math.min(40, unit.capacity / 30));
                       
                       return (
                         <div 
-                          key={unit.code} 
+                          key={unit.duid} 
                           className="opennem-stripe-row"
                           style={{ height: `${rowHeight}px` }}
                         >
@@ -457,9 +574,8 @@ export default function Home() {
                               </div>
                             )}
                             
-                            {data.dates.map((date, index) => {
-                              const energy = unit.data[date];
-                              const capacityFactor = energy !== undefined ? CoalDisplayUtils.calculateCapacityFactor(energy, unit.capacity) : null;
+                            {dates.map((date, index) => {
+                              const capacityFactor = unit.history.data[index];
                               const color = getCoalProportionColor(capacityFactor);
                               
                               return (
@@ -468,10 +584,8 @@ export default function Home() {
                                   className="opennem-stripe-segment"
                                   style={{ backgroundColor: color }}
                                   data-date={date}
-                                  data-unit={unit.code}
+                                  data-unit={unit.duid}
                                   data-facility={unit.facility_name}
-                                  data-capacity={unit.capacity}
-                                  data-energy={energy !== undefined ? energy : ''}
                                   data-capacity-factor={capacityFactor !== null ? capacityFactor : ''}
                                   data-date-index={index}
                                 />
@@ -483,8 +597,8 @@ export default function Home() {
                               <div
                                 className="opennem-hover-line"
                                 style={{
-                                  left: `${(hoveredDateIndex / data.dates.length) * 100}%`,
-                                  width: `${100 / data.dates.length}%`
+                                  left: `${(hoveredDateIndex / dates.length) * 100}%`,
+                                  width: `${100 / dates.length}%`
                                 }}
                               />
                             )}
@@ -497,7 +611,7 @@ export default function Home() {
                 
                 {/* X-axis with month labels */}
                 <div className="opennem-region-x-axis">
-                  {getMonthLabels(data.dates, region.units, useShortLabels).map((month) => (
+                  {getMonthLabels(dates, region.units, useShortLabels).map((month) => (
                     <div
                       key={month.monthYear}
                       className="opennem-month-label"
@@ -533,57 +647,17 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        {/* Partial data warning */}
+        {isPartial && missingYears && missingYears.length > 0 && (
+          <div className="opennem-partial-warning">
+            <p>
+              ⚠️ Partial data: Missing years {missingYears.join(', ')}. 
+              These will load in the background.
+            </p>
+          </div>
+        )}
       </div>
     </>
   );
 }
-
-function formatDateRange(startDate: string, endDate: string): string {
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-  
-  const startFormatted = start.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-    day: 'numeric',
-    month: 'long', 
-    year: 'numeric',
-    timeZone: 'Australia/Brisbane'
-  });
-  
-  const endFormatted = end.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-    day: 'numeric',
-    month: 'long', 
-    year: 'numeric',
-    timeZone: 'Australia/Brisbane'
-  });
-  
-  return `${startFormatted} – ${endFormatted}`;
-}
-
-function formatTooltipDate(dateStr: string): string {
-  const calendarDate = parseDate(dateStr);
-  return calendarDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-    day: 'numeric', 
-    month: 'long', 
-    year: 'numeric',
-    timeZone: 'Australia/Brisbane'
-  });
-}
-
-function getCoalProportionColor(capacityFactor: number | null): string {
-  // Light blue for missing data
-  if (capacityFactor === null || capacityFactor === undefined) return '#e6f3ff';
-  
-  // Red for anything under 25%
-  if (capacityFactor < 25) return '#ef4444';
-  
-  // Map capacity factor directly to grey scale
-  // 25% -> 75% grey (light), 100% -> 0% grey (black)
-  // Grey value = 255 * (1 - capacityFactor/100)
-  const clampedCapacity = Math.min(100, Math.max(25, capacityFactor));
-  
-  // Invert so that higher capacity = darker (lower grey value)
-  const greyValue = Math.round(255 * (1 - clampedCapacity / 100));
-  
-  return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
-}
-

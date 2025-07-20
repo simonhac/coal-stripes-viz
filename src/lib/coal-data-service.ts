@@ -1,86 +1,244 @@
 import { OpenElectricityClient } from 'openelectricity';
 import { 
   CoalStripesData, 
+  PartialCoalStripesData,
   DataAvailabilityInfo, 
   OpenElectricityFacility, 
   OpenElectricityDataRow,
-  Regions,
   CoalUnit
 } from './types';
-import { CalendarDate, today, parseDate, fromDate, toCalendarDate } from '@internationalized/date';
+import { CalendarDate, today, parseDate, fromDate, toCalendarDate, getLocalTimeZone } from '@internationalized/date';
+import { TimeSeriesCache } from './time-series-cache';
 
 export class CoalDataService {
   private client: OpenElectricityClient;
+  private cache: TimeSeriesCache;
+  private pendingRequests = new Map<string, Promise<CoalStripesData>>();
+  private facilitiesCache: OpenElectricityFacility[] | null = null;
+  private facilitiesFetchPromise: Promise<OpenElectricityFacility[]> | null = null;
 
   constructor(apiKey: string) {
     this.client = new OpenElectricityClient({ apiKey });
+    this.cache = new TimeSeriesCache(5); // Max 5 year chunks
   }
 
 
-  /**
-   * Main method to fetch and process coal stripes data
-   */
-  async getCoalStripesData(requestDays: number = 365): Promise<CoalStripesData> {
-    console.log('🎨 Fetching coal stripes data...');
-    
-    // Step 1: Get date range with buffer
-    const { requestStartDate, requestEndDate } = this.getRequestDateRange(requestDays);
-    const dateStart = requestStartDate.toString(); // YYYY-MM-DD
-    const dateEnd = requestEndDate.toString(); // YYYY-MM-DD
-    
-    console.log(`📅 Requesting data from ${dateStart} to ${dateEnd} (${requestDays} days)`);
-    
-    // Step 2: Get facilities from both networks
-    const facilities = await this.getAllCoalFacilities();
-    console.log(`🔍 Found ${facilities.length} total coal facilities`);
-    
-    // Step 3: Fetch energy data in batches
-    const allData = await this.fetchEnergyData(facilities, dateStart, dateEnd);
-    console.log(`✅ Retrieved ${allData.length} data rows`);
-    
-    // Step 4: Analyze data availability and determine final date range
-    const availabilityInfo = this.analyzeDataAvailability(
-      allData, 
-      facilities, 
-      requestStartDate, 
-      requestEndDate,
-      requestDays
-    );
-    
-    console.log(`📊 Last day with good data: ${availabilityInfo.lastGoodDay}`);
-    console.log(`📅 Using date range: ${availabilityInfo.actualRange.start} to ${availabilityInfo.actualRange.end} (${availabilityInfo.actualRange.days} days)`);
-    
-    // Step 5: Process data into final structure
-    const coalStripesData = this.processCoalStripesData(
-      allData, 
-      facilities, 
-      availabilityInfo
-    );
-    
-    return coalStripesData;
-  }
 
   /**
-   * Get request date range with buffer for data availability
+   * NEW: Fetch coal data for a specific date range with caching
+   * Uses year-long chunks (Jan 1 - Dec 31) for efficient caching
    */
-  private getRequestDateRange(requestDays: number) {
-    // End on today - we now know the API has current data available
-    const todayDate = today('Australia/Brisbane');
-    const requestEndDate = todayDate; // Today
+  async getCoalStripesDataRange(startDate: CalendarDate, endDate: CalendarDate): Promise<CoalStripesData | PartialCoalStripesData> {
+    const startTime = performance.now();
+    const days = endDate.compare(startDate) + 1;
     
-    // Request extra days to account for potential data delays, but respect API limits
-    // The OpenElectricity API has a maximum range of 365 days for 1d intervals
-    const bufferDays = requestDays >= 365 ? 0 : 3; // No buffer for 365-day requests
-    const totalDaysToRequest = requestDays + bufferDays;
-    const requestStartDate = requestEndDate.subtract({ days: totalDaysToRequest - 1 });
+    console.log(`📡 API fetch: ${startDate.toString()} → ${endDate.toString()} (${days} days)`);
     
-    return { requestStartDate, requestEndDate };
+    // Check cache first - may return full data, partial data, or null
+    const cachedResult = this.cache.getDataForDateRange(startDate, endDate);
+    if (cachedResult) {
+      const elapsed = Math.round(performance.now() - startTime);
+      const stats = this.cache.getCacheStats();
+      
+      if ('isPartial' in cachedResult) {
+        console.log(`📦 Partial cache hit: ${startDate.toString()} → ${endDate.toString()} | ${elapsed}ms | Missing: ${cachedResult.missingYears.join(', ')}`);
+        
+        // Launch background fetch for missing years
+        this.backgroundFetchMissingYears(cachedResult.missingYears);
+        
+        return cachedResult;
+      } else {
+        console.log(`✅ Complete cache hit: ${startDate.toString()} → ${endDate.toString()} | ${elapsed}ms | Cache: ${stats.sizeMB}MB (${stats.chunkCount} chunks)`);
+        return cachedResult;
+      }
+    }
+    
+    // Determine which years we need to fetch
+    const requiredYears = this.getRequiredYears(startDate, endDate);
+    const fetchPromises: Promise<CoalStripesData>[] = [];
+    
+    for (const year of requiredYears) {
+      const yearStart = parseDate(`${year}-01-01`);
+      const yearEnd = parseDate(`${year}-12-31`);
+      
+      // Check if this year is already cached
+      if (this.cache.hasDataForDate(yearStart)) {
+        continue; // Skip, already have it
+      }
+      
+      // Check for duplicate requests
+      const requestKey = year.toString();
+      if (this.pendingRequests.has(requestKey)) {
+        fetchPromises.push(this.pendingRequests.get(requestKey)!);
+        continue;
+      }
+      
+      // Start fetch for this year
+      const fetchPromise = this.fetchYearData(year);
+      this.pendingRequests.set(requestKey, fetchPromise);
+      fetchPromises.push(fetchPromise);
+    }
+    
+    // Wait for all required years to load
+    if (fetchPromises.length > 0) {
+      console.log(`⏳ Fetching ${fetchPromises.length} year(s) of data...`);
+      await Promise.all(fetchPromises);
+    }
+    
+    // Now try to get the data from cache again
+    const result = this.cache.getDataForDateRange(startDate, endDate);
+    const elapsed = Math.round(performance.now() - startTime);
+    
+    if (result) {
+      const stats = this.cache.getCacheStats();
+      
+      if ('isPartial' in result) {
+        console.log(`📦 Partial result after fetch: ${startDate.toString()} → ${endDate.toString()} | ${elapsed}ms | Still missing: ${result.missingYears.join(', ')}`);
+        return result;
+      } else {
+        console.log(`✅ Complete result after fetch: ${startDate.toString()} → ${endDate.toString()} | ${elapsed}ms | Cache: ${stats.sizeMB}MB (${stats.chunkCount} chunks)`);
+        return result;
+      }
+    } else {
+      console.log(`❌ API failed: ${startDate.toString()} → ${endDate.toString()} | ${elapsed}ms | Error: Unable to retrieve data after fetch`);
+      throw new Error(`Failed to retrieve data for range ${startDate.toString()} → ${endDate.toString()}`);
+    }
   }
+
+  /**
+   * Fetch a complete year of data (Jan 1 - Dec 31)
+   */
+  private async fetchYearData(year: number): Promise<CoalStripesData> {
+    const yearStart = parseDate(`${year}-01-01`);
+    const yearEnd = parseDate(`${year}-12-31`);
+    const daysInYear = yearEnd.compare(yearStart) + 1;
+    const requestKey = year.toString();
+    
+    try {
+      console.log(`🔄 Fetching year ${year} data... (${daysInYear} days)`);
+      
+      // Get facilities first
+      const facilities = await this.getAllCoalFacilities();
+      
+      if (daysInYear <= 365) {
+        // Single request for normal years
+        console.log(`   📡 Single request: ${yearStart.toString()} → ${yearEnd.toString()}`);
+        const allData = await this.fetchEnergyData(facilities, yearStart.toString(), yearEnd.toString());
+        
+        const availabilityInfo = this.analyzeDataAvailability(allData, facilities, yearStart, yearEnd, 365);
+        const coalStripesData = this.processCoalStripesData(allData, facilities, availabilityInfo);
+        this.cache.addChunk(year, coalStripesData);
+        return coalStripesData;
+        
+      } else {
+        // Split into 6-month chunks for leap years (366 days)
+        console.log(`🔀 Leap year detected: splitting into 6-month chunks`);
+        
+        // First 6 months: Jan 1 → Jun 30
+        const chunk1Start = parseDate(`${year}-01-01`);
+        const chunk1End = parseDate(`${year}-06-30`);
+        
+        // Last 6 months: Jul 1 → Dec 31
+        const chunk2Start = parseDate(`${year}-07-01`);
+        const chunk2End = parseDate(`${year}-12-31`);
+        
+        console.log(`   📡 Fetching both halves in parallel...`);
+        console.log(`      • ${chunk1Start.toString()} → ${chunk1End.toString()}`);
+        console.log(`      • ${chunk2Start.toString()} → ${chunk2End.toString()}`);
+        
+        // Fetch both chunks in parallel
+        const [data1, data2] = await Promise.all([
+          this.fetchEnergyData(facilities, chunk1Start.toString(), chunk1End.toString()),
+          this.fetchEnergyData(facilities, chunk2Start.toString(), chunk2End.toString())
+        ]);
+        
+        // Merge the data
+        console.log(`   🔗 Merging leap year data: ${data1.length} + ${data2.length} rows`);
+        const allData = [...data1, ...data2];
+        
+        const availabilityInfo = this.analyzeDataAvailability(allData, facilities, yearStart, yearEnd, 366);
+        const coalStripesData = this.processCoalStripesData(allData, facilities, availabilityInfo);
+        this.cache.addChunk(year, coalStripesData);
+        return coalStripesData;
+      }
+      
+    } catch (error) {
+      console.log(`❌ Failed to fetch year ${year}: ${error}`);
+      throw error;
+    } finally {
+      // Clean up pending request
+      this.pendingRequests.delete(requestKey);
+    }
+  }
+
+  /**
+   * Launch background fetch for missing years (don't wait for completion)
+   */
+  private backgroundFetchMissingYears(missingYears: number[]): void {
+    console.log(`🔄 Background fetching missing years: ${missingYears.join(', ')}`);
+    
+    for (const year of missingYears) {
+      const requestKey = year.toString();
+      
+      // Skip if already being fetched
+      if (this.pendingRequests.has(requestKey)) {
+        continue;
+      }
+      
+      // Start background fetch
+      const fetchPromise = this.fetchYearData(year);
+      this.pendingRequests.set(requestKey, fetchPromise);
+      
+      // Clean up on completion (don't await)
+      fetchPromise.finally(() => {
+        this.pendingRequests.delete(requestKey);
+      });
+    }
+  }
+
+  /**
+   * Get all years needed to cover a date range
+   */
+  private getRequiredYears(startDate: CalendarDate, endDate: CalendarDate): number[] {
+    const years: number[] = [];
+    let currentYear = startDate.year;
+    
+    while (currentYear <= endDate.year) {
+      years.push(currentYear);
+      currentYear++;
+    }
+    
+    return years;
+  }
+
 
   /**
    * Fetch all coal facilities from both NEM and WEM networks
    */
   private async getAllCoalFacilities(): Promise<OpenElectricityFacility[]> {
+    // Return cached facilities if available
+    if (this.facilitiesCache) {
+      return this.facilitiesCache;
+    }
+    
+    // If already fetching, wait for the existing promise
+    if (this.facilitiesFetchPromise) {
+      return this.facilitiesFetchPromise;
+    }
+    
+    // Start new fetch
+    this.facilitiesFetchPromise = this.fetchFacilitiesFromAPI();
+    
+    try {
+      const facilities = await this.facilitiesFetchPromise;
+      this.facilitiesCache = facilities;
+      return facilities;
+    } finally {
+      this.facilitiesFetchPromise = null;
+    }
+  }
+
+  private async fetchFacilitiesFromAPI(): Promise<OpenElectricityFacility[]> {
     console.log('📋 Fetching facilities from all networks...');
     
     const allFacilities = await this.client.getFacilities();
@@ -181,78 +339,33 @@ export class CoalDataService {
     requestDays: number
   ): DataAvailabilityInfo {
     console.log('🔍 Analyzing data availability...');
+    console.log(`   Total data rows: ${allData.length}`);
+    console.log(`   Requested range: ${requestStartDate.toString()} → ${requestEndDate.toString()}`);
     
-    // Filter out today's data first as it's partial/incomplete
-    const todayBrisbane = today('Australia/Brisbane');
-    const filteredData = allData.filter(row => {
-      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane'));
-      return date.compare(todayBrisbane) !== 0;
-    });
-    
-    console.log(`🗑️  Filtered out ${allData.length - filteredData.length} data points for today (${todayBrisbane.toString()}) - partial data`);
-    
-    // Create all possible dates in the requested range (excluding today)
-    const allDates: string[] = [];
-    let currentDate = requestStartDate;
-    while (currentDate.compare(requestEndDate) <= 0) {
-      if (currentDate.compare(todayBrisbane) !== 0) {
-        allDates.push(currentDate.toString());
-      }
-      currentDate = currentDate.add({ days: 1 });
+    // Debug: Check first few rows
+    if (allData.length > 0) {
+      console.log(`   Sample data:`, allData.slice(0, 3).map(row => ({
+        unit: row.unit_code,
+        date: row.interval,
+        energy: row.energy
+      })));
     }
     
-    // Count data points per day (from filtered data)
-    const dailyDataCount: Record<string, number> = {};
-    filteredData.forEach(row => {
-      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane')).toString();
-      dailyDataCount[date] = (dailyDataCount[date] || 0) + 1;
-    });
-    
-    // Calculate expected data points (total coal units across all facilities)
-    const expectedDataPoints = facilities.reduce((sum, f) => {
-      return sum + f.units.filter(u => u.fueltech_id === 'coal_black' || u.fueltech_id === 'coal_brown').length;
-    }, 0);
-    
-    const minDataThreshold = Math.floor(expectedDataPoints * 0.5); // 50% threshold
-    
-    // Find days with data (excluding today)
-    const daysWithData = allDates.filter(date => (dailyDataCount[date] || 0) > 0);
-    
-    // Error if no data found at all
-    if (daysWithData.length === 0) {
-      throw new Error(`No coal data found in the requested date range (${requestStartDate.toString()} to ${requestEndDate.toString()})`);
-    }
-    
-    // Sort days with data in descending order (most recent first)
-    daysWithData.sort((a, b) => b.localeCompare(a));
-    
-    // Take the most recent N days that have data, where N = requestDays
-    const selectedDays = daysWithData.slice(0, requestDays);
-    
-    if (selectedDays.length === 0) {
-      throw new Error(`No coal data found in the requested date range (${requestStartDate.toString()} to ${requestEndDate.toString()})`);
-    }
-    
-    // Sort selected days in ascending order for the final range
-    selectedDays.sort((a, b) => a.localeCompare(b));
-    
-    const finalStartDate = parseDate(selectedDays[0]);
-    const finalEndDate = parseDate(selectedDays[selectedDays.length - 1]);
-    const actualDays = selectedDays.length;
-    
+    // Simply return the requested range - no filtering
+    // The client will handle any date filtering if needed
     return {
       requestedRange: {
         start: requestStartDate,
         end: requestEndDate,
-        days: Math.ceil((requestEndDate.toDate('Australia/Brisbane').getTime() - requestStartDate.toDate('Australia/Brisbane').getTime()) / (1000 * 60 * 60 * 24)) + 1
+        days: requestDays
       },
       actualRange: {
-        start: finalStartDate,
-        end: finalEndDate,
-        days: actualDays
+        start: requestStartDate,
+        end: requestEndDate,
+        days: requestDays
       },
-      lastGoodDay: finalEndDate,
-      dataPoints: dailyDataCount[finalEndDate.toString()] || 0
+      lastGoodDay: requestEndDate,
+      dataPoints: allData.length
     };
   }
 
@@ -266,122 +379,161 @@ export class CoalDataService {
   ): CoalStripesData {
     const { actualRange } = availabilityInfo;
     
-    // Create facility lookup
-    const facilityLookup: Record<string, OpenElectricityFacility> = {};
-    facilities.forEach(f => {
-      facilityLookup[f.code] = f;
-    });
+    // Get today's date in Australian Eastern Time using Temporal API
+    const todayAEST = today('Australia/Brisbane');
     
-    // Process data into unit/date matrix (only for the final date range)
-    // Today's data has already been filtered out in analyzeDataAvailability
-    const unitData: Record<string, Map<CalendarDate, number>> = {};
-    
-    allData.forEach(row => {
-      const unitCode = row.unit_code;
-      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane'));
-      const energy = row.energy || 0;
-      
-      // Only include data within our final date range
-      if (date.compare(actualRange.start) >= 0 && 
-          date.compare(actualRange.end) <= 0) {
-        if (!unitData[unitCode]) unitData[unitCode] = new Map();
-        unitData[unitCode].set(date, energy);
-      }
-    });
-    
-    // Create date array for the final date range
-    // Today's data has already been filtered out in analyzeDataAvailability
-    const allDates: CalendarDate[] = [];
-    let currentDate = actualRange.start;
-    while (currentDate.compare(actualRange.end) <= 0) {
-      allDates.push(currentDate);
-      currentDate = currentDate.add({ days: 1 });
-    }
-    
-    // Find the first date where we have substantial data across multiple units
-    let firstGoodDate = allDates[0];
-    const minUnitsThreshold = Math.max(5, Object.keys(unitData).length * 0.3); // At least 30% of units or 5 units
-    
-    for (const date of allDates) {
-      const unitsWithData = Object.keys(unitData).filter(unitCode => {
-        const energy = unitData[unitCode].get(date);
-        return energy !== undefined && energy > 0;
-      }).length;
-      
-      if (unitsWithData >= minUnitsThreshold) {
-        firstGoodDate = date;
-        break;
-      }
-    }
-    
-    // Create final dates array - use the full actualRange
-    // For 365-day requests, we accept that some days might have data collection gaps
-    const dates = allDates;
-    
-    // Group units by region
-    const regions: Regions = {
-      NSW1: { name: 'New South Wales', units: [] },
-      QLD1: { name: 'Queensland', units: [] },
-      VIC1: { name: 'Victoria', units: [] },
-      SA1: { name: 'South Australia', units: [] },
-      WEM: { name: 'Western Australia', units: [] }
-    };
-    
-    // Organize units by region - include ALL coal units, not just those with data
+    // Build facility unit capacity lookup
+    const unitCapacities: Record<string, number> = {};
+    const unitFacilityMap: Record<string, OpenElectricityFacility> = {};
     facilities.forEach(facility => {
       facility.units.forEach(unit => {
         if (unit.status_id === 'operating' && 
             (unit.fueltech_id === 'coal_black' || unit.fueltech_id === 'coal_brown')) {
-          const region = facility.network_region as keyof Regions;
+          unitCapacities[unit.code] = unit.capacity_registered || 0;
+          unitFacilityMap[unit.code] = facility;
+        }
+      });
+    });
+    
+    // Process data into arrays - since we know data is ordered by date and complete years
+    const unitDataArrays: Record<string, (number | null)[]> = {};
+    const daysInYear = actualRange.end.compare(actualRange.start) + 1;
+    
+    // Initialize arrays for each unit
+    facilities.forEach(facility => {
+      facility.units.forEach(unit => {
+        if (unit.status_id === 'operating' && 
+            (unit.fueltech_id === 'coal_black' || unit.fueltech_id === 'coal_brown')) {
+          unitDataArrays[unit.code] = new Array(daysInYear).fill(null);
+        }
+      });
+    });
+    
+    // Fill in the data
+    allData.forEach(row => {
+      const unitCode = row.unit_code;
+      const date = toCalendarDate(fromDate(row.interval, 'Australia/Brisbane'));
+      let energy = row.energy; // Preserve null values - don't convert to 0
+      
+      // Replace ONLY today's partial data with null (we only want complete days)
+      if (date.compare(todayAEST) === 0) {
+        // Today's data is partial/incomplete - set to null
+        energy = null;
+      }
+      // For future dates, preserve whatever OpenElectricity sends (even if it's wrong)
+      // so we can detect their bugs
+      
+      // Calculate capacity factor
+      let capacityFactor: number | null = null;
+      if (energy !== null) {
+        const capacity = unitCapacities[unitCode] || 0;
+        if (capacity > 0) {
+          const maxPossibleMWh = capacity * 24;
+          capacityFactor = Math.min(100, (energy / maxPossibleMWh) * 100);
+          // Round to 1 decimal place
+          capacityFactor = Math.round(capacityFactor * 10) / 10;
+        } else {
+          capacityFactor = 0;
+        }
+      }
+      
+      // Calculate the index in the array (0-based)
+      const dayIndex = date.compare(actualRange.start);
+      if (unitDataArrays[unitCode] && dayIndex >= 0 && dayIndex < daysInYear) {
+        unitDataArrays[unitCode][dayIndex] = capacityFactor;
+      }
+    });
+    
+    // Convert to new flat unit array format
+    const units: CoalUnit[] = [];
+    
+    facilities.forEach(facility => {
+      facility.units.forEach(unit => {
+        if (unit.status_id === 'operating' && 
+            (unit.fueltech_id === 'coal_black' || unit.fueltech_id === 'coal_brown')) {
           
-          if (regions[region]) {
-            // Convert Map to Record for frontend compatibility
-            const dataRecord: Record<string, number> = {};
-            const unitMap = unitData[unit.code];
-            if (unitMap) {
-              for (const [date, energy] of unitMap) {
-                dataRecord[date.toString()] = energy;
-              }
-            }
-            // If no data available, dataRecord will be empty (which is correct)
-            
-            regions[region].units.push({
-              code: unit.code,
-              facility_name: facility.name,
-              facility_code: facility.code,
-              capacity: unit.capacity_registered || 0,
-              fueltech: unit.fueltech_id as 'coal_black' | 'coal_brown',
-              data: dataRecord
-            });
+          // Get the pre-built data array for this unit
+          const dataArray = unitDataArrays[unit.code] || [];
+          
+          // Determine region from network_region
+          let region: string;
+          const networkRegion = facility.network_region;
+          if (networkRegion === 'WEM') {
+            region = ''; // WEM has no regions
+          } else {
+            // For NEM, use the network_region as the region (NSW1, QLD1, etc.)
+            region = networkRegion;
           }
+          
+          const unitData: CoalUnit = {
+            network: networkRegion === 'WEM' ? 'wem' : 'nem',
+            data_type: 'capacity_factor',
+            units: 'percentage',
+            capacity: unit.capacity_registered || 0,
+            duid: unit.code,
+            facility_code: facility.code,
+            facility_name: facility.name,
+            fueltech: unit.fueltech_id as 'coal_black' | 'coal_brown',
+            history: {
+              start: actualRange.start.toString(),
+              last: actualRange.end.toString(),
+              interval: '1d',
+              data: dataArray
+            }
+          };
+          
+          // Only add region for NEM units
+          if (networkRegion !== 'WEM') {
+            unitData.region = region;
+          }
+          
+          units.push(unitData);
         }
       });
     });
     
-    // Sort units by facility first, then by capacity within each facility
-    Object.values(regions).forEach(region => {
-      region.units.sort((a: CoalUnit, b: CoalUnit) => {
-        // First sort by facility name
-        if (a.facility_name !== b.facility_name) {
-          return a.facility_name.localeCompare(b.facility_name);
-        }
-        // Then sort by capacity (largest first) within the same facility
-        return (b.capacity || 0) - (a.capacity || 0);
-      });
+    // Sort units by: network, region, facility, then duid
+    units.sort((a, b) => {
+      // First sort by network (nem before wem)
+      if (a.network !== b.network) {
+        return a.network.localeCompare(b.network);
+      }
+      
+      // Then by region (WEM units have no region, so handle that)
+      const aRegion = a.region || '';
+      const bRegion = b.region || '';
+      if (aRegion !== bRegion) {
+        return aRegion.localeCompare(bRegion);
+      }
+      
+      // Then by facility name
+      if (a.facility_name !== b.facility_name) {
+        return a.facility_name.localeCompare(b.facility_name);
+      }
+      
+      // Finally by duid
+      return a.duid.localeCompare(b.duid);
     });
     
-    // Calculate total units
-    const totalUnits = Object.values(regions).reduce((sum, region) => sum + region.units.length, 0);
+    // Get current time in AEST
+    const now = new Date();
+    const aestFormatter = new Intl.DateTimeFormat('en-AU', {
+      timeZone: 'Australia/Brisbane',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    const aestTime = aestFormatter.format(now).replace(/\//g, '-').replace(', ', 'T');
     
     return {
-      regions,
-      dates: dates.map(d => d.toString()),
-      actualDateStart: actualRange.start.toString(),
-      actualDateEnd: actualRange.end.toString(),
-      lastGoodDay: availabilityInfo.lastGoodDay.toString(),
-      totalUnits,
-      requestedDays: availabilityInfo.requestedRange.days,
-      actualDays: dates.length
+      type: "capacity_factors" as const,
+      version: "unknown",
+      created_at: aestTime,
+      data: units
     };
   }
 }

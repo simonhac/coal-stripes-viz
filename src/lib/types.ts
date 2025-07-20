@@ -1,37 +1,42 @@
 // Type definitions for coal stripes visualisation
 import { CalendarDate } from '@internationalized/date';
 
+export interface UnitHistory {
+  start: string;
+  last: string;
+  interval: string;
+  data: (number | null)[];
+}
+
 export interface CoalUnit {
-  code: string;
-  facility_name: string;
-  facility_code: string;
+  network: string;
+  region?: string; // Only present for NEM units
+  data_type: string;
+  units: string;
   capacity: number;
+  duid: string;
+  facility_code: string;
+  facility_name: string;
   fueltech: 'coal_black' | 'coal_brown';
-  data: Record<string, number>; // date string -> energy MWh (for frontend compatibility)
-}
-
-export interface RegionData {
-  name: string;
-  units: CoalUnit[];
-}
-
-export interface Regions {
-  NSW1: RegionData;
-  QLD1: RegionData;
-  VIC1: RegionData;
-  SA1: RegionData;
-  WEM: RegionData;
+  history: UnitHistory;
 }
 
 export interface CoalStripesData {
-  regions: Regions;
-  dates: string[]; // ISO date strings for frontend compatibility
-  actualDateStart: string;
-  actualDateEnd: string;
-  lastGoodDay: string;
-  totalUnits: number;
-  requestedDays: number;
-  actualDays: number;
+  type: "capacity_factors";
+  version: string;
+  created_at: string;
+  data: CoalUnit[];
+}
+
+export interface PartialCoalStripesData extends CoalStripesData {
+  isPartial: true;
+  missingYears: number[];
+  availableYears: number[];
+  missingDateRanges: Array<{
+    start: string;
+    end: string;
+    reason: string;
+  }>;
 }
 
 // Internal interface for coal-data-service (uses CalendarDate internally)
@@ -68,5 +73,5 @@ export interface OpenElectricityFacility {
 export interface OpenElectricityDataRow {
   unit_code: string;
   interval: Date;
-  energy: number;
+  energy: number | null;
 }
