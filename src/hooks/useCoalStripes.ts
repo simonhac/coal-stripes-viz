@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { CoalStripesData, PartialCoalStripesData } from '../lib/types';
 import { SmartCache } from '../lib/smart-cache';
 import { CalendarDate, today } from '@internationalized/date';
+import { perfMonitor } from '../lib/performance-monitor';
 
 interface UseCoalStripesOptions {
   requestDays?: number;
@@ -47,19 +48,24 @@ export function useCoalStripes(options: UseCoalStripesOptions = {}): UseCoalStri
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
+    perfMonitor.start('useCoalStripes_fetchData', { days: requestDays });
     setLoading(true);
     setError(null);
     
     try {
       const url = `/api/coal-stripes?days=${requestDays}`;
-      const response = await fetch(url);
+      const response = await perfMonitor.measureAsync('useCoalStripes_fetch', 
+        async () => await fetch(url)
+      );
       
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP ${response.status}`);
       }
       
-      const result = await response.json();
+      const result = await perfMonitor.measureAsync('useCoalStripes_json', 
+        async () => await response.json()
+      );
       setData(result);
       
     } catch (err) {
@@ -69,6 +75,7 @@ export function useCoalStripes(options: UseCoalStripesOptions = {}): UseCoalStri
       
     } finally {
       setLoading(false);
+      perfMonitor.end('useCoalStripes_fetchData');
     }
   };
 
@@ -124,12 +131,19 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
   const fetchData = async (start: CalendarDate, end: CalendarDate) => {
     if (!smartCacheRef.current) return;
     
+    perfMonitor.start('useCoalStripesRange_fetchData', { 
+      start: start.toString(), 
+      end: end.toString() 
+    });
     setLoading(true);
     setError(null);
     
     try {
       // SmartCache handles EVERYTHING: cache hits, misses, server calls, partial data, preloading
-      const result = await smartCacheRef.current.getDataForDateRange(start, end, true);
+      const result = await perfMonitor.measureAsync('useCoalStripesRange_smartCache', 
+        async () => await smartCacheRef.current!.getDataForDateRange(start, end, true),
+        { start: start.toString(), end: end.toString() }
+      );
       setData(result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
@@ -137,6 +151,7 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
       console.error('Coal stripes range fetch error:', err);
     } finally {
       setLoading(false);
+      perfMonitor.end('useCoalStripesRange_fetchData');
     }
   };
 
@@ -166,6 +181,7 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
   const onDragMove = (clientX: number) => {
     if (!isDragging) return;
     
+    perfMonitor.start('onDragMove');
     const deltaX = clientX - dragStartX.current;
     
     // Calculate accurate pixels per day based on container width and current data
@@ -213,6 +229,7 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
       lastDaysDelta.current = daysDelta;
       
     }
+    perfMonitor.end('onDragMove');
   };
 
   const onDragEnd = () => {

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { CoalUnit } from '../lib/types';
+import { perfMonitor } from '../lib/performance-monitor';
 
 interface StripeCanvasProps {
   unit: CoalUnit;
@@ -107,6 +108,7 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
     };
     
     const handleNativeMouseMove = (e: MouseEvent) => {
+      perfMonitor.start('mouse_move');
       const { unit, dates, onHover } = propsRef.current;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -118,13 +120,16 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
       if (index >= 0 && index < dates.length) {
         // Only call onHover when index changes
         if (lastHoveredIndex.current !== index) {
+          perfMonitor.start('mouse_move_hover_update');
           lastHoveredIndex.current = index;
           // Pass the pixel position and stripe width
           const pixelX = index * stripeWidth + stripeWidth / 2; // Center of stripe
           onHover?.(index, pixelX, stripeWidth);
+          perfMonitor.end('mouse_move_hover_update');
         }
         
         // Update tooltip directly for maximum performance
+        perfMonitor.start('mouse_move_tooltip');
         const capacityFactor = unit.history.data[index];
         
         // Direct DOM manipulation for 60Hz performance
@@ -188,7 +193,9 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
         tooltip.style.transform = transform;
         tooltip.style.display = 'block';
         tooltip.style.opacity = '1';
+        perfMonitor.end('mouse_move_tooltip');
       }
+      perfMonitor.end('mouse_move');
     };
     
     const handleNativeMouseLeave = () => {
@@ -222,7 +229,14 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
     
     // Use requestAnimationFrame to ensure DOM has rendered
     requestAnimationFrame(() => {
+      perfMonitor.start('canvas_draw', { 
+        unit: unit.duid, 
+        dates: dates.length,
+        height 
+      });
+      
       // Get actual width from DOM
+      perfMonitor.start('canvas_setup');
       const rect = canvas.getBoundingClientRect();
       const width = rect.width || canvas.offsetWidth || 1000; // Fallback values
       
@@ -237,9 +251,12 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
       canvas.style.height = `${height + extraHeight}px`;
       canvas.style.marginBottom = `-${extraHeight}px`; // Overlap with next row
       ctx.scale(dpr, dpr);
+      perfMonitor.end('canvas_setup');
       
       // Clear canvas
+      perfMonitor.start('canvas_clear');
       ctx.clearRect(0, 0, width, height);
+      perfMonitor.end('canvas_clear');
       
       // Increment paint counter
       globalPaintCount++;
@@ -248,6 +265,7 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
       }
       
       // Draw each stripe
+      perfMonitor.start('canvas_stripes');
       const stripeWidth = width / dates.length;
       
       dates.forEach((date, index) => {
@@ -261,8 +279,10 @@ export const StripeCanvas: React.FC<StripeCanvasProps> = ({
         const h = height + 2; // Extend beyond canvas height
         ctx.fillRect(Math.floor(x), 0, Math.ceil(w), h);
       });
+      perfMonitor.end('canvas_stripes', { stripeCount: dates.length });
       
       // No hover overlay in initial draw - we'll handle it differently
+      perfMonitor.end('canvas_draw');
     });
   }, [dataKey, unit.history.data.length]);
   

@@ -5,6 +5,7 @@ import { useCoalStripesRange } from '../hooks/useCoalStripes';
 import { CoalUnit } from '../lib/types';
 import { parseDate, today } from '@internationalized/date';
 import { StripeCanvas, setPaintCountCallback } from '../components/StripeCanvas';
+import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import './opennem.css';
 
 // Get color based on capacity factor
@@ -485,6 +486,9 @@ export default function Home() {
 
   return (
     <>
+      {/* Performance Monitor */}
+      <PerformanceDisplay />
+      
       {/* Header - Exact OpenElectricity structure */}
       <header className="bg-white border-b" style={{ borderBottom: '1px dotted #cdcdcd' }}>
         <div className="mx-auto px-4 py-6" style={{ maxWidth: '1200px' }}>

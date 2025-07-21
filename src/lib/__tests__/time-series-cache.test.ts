@@ -1,4 +1,4 @@
-import { TimeSeriesCache, CacheEntry } from '../time-series-cache';
+import { TimeSeriesCache } from '../time-series-cache';
 import { CoalStripesData } from '../types';
 import { parseDate } from '@internationalized/date';
 
@@ -278,8 +278,11 @@ describe('TimeSeriesCache', () => {
       // TimeSeriesCache no longer logs lookup operations - that's handled by SmartCache
       cache.getDataForDateRange(parseDate('2023-06-01'), parseDate('2023-06-30'));
       
-      // Just verify the caching message was called
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
+      // Verify the caching message was called (ignoring performance monitor logs)
+      const cacheLogCalls = consoleSpy.mock.calls.filter(call => 
+        call[0].includes('💾 Cached')
+      );
+      expect(cacheLogCalls).toHaveLength(1);
     });
 
     test('should handle cache misses silently', () => {

@@ -1,6 +1,7 @@
 import { CalendarDate, parseDate, today } from '@internationalized/date';
 import { CoalStripesData, PartialCoalStripesData } from './types';
 import { TimeSeriesCache } from './time-series-cache';
+import { perfMonitor } from './performance-monitor';
 
 /**
  * Smart cache that handles server communication and caching logic
@@ -171,9 +172,17 @@ export class SmartCache {
     isUIRequest: boolean = true
   ): Promise<CoalStripesData | PartialCoalStripesData> {
     const startTime = performance.now();
+    perfMonitor.start('smartCache_getDataForDateRange', {
+      start: start.toString(),
+      end: end.toString(),
+      isUIRequest
+    });
     
     // STEP 1: Check cache first
-    const cachedResult = this.cache.getDataForDateRange(start, end);
+    const cachedResult = perfMonitor.measure('smartCache_cacheCheck', 
+      () => this.cache.getDataForDateRange(start, end)
+    );
+    
     if (cachedResult) {
       const elapsed = Math.round(performance.now() - startTime);
       
@@ -185,6 +194,7 @@ export class SmartCache {
         // Launch background fetch for missing years (don't await)
         this.backgroundFetchMissingYears(cachedResult.missingYears);
         
+        perfMonitor.end('smartCache_getDataForDateRange', { result: 'partial_hit' });
         return cachedResult;
       } else {
         if (isUIRequest) {
@@ -192,9 +202,12 @@ export class SmartCache {
           
           // Auto-detect direction and preload if enabled
           if (this.enablePreloading) {
-            this.autoPreload(start, end);
+            perfMonitor.measure('smartCache_autoPreload', 
+              () => this.autoPreload(start, end)
+            );
           }
         }
+        perfMonitor.end('smartCache_getDataForDateRange', { result: 'full_hit' });
         return cachedResult;
       }
     }
@@ -233,11 +246,16 @@ export class SmartCache {
       if (isUIRequest) {
         console.log(`🔍 Cache lookup: ${start.toString()} → ${end.toString()} ❌❌ complete miss (${elapsed}ms)`);
       }
-      await Promise.all(fetchPromises);
+      await perfMonitor.measureAsync('smartCache_fetchYears', 
+        async () => await Promise.all(fetchPromises),
+        { yearCount: fetchPromises.length }
+      );
     }
     
     // STEP 4: Try cache again after fetch
-    const result = this.cache.getDataForDateRange(start, end);
+    const result = perfMonitor.measure('smartCache_finalCacheCheck', 
+      () => this.cache.getDataForDateRange(start, end)
+    );
     const elapsed = Math.round(performance.now() - startTime);
     
     if (result) {
@@ -245,19 +263,24 @@ export class SmartCache {
         if (isUIRequest) {
           console.log(`📦 Partial result after fetch: ${start.toString()} → ${end.toString()} | ${elapsed}ms | Still missing: ${result.missingYears.join(', ')}`);
         }
+        perfMonitor.end('smartCache_getDataForDateRange', { result: 'partial_after_fetch' });
       } else {
         if (isUIRequest) {
           console.log(`✅ Complete result after fetch: ${start.toString()} → ${end.toString()} | ${elapsed}ms`);
         }
+        perfMonitor.end('smartCache_getDataForDateRange', { result: 'complete_after_fetch' });
       }
       
       // Store this request for direction detection and preload if enabled
       if (isUIRequest && this.enablePreloading) {
-        this.autoPreload(start, end);
+        perfMonitor.measure('smartCache_autoPreload', 
+          () => this.autoPreload(start, end)
+        );
       }
       
       return result;
     } else {
+      perfMonitor.end('smartCache_getDataForDateRange', { result: 'failed' });
       throw new Error(`Failed to retrieve data for range ${start.toString()} → ${end.toString()}`);
     }
   }
