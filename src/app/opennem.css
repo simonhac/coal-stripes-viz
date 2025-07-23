@@ -303,7 +303,7 @@ header a {
 /* Individual stripe rows */
 .opennem-stripe-row {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   border: none;
   min-height: 12px; /* Minimum height, but can be larger based on capacity */
   position: relative;
@@ -341,7 +341,7 @@ header a {
   min-width: 140px;
   max-width: 140px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -352,6 +352,11 @@ header a {
   display: flex;
   position: relative;
   overflow: hidden;
+}
+
+.opennem-stripe-data:focus {
+  outline: 2px solid var(--opennem-primary);
+  outline-offset: -2px;
 }
 
 .opennem-stripe-data-inner {
@@ -377,6 +382,12 @@ header a {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.opennem-facility-canvas {
+  display: block;
+  width: 100%;
+  cursor: pointer;
 }
 
 /* Hover indicator line */

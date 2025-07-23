@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { perfMonitor } from '../lib/performance-monitor';
+import { perfMonitor } from '@/shared/performance-monitor';
 
 export const PerformanceDisplay: React.FC = () => {
   const [fps, setFps] = useState(0);

@@ -9,4 +9,7 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   testTimeout: 60000, // 60 seconds for API calls
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  }
 };

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { CoalStripesData, PartialCoalStripesData } from '../lib/types';
-import { SmartCache } from '../lib/smart-cache';
+import { CoalStripesData, PartialCoalStripesData } from '@/shared/types';
+import { SmartCache } from '@/client/smart-cache';
 import { CalendarDate, today } from '@internationalized/date';
-import { perfMonitor } from '../lib/performance-monitor';
+import { perfMonitor } from '@/shared/performance-monitor';
+import { DRAG_CONFIG } from '@/shared/config';
 
 interface UseCoalStripesOptions {
   requestDays?: number;
@@ -104,7 +105,7 @@ export function useCoalStripes(options: UseCoalStripesOptions = {}): UseCoalStri
 export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): UseCoalStripesRangeResult {
   const { 
     startDate: initialStartDate = today('Australia/Brisbane').subtract({ days: 364 }),
-    endDate: initialEndDate = today('Australia/Brisbane').subtract({ days: 1 }), // Yesterday (avoid partial data)
+    endDate: initialEndDate = today('Australia/Brisbane'),
     autoFetch = true,
     containerWidth = 1200 // Default fallback, should be passed from component
   } = options;
@@ -224,7 +225,7 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
       updateTimeoutRef.current = setTimeout(() => {
         // Just update the date range - the useEffect will handle fetching and preloading
         setDateRange({ start: constrainedStart, end: constrainedEnd });
-      }, 150); // 150ms debounce for smooth updates
+      }, DRAG_CONFIG.DEBOUNCE_DELAY); // Debounce for smooth updates
       
       lastDaysDelta.current = daysDelta;
       

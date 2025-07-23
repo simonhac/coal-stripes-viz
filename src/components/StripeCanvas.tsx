@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { CoalUnit } from '../lib/types';
-import { perfMonitor } from '../lib/performance-monitor';
+import { CoalUnit } from '@/shared/types';
+import { perfMonitor } from '@/shared/performance-monitor';
 
 interface StripeCanvasProps {
   unit: CoalUnit;

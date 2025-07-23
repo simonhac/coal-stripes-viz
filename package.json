@@ -10,6 +10,7 @@
     "test": "jest --config jest.config.unit.js",
     "test:all": "jest",
     "test:integration": "jest --config jest.config.integration.js",
+    "test:performance": "jest --config jest.config.performance.js --verbose",
     "test:watch": "jest --config jest.config.unit.js --watch"
   },
   "dependencies": {

@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesRange } from '../hooks/useCoalStripes';
 import { CoalUnit } from '../lib/types';
 import { parseDate, today } from '@internationalized/date';
-import { StripeCanvas, setPaintCountCallback } from '../components/StripeCanvas';
+import { OptimizedStripeCanvas } from '../components/OptimizedStripeCanvas';
+import { TileViewport } from '../components/TileViewport';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
+import { UI_CONFIG } from '../lib/config';
 import './opennem.css';
 
 // Get color based on capacity factor
@@ -52,7 +54,7 @@ function groupUnitsByRegion(units: CoalUnit[]): RegionGroup[] {
   return Object.values(regions).filter(r => r.units.length > 0);
 }
 
-function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: boolean = false) {
+function getMonthLabels(dates: string[], units: CoalUnit[], data: any, useShortLabels: boolean = false) {
   const monthGroups: Record<string, { 
     dates: string[]; 
     monthYear: string; 
@@ -94,25 +96,54 @@ function getMonthLabels(dates: string[], units: CoalUnit[], useShortLabels: bool
   return Object.entries(monthGroups).map(([monthKey, group]) => {
     const monthLabel = group.shortMonthYear.split(' ')[0]; // Just the month part (Jan, Feb, etc)
     
-    // Calculate average capacity factor for this month across all units
-    let totalCapacityFactor = 0;
-    let dataPoints = 0;
+    // Use pre-calculated monthly averages if available
+    let avgCapacityFactor = null;
     
-    units.forEach(unit => {
-      group.dates.forEach((date) => {
-        // Find the index of this date in the unit's data
-        const dateIndex = dates.indexOf(date);
-        if (dateIndex >= 0 && dateIndex < unit.history.data.length) {
-          const capacityFactor = unit.history.data[dateIndex];
-          if (capacityFactor !== null && capacityFactor !== undefined) {
-            totalCapacityFactor += capacityFactor;
-            dataPoints++;
-          }
+    if (data.monthlyAverages && data.monthlyAverages[monthKey]) {
+      let totalCapacityFactor = 0;
+      let unitCount = 0;
+      
+      units.forEach(unit => {
+        const monthAvg = data.monthlyAverages[monthKey][unit.duid];
+        if (monthAvg !== undefined && monthAvg !== null) {
+          totalCapacityFactor += monthAvg;
+          unitCount++;
         }
       });
-    });
-    
-    const avgCapacityFactor = dataPoints > 0 ? totalCapacityFactor / dataPoints : null;
+      
+      if (unitCount > 0) {
+        avgCapacityFactor = totalCapacityFactor / unitCount;
+      }
+    } else {
+      // Fallback to calculating on the fly if no pre-calculated data
+      let totalCapacityFactor = 0;
+      let dataPoints = 0;
+      
+      units.forEach(unit => {
+        group.dates.forEach((date) => {
+          // Calculate the data index for this date
+          const dataStartDate = unit.history.start;
+          const [year, month, day] = date.split('-').map(Number);
+          const [startYear, startMonth, startDay] = dataStartDate.split('-').map(Number);
+          
+          // Simple day difference calculation
+          const currentTime = new Date(year, month - 1, day).getTime();
+          const startTime = new Date(startYear, startMonth - 1, startDay).getTime();
+          const daysDiff = Math.floor((currentTime - startTime) / (1000 * 60 * 60 * 24));
+          
+          // Get the capacity factor if within data range
+          if (daysDiff >= 0 && daysDiff < unit.history.data.length) {
+            const capacityFactor = unit.history.data[daysDiff];
+            if (capacityFactor !== null && capacityFactor !== undefined) {
+              totalCapacityFactor += capacityFactor;
+              dataPoints++;
+            }
+          }
+        });
+      });
+      
+      avgCapacityFactor = dataPoints > 0 ? totalCapacityFactor / dataPoints : null;
+    }
     
     // Calculate position and width based on actual date positions
     const startPosition = (group.startIndex / totalDates) * 100;
@@ -156,6 +187,8 @@ function formatDateRange(startDate: string, endDate: string): string {
 export default function Home() {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const stripesContainerRef = useRef<HTMLDivElement>(null);
+  const firstFacilityRef = useRef<HTMLDivElement>(null);
+  const [isFirstFacilityFocused, setIsFirstFacilityFocused] = useState(false);
   
   // Calculate container width for accurate drag sensitivity
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -178,6 +211,7 @@ export default function Home() {
   const isMouseOverMonth = useRef(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [paintCount, setPaintCount] = useState(0);
+  
 
   useEffect(() => {
     const handleResize = () => {
@@ -259,6 +293,9 @@ export default function Home() {
         return;
       }
 
+      // Only handle arrow keys if first facility is focused
+      if (!isFirstFacilityFocused) return;
+
       if (!currentDateRange) return;
 
       const isShift = e.shiftKey;
@@ -303,7 +340,7 @@ export default function Home() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentDateRange, setDateRange]);
+  }, [currentDateRange, setDateRange, isFirstFacilityFocused]);
 
   // Clear navigating state when loading completes
   useEffect(() => {
@@ -312,10 +349,6 @@ export default function Home() {
     }
   }, [loading, isNavigating]);
   
-  // Set up paint count callback
-  useEffect(() => {
-    setPaintCountCallback(setPaintCount);
-  }, []);
 
   const updateUnifiedTooltip = (tooltipData: any) => {
     let tooltip = document.getElementById('unified-tooltip');
@@ -468,16 +501,25 @@ export default function Home() {
     );
   }
 
-  // Extract dates from first unit
+  // Calculate dates based on currentDateRange for real-time drag feedback
   const dates: string[] = [];
-  const firstUnit = data.data[0];
-  const startDate = parseDate(firstUnit.history.start);
-  const endDate = parseDate(firstUnit.history.last);
-  
-  let currentDate = startDate;
-  while (currentDate.compare(endDate) <= 0) {
-    dates.push(currentDate.toString());
-    currentDate = currentDate.add({ days: 1 });
+  if (currentDateRange) {
+    let currentDate = currentDateRange.start;
+    while (currentDate.compare(currentDateRange.end) <= 0) {
+      dates.push(currentDate.toString());
+      currentDate = currentDate.add({ days: 1 });
+    }
+  } else if (data.data.length > 0) {
+    // Fallback to data dates if no currentDateRange
+    const firstUnit = data.data[0];
+    const startDate = parseDate(firstUnit.history.start);
+    const endDate = parseDate(firstUnit.history.last);
+    
+    let currentDate = startDate;
+    while (currentDate.compare(endDate) <= 0) {
+      dates.push(currentDate.toString());
+      currentDate = currentDate.add({ days: 1 });
+    }
   }
 
   // Group units by region
@@ -537,21 +579,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Paint Counter */}
-      <div style={{
-        position: 'fixed',
-        top: '10px',
-        right: '10px',
-        background: 'rgba(0, 0, 0, 0.8)',
-        color: 'white',
-        padding: '8px 12px',
-        borderRadius: '4px',
-        fontSize: '12px',
-        fontFamily: 'monospace',
-        zIndex: 1000
-      }}>
-        Canvas paints: {paintCount}
-      </div>
       
       {/* Date Range Header */}
       <div className="opennem-stripes-container">
@@ -575,32 +602,9 @@ export default function Home() {
         >
           <div 
           ref={stripesContainerRef}
-          className="opennem-stripes-viz"
+          className={`opennem-stripes-viz ${isDragging ? 'is-dragging' : ''}`}
           style={{ 
-            cursor: isDragging ? 'grabbing' : 'grab',
             userSelect: 'none'
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // Prevent text selection
-            if (e.detail > 1) {
-              e.preventDefault();
-            }
-            onDragStart(e.clientX);
-          }}
-          onTouchStart={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const touch = e.touches[0];
-            onDragStart(touch.clientX);
-          }}
-          onClick={(e) => {
-            // Prevent any click actions during drag
-            if (isDragging) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
           }}
           onMouseEnter={() => { isMouseOverStripes.current = true; }}
           onMouseOut={(e) => {
@@ -614,7 +618,11 @@ export default function Home() {
             }
           }}
         >
-          {regionsWithData.map((region) => (
+          {regionsWithData.map((region) => {
+            // TEMPORARY: Only render NSW for testing
+            if (region.name !== 'New South Wales') return null;
+            
+            return (
             <div key={region.name} className="opennem-region">
               <div className="opennem-region-header">
                 {region.name}
@@ -629,81 +637,94 @@ export default function Home() {
                     facilities[unit.facility_name].push(unit);
                     return facilities;
                   }, {} as Record<string, CoalUnit[]>)
-                ).map(([facilityName, facilityUnits]) => (
-                  <div key={facilityName} className="opennem-facility-group">
-                    {facilityUnits.map((unit, unitIndex) => {
-                      const minHeight = useShortLabels ? 16 : 12; // Minimum 16px on mobile for text overlay
-                      const rowHeight = Math.max(minHeight, Math.min(40, unit.capacity / 30));
-                      
-                      return (
-                        <div 
-                          key={unit.duid} 
-                          className="opennem-stripe-row"
-                          style={{ 
-                            height: `${rowHeight}px`,
-                            marginBottom: '-1px' // Overlap rows to prevent hairlines
-                          }}
-                        >
-                          <div className="opennem-facility-label">
-                            {unitIndex === 0 && !useShortLabels ? facilityName : ''}
-                          </div>
-                          <div className="opennem-stripe-data">
-                            <div className="opennem-stripe-data-inner">
-                              {/* Mobile facility name overlay on first unit */}
-                              {unitIndex === 0 && useShortLabels && (
-                                <div className="opennem-mobile-facility-overlay">
-                                  {facilityName}
-                                </div>
-                              )}
-                              
-                              <StripeCanvas
-                                unit={unit}
-                                dates={dates}
-                                height={rowHeight}
-                                onHover={(dateIndex, pixelX, stripeWidth) => {
-                                  // Don't update React state on every mouse move for performance
-                                  // Just update the hover line directly
-                                  if (dateIndex !== null && pixelX !== undefined && stripeWidth !== undefined) {
-                                    const hoverLines = document.querySelectorAll('.opennem-hover-line');
-                                    hoverLines.forEach(line => {
-                                      const lineElement = line as HTMLElement;
-                                      // Use pixel positioning for accurate alignment
-                                      lineElement.style.left = `${pixelX - stripeWidth / 2}px`;
-                                      lineElement.style.width = `${stripeWidth}px`;
-                                      lineElement.style.display = 'block';
-                                    });
-                                  } else {
-                                    const hoverLines = document.querySelectorAll('.opennem-hover-line');
-                                    hoverLines.forEach(line => {
-                                      (line as HTMLElement).style.display = 'none';
-                                    });
-                                  }
-                                }}
-                              />
-                              
-                              {/* Red vertical line on hover */}
-                              <div
-                                className="opennem-hover-line"
-                                style={{
-                                  display: 'none',
-                                  position: 'absolute',
-                                  top: 0,
-                                  bottom: 0,
-                                  pointerEvents: 'none'
-                                }}
-                              />
-                            </div>
-                          </div>
+                ).map(([facilityName, facilityUnits], facilityIndex) => {
+                  // Check if this is the very first facility
+                  const isFirstFacility = region.name === regionsWithData[0].name && facilityIndex === 0;
+                  
+                  // Only render the first facility for testing
+                  if (!isFirstFacility) return null;
+                  
+                  // Calculate row heights for all units in this facility
+                  const rowHeights = facilityUnits.map(unit => {
+                    const minHeight = useShortLabels ? 16 : 12;
+                    return Math.max(minHeight, Math.min(40, unit.capacity / 30));
+                  });
+                  
+                  return (
+                    <div key={facilityName} className="opennem-facility-group">
+                      <div className="opennem-stripe-row" style={{ display: 'flex' }}>
+                        <div className="opennem-facility-label">
+                          {!useShortLabels ? facilityName : ''}
                         </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                        <div 
+                          ref={isFirstFacility ? firstFacilityRef : undefined}
+                          className="opennem-stripe-data"
+                          tabIndex={isFirstFacility ? 0 : undefined}
+                          style={isFirstFacility ? { cursor: isDragging ? 'grabbing' : 'grab' } : {}}
+                          onFocus={isFirstFacility ? () => setIsFirstFacilityFocused(true) : undefined}
+                          onBlur={isFirstFacility ? () => setIsFirstFacilityFocused(false) : undefined}
+                          onMouseDown={isFirstFacility ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (e.detail > 1) {
+                            e.preventDefault();
+                          }
+                          // Focus the element when clicking
+                          if (firstFacilityRef.current) {
+                            firstFacilityRef.current.focus();
+                          }
+                          onDragStart(e.clientX);
+                        } : undefined}
+                        onTouchStart={isFirstFacility ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const touch = e.touches[0];
+                          onDragStart(touch.clientX);
+                        } : undefined}
+                      >
+                        <div className="opennem-stripe-data-inner">
+                          {/* Mobile facility name overlay */}
+                          {useShortLabels && (
+                            <div className="opennem-mobile-facility-overlay">
+                              {facilityName}
+                            </div>
+                          )}
+                          
+                          {currentDateRange && (
+                            <TileViewport
+                              facilityName={facilityName}
+                              units={facilityUnits}
+                              dates={dates}
+                              unitHeights={rowHeights}
+                              startYear={currentDateRange.start.year}
+                              endYear={currentDateRange.end.year}
+                            />
+                          )}
+                          
+                          {/* Red vertical line on hover - only for first facility */}
+                          {isFirstFacility && (
+                            <div
+                              className="opennem-hover-line"
+                              style={{
+                                display: 'none',
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                pointerEvents: 'none'
+                              }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                      </div>
+                    </div>
+                  );
+                })}
                 
                 {/* X-axis with month labels */}
                 <div className="opennem-region-x-axis">
                   <div className="opennem-region-x-axis-inner">
-                    {getMonthLabels(dates, region.units, useShortLabels).map((month) => (
+                    {getMonthLabels(dates, region.units, data, useShortLabels).map((month) => (
                       <div
                         key={month.monthYear}
                         className="opennem-month-label"
@@ -738,7 +759,8 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {/* Partial data warning */}

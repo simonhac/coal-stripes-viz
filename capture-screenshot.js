@@ -14,8 +14,8 @@ async function captureScreenshot() {
     
     const page = await browser.newPage();
     
-    console.log('📱 Navigating to http://localhost:3000...');
-    await page.goto('http://localhost:3000', { 
+    console.log('📱 Navigating to http://localhost:3003...');
+    await page.goto('http://localhost:3003', { 
       waitUntil: 'networkidle0',
       timeout: 60000 
     });
