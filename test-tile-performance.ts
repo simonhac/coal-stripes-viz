@@ -1,5 +1,5 @@
-import { Tile } from './src/lib/tile-system/Tile';
-import { TileData } from './src/lib/tile-system/types';
+import { Tile } from './src/client/tile-system/Tile';
+import { TileData } from './src/client/tile-system/types';
 
 // Mock data for testing
 function generateMockTileData(facilityName: string, year: number): TileData {

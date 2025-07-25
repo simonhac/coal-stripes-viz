@@ -215,15 +215,7 @@ export class CapFacCache {
    * Get cache statistics
    */
   getCacheStats() {
-    const stats = this.cache.getStats();
-    // Extract years from labels and convert to expected format
-    const cachedYears = stats.labels.map(label => parseInt(label)).filter(year => !isNaN(year)).sort();
-    
-    return {
-      yearCount: stats.numItems,
-      totalMB: stats.totalKB / 1024,
-      cachedYears
-    };
+    return this.cache.getStats();
   }
   
   /**

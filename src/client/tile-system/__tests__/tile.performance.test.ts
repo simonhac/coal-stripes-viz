@@ -64,41 +64,74 @@ describe('Tile Performance Test', () => {
         if (!yearCache.has(year)) {
           // Simulate fetching year data
           const yearData: GeneratingUnitCapFacHistoryDTO = {
+            type: 'capacity_factors' as const,
+            version: '1.0',
+            created_at: new Date().toISOString(),
             data: [{
-              facility_name: facilityName,
-              duid: 'ER01',
+              network: 'NEM',
+              region: 'NSW1',
+              data_type: 'capacity_factor',
+              units: 'MW',
               capacity: 720,
+              duid: 'ER01',
+              facility_code: 'ERARING',
+              facility_name: facilityName,
+              fueltech: 'black_coal',
               history: {
+                start: `${year}-01-01`,
+                last: `${year}-12-31`,
+                interval: '1D',
                 data: generateMockTileData(facilityName, year).units[0].data
               }
             }, {
-              facility_name: facilityName,
-              duid: 'ER02',
+              network: 'NEM',
+              region: 'NSW1',
+              data_type: 'capacity_factor',
+              units: 'MW',
               capacity: 720,
+              duid: 'ER02',
+              facility_code: 'ERARING',
+              facility_name: facilityName,
+              fueltech: 'black_coal',
               history: {
+                start: `${year}-01-01`,
+                last: `${year}-12-31`,
+                interval: '1D',
                 data: generateMockTileData(facilityName, year).units[1].data
               }
             }, {
-              facility_name: facilityName,
-              duid: 'ER03',
+              network: 'NEM',
+              region: 'NSW1',
+              data_type: 'capacity_factor',
+              units: 'MW',
               capacity: 720,
+              duid: 'ER03',
+              facility_code: 'ERARING',
+              facility_name: facilityName,
+              fueltech: 'black_coal',
               history: {
+                start: `${year}-01-01`,
+                last: `${year}-12-31`,
+                interval: '1D',
                 data: generateMockTileData(facilityName, year).units[2].data
               }
             }, {
-              facility_name: facilityName,
-              duid: 'ER04',
+              network: 'NEM',
+              region: 'NSW1',
+              data_type: 'capacity_factor',
+              units: 'MW',
               capacity: 720,
+              duid: 'ER04',
+              facility_code: 'ERARING',
+              facility_name: facilityName,
+              fueltech: 'black_coal',
               history: {
+                start: `${year}-01-01`,
+                last: `${year}-12-31`,
+                interval: '1D',
                 data: generateMockTileData(facilityName, year).units[3].data
               }
-            }],
-            metadata: {
-              start_date: `${year}-01-01`,
-              end_date: `${year}-12-31`,
-              version: '1.0',
-              created_at: new Date().toISOString()
-            }
+            }]
           };
           yearCache.set(year, yearData);
         }

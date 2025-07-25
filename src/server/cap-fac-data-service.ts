@@ -430,7 +430,7 @@ export class CapFacDataService {
 /**
  * Get or create a singleton instance of CoalDataService
  */
-export async function getCoalDataService(): Promise<CoalDataService> {
+export async function getCoalDataService(): Promise<CapFacDataService> {
   const apiKey = process.env.OPENELECTRICITY_API_KEY;
   if (!apiKey) {
     throw new Error('OPENELECTRICITY_API_KEY environment variable is not set');

@@ -9,7 +9,7 @@ import { OptimizedStripeCanvas } from '../components/OptimizedStripeCanvas';
 import { TileViewport } from '../components/TileViewport';
 import { TileManager } from '../client/tile-system/TileManager';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
-import { UI_CONFIG } from '../lib/config';
+import { UI_CONFIG } from '@/shared/config';
 import './opennem.css';
 
 // Get color based on capacity factor
@@ -201,8 +201,6 @@ export default function Home() {
     data, 
     loading, 
     error, 
-    isPartial, 
-    missingYears,
     currentDateRange,
     isDragging,
     onDragStart,

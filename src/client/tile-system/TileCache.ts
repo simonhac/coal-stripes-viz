@@ -65,6 +65,10 @@ export class TileCache {
       yearList: Array.from(years)
     };
   }
+  
+  getCacheStats(): CacheStats {
+    return this.cache.getStats();
+  }
 
 }
 

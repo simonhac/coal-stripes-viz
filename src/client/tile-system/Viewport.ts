@@ -108,8 +108,8 @@ export class Viewport {
     const endDate = startDate.add({ days: visibleDays });
     
     return {
-      startDate: startDate.toDate(),
-      endDate: endDate.toDate(),
+      startDate: startDate.toDate('Australia/Brisbane'),
+      endDate: endDate.toDate('Australia/Brisbane'),
       width: this.config.containerWidth,
       height: this.config.containerHeight,
       pixelsPerDay

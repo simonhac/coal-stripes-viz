@@ -50,29 +50,29 @@ describe('Cache Performance Tests', () => {
       }
       
       units.push({
-        facility_name: `Facility ${Math.floor(i / 4)}`,
-        facility_id: `facility-${Math.floor(i / 4)}`,
-        duid: `UNIT${i.toString().padStart(3, '0')}`,
+        network: 'NEM',
+        region: 'NSW1',
+        data_type: 'capacity_factor',
+        units: 'MW',
         capacity: 660 + (i % 4) * 60, // 660-840 MW
-        fuel_source_descriptor: 'Black Coal',
-        commissioned_date: '2000-01-01',
-        decommissioned_date: null,
-        latest_carbon_intensity: 0.85 + (i % 10) * 0.01,
+        duid: `UNIT${i.toString().padStart(3, '0')}`,
+        facility_code: `FAC${Math.floor(i / 4)}`,
+        facility_name: `Facility ${Math.floor(i / 4)}`,
+        fueltech: 'black_coal',
         history: {
           start: startDate,
+          last: endDate,
+          interval: '1D',
           data: unitData
         }
       });
     }
     
     return {
-      data: units,
-      metadata: {
-        start_date: startDate,
-        end_date: endDate,
-        version: '1.0',
-        created_at: new Date().toISOString()
-      }
+      type: 'capacity_factors' as const,
+      version: '1.0',
+      created_at: new Date().toISOString(),
+      data: units
     };
   };
 
@@ -178,7 +178,7 @@ describe('Cache Performance Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       const stats = capFacCache.getCacheStats();
-      console.log(`📦 Final cache: ${stats.yearCount} years, ${stats.totalMB.toFixed(2)}MB`);
+      console.log(`📦 Final cache: ${stats.numItems} years, ${(stats.totalKB / 1024).toFixed(2)}MB`);
       
       // Cache hits should be very fast
       expect(avgCache).toBeLessThan(1);

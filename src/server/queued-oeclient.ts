@@ -78,7 +78,7 @@ export class OEClientQueued {
     const url = `/data/facilities/${networkCode}?${queryParams.toString()}`;
     
     return this.requestQueue.add({
-      execute: () => this.client.getFacilityData(networkCode, facilityCodes, metrics, params),
+      execute: () => this.client.getFacilityData(networkCode, facilityCodes, metrics as any, params),
       priority: 0, // High priority for data requests
       method: 'GET',
       url,
@@ -100,7 +100,7 @@ export class OEClientQueued {
     params: any
   ): Promise<any> {
     return this.requestQueue.add({
-      execute: () => this.client.getNetworkData(networkCode, metrics, params),
+      execute: () => this.client.getNetworkData(networkCode, metrics as any, params),
       priority: 0, // High priority for data requests
       method: 'GET',
       url: `/data/network/${networkCode}`,

@@ -1672,3 +1672,5 @@ https://nextjs.org/docs/messages/module-not-found
 
 
  ✓ Compiled in 20ms
+ ✓ Compiled instrumentation Node.js in 3ms
+ ✓ Compiled instrumentation Edge in 0ms

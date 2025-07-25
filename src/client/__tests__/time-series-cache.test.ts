@@ -15,42 +15,45 @@ describe('TimeSeriesCache', () => {
     });
     
     return {
+      type: 'capacity_factors' as const,
+      version: '1.0',
+      created_at: new Date().toISOString(),
       data: [
         {
-          facility_name: 'Eraring',
-          facility_id: 'eraring-1',
-          duid: 'ER01',
+          network: 'NEM',
+          region: 'NSW1',
+          data_type: 'capacity_factor',
+          units: 'MW',
           capacity: 720,
-          fuel_source_descriptor: 'Black Coal',
-          commissioned_date: '1982-08-01',
-          decommissioned_date: null,
-          latest_carbon_intensity: 0.9,
+          duid: 'ER01',
+          facility_code: 'ERARING',
+          facility_name: 'Eraring',
+          fueltech: 'black_coal',
           history: {
             start: `${year}-01-01`,
+            last: `${year}-12-31`,
+            interval: '1D',
             data: mockData
           }
         },
         {
-          facility_name: 'Bayswater',
-          facility_id: 'bayswater-1',
-          duid: 'BW01',
+          network: 'NEM',
+          region: 'NSW1',
+          data_type: 'capacity_factor',
+          units: 'MW',
           capacity: 660,
-          fuel_source_descriptor: 'Black Coal',
-          commissioned_date: '1985-11-01',
-          decommissioned_date: null,
-          latest_carbon_intensity: 0.91,
+          duid: 'BW01',
+          facility_code: 'BAYSWATER',
+          facility_name: 'Bayswater',
+          fueltech: 'black_coal',
           history: {
             start: `${year}-01-01`,
+            last: `${year}-12-31`,
+            interval: '1D',
             data: mockData.map(v => v !== null ? v * 0.9 : null)
           }
         }
-      ],
-      metadata: {
-        start_date: `${year}-01-01`,
-        end_date: `${year}-12-31`,
-        version: '1.0',
-        created_at: new Date().toISOString()
-      }
+      ]
     };
   };
 

@@ -7,7 +7,7 @@ import { CapFacCache } from '@/client/cap-fac-cache';
 import { CACHE_CONFIG } from '@/shared/config';
 
 export default function TilesTestPage() {
-  const [tiles, setTiles] = useState<Map<string, HTMLCanvasElement | null>>(new Map());
+  const [tiles, setTiles] = useState<Map<string, HTMLCanvasElement | OffscreenCanvas | null>>(new Map());
   const [loading, setLoading] = useState<Set<string>>(new Set());
   const [renderTime, setRenderTime] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export default function TilesTestPage() {
     setLoading(newLoading);
 
     // Fetch data and render tiles
-    const newTiles = new Map<string, HTMLCanvasElement | null>();
+    const newTiles = new Map<string, HTMLCanvasElement | OffscreenCanvas | null>();
     
     for (const year of years) {
       const tileKey: TileKey = { facilityName, year };
@@ -204,14 +204,14 @@ export default function TilesTestPage() {
         container.innerHTML = '';
         
         // Check if it's an OffscreenCanvas or HTMLCanvasElement
-        if ('cloneNode' in canvas) {
+        if (canvas instanceof HTMLCanvasElement) {
           // HTMLCanvasElement - can be cloned
           const clonedCanvas = canvas.cloneNode(true) as HTMLCanvasElement;
           clonedCanvas.style.width = '100%';
           clonedCanvas.style.height = '100%';
           clonedCanvas.style.display = 'block';
           container.appendChild(clonedCanvas);
-        } else {
+        } else if (canvas instanceof OffscreenCanvas) {
           // OffscreenCanvas - need to create a new canvas and copy content
           const newCanvas = document.createElement('canvas');
           newCanvas.width = canvas.width;

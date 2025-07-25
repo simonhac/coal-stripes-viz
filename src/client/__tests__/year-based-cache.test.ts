@@ -14,29 +14,29 @@ describe('Year-based Cache Tests', () => {
     const daysInYear = isLeapYear ? 366 : 365;
     
     return {
+      type: 'capacity_factors' as const,
+      version: '1.0',
+      created_at: new Date().toISOString(),
       data: [{
-        facility_name: 'Test Facility',
-        facility_id: 'test-1',
-        duid: 'TEST01',
+        network: 'NEM',
+        region: 'NSW1',
+        data_type: 'capacity_factor',
+        units: 'MW',
         capacity: 720,
-        fuel_source_descriptor: 'Black Coal',
-        commissioned_date: '2000-01-01',
-        decommissioned_date: null,
-        latest_carbon_intensity: 0.9,
+        duid: 'TEST01',
+        facility_code: 'TESTFAC',
+        facility_name: 'Test Facility',
+        fueltech: 'black_coal',
         history: {
           start: `${year}-01-01`,
+          last: `${year}-12-31`,
+          interval: '1D',
           data: new Array(daysInYear).fill(null).map((_, i) => {
             // Generate realistic capacity factors
             return Math.round((70 + Math.sin(i / 30) * 20) * 10) / 10;
           })
         }
-      }],
-      metadata: {
-        start_date: `${year}-01-01`,
-        end_date: `${year}-12-31`,
-        version: '1.0',
-        created_at: new Date().toISOString()
-      }
+      }]
     };
   };
   
@@ -128,8 +128,9 @@ describe('Year-based Cache Tests', () => {
     await smallCache.getYearData(2023);
     
     const stats = smallCache.getCacheStats();
-    expect(stats.yearCount).toBe(2);
-    expect(stats.cachedYears).not.toContain(2021); // 2021 should be evicted
+    expect(stats.numItems).toBe(2);
+    const cachedYears = stats.labels.map(label => parseInt(label)).filter(year => !isNaN(year));
+    expect(cachedYears).not.toContain(2021); // 2021 should be evicted
     
     smallCache.clear();
   });
@@ -145,8 +146,9 @@ describe('Year-based Cache Tests', () => {
     }
     
     const stats = capFacCache.getCacheStats();
-    expect(stats.yearCount).toBe(3);
-    expect(stats.cachedYears).toEqual([2020, 2021, 2022]);
-    expect(stats.totalMB).toBeGreaterThan(0);
+    expect(stats.numItems).toBe(3);
+    const cachedYears = stats.labels.map(label => parseInt(label)).filter(year => !isNaN(year)).sort();
+    expect(cachedYears).toEqual([2020, 2021, 2022]);
+    expect(stats.totalKB / 1024).toBeGreaterThan(0);
   });
 });

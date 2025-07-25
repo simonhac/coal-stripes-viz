@@ -11,7 +11,13 @@ export function TileTest() {
     tile: string;
     time: number;
   }>>([]);
-  const [cacheStats, setCacheStats] = useState({ count: 0, totalMB: 0 });
+  const [cacheStats, setCacheStats] = useState({ 
+    tiles: 0, 
+    tileMemoryMB: 0, 
+    years: 0, 
+    yearMemoryMB: 0, 
+    cachedYears: [] as number[] 
+  });
 
   useEffect(() => {
     if (!tileManagerRef.current) {
@@ -113,7 +119,7 @@ export function TileTest() {
           ))}
         </ul>
         <p>
-          Cache: {cacheStats.count} tiles, {cacheStats.totalMB.toFixed(1)}MB
+          Cache: {cacheStats.tiles} tiles ({cacheStats.tileMemoryMB.toFixed(1)}MB), {cacheStats.years} years ({cacheStats.yearMemoryMB.toFixed(1)}MB)
         </p>
       </div>
 

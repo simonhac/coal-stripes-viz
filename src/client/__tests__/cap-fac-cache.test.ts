@@ -112,13 +112,13 @@ describe('CapFacCache Architecture', () => {
       resolveResponse = resolve;
     });
     
-    (global.fetch as jest.MockedFunction<typeof fetch>).mockReturnValueOnce({
+    (global.fetch as jest.MockedFunction<typeof fetch>).mockReturnValueOnce(Promise.resolve({
       ok: true,
       json: async () => {
         await responsePromise;
         return mockData;
       }
-    } as Response);
+    } as Response));
     
     // Start two requests before the first completes
     const promise1 = capFacCache.getYearData(2023);
@@ -215,9 +215,10 @@ describe('CapFacCache Architecture', () => {
     await capFacCache.getYearData(2023);
     
     const stats = capFacCache.getCacheStats();
-    expect(stats.yearCount).toBe(2);
-    expect(stats.cachedYears).toEqual([2022, 2023]);
-    expect(stats.totalMB).toBeGreaterThan(0);
+    expect(stats.numItems).toBe(2);
+    const cachedYears = stats.labels.map(label => parseInt(label)).filter(year => !isNaN(year)).sort();
+    expect(cachedYears).toEqual([2022, 2023]);
+    expect(stats.totalKB / 1024).toBeGreaterThan(0);
   });
 
   test('should clear cache on demand', async () => {
@@ -234,6 +235,6 @@ describe('CapFacCache Architecture', () => {
     expect(capFacCache.hasYear(2023)).toBe(false);
     
     const stats = capFacCache.getCacheStats();
-    expect(stats.yearCount).toBe(0);
+    expect(stats.numItems).toBe(0);
   });
 });
