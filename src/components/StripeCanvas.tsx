@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { CoalUnit } from '@/shared/types';
+import { GeneratingUnitDTO } from '@/shared/types';
 import { perfMonitor } from '@/shared/performance-monitor';
 
 interface StripeCanvasProps {
-  unit: CoalUnit;
+  unit: GeneratingUnitDTO;
   dates: string[];
   height: number;
   onHover?: (dateIndex: number | null, pixelX?: number, stripeWidth?: number) => void;

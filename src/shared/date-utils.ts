@@ -19,31 +19,6 @@ export function getDaysBetween(start: CalendarDate, end: CalendarDate): number {
 }
 
 /**
- * Get a date/time in AEST timezone format without milliseconds
- * Format: YYYY-MM-DDTHH:mm:ss+10:00
- * 
- * @param date The date to convert (defaults to current time)
- * @returns ISO 8601 formatted string with AEST timezone offset
- */
-export function getAESTDateTimeString(date: Date = new Date()): string {
-  // fromDate should interpret the Date object as UTC
-  const utcDateTime = fromDate(date, 'UTC');
-  // Then convert to AEST
-  const aestTime = toZoned(utcDateTime, 'Australia/Brisbane');
-  
-  // Format manually to ensure we get the right format
-  const year = aestTime.year;
-  const month = String(aestTime.month).padStart(2, '0');
-  const day = String(aestTime.day).padStart(2, '0');
-  const hour = String(aestTime.hour).padStart(2, '0');
-  const minute = String(aestTime.minute).padStart(2, '0');
-  const second = String(aestTime.second).padStart(2, '0');
-  
-  // AEST is always +10:00 (Brisbane doesn't observe DST)
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}+10:00`;
-}
-
-/**
  * Get the day index within a year (0-based)
  * January 1st is day 0, December 31st is day 364 (or 365 in leap years)
  * 
@@ -168,3 +143,28 @@ export function parseAESTDateString(dateStr: string): CalendarDate {
   );
 }
 
+/**
+ * Get a date/time in AEST timezone format without milliseconds
+ * Format: YYYY-MM-DDTHH:mm:ss+10:00
+ * 
+ * @param date The date to convert (defaults to current time)
+ * @returns ISO 8601 formatted string with AEST timezone offset
+ */
+export function getAESTDateTimeString(date: Date = new Date()): string {
+  // fromDate should interpret the Date object as UTC
+  const utcDateTime = fromDate(date, 'UTC');
+
+  // Then convert to AEST (Brisbane doesn't observe DST)
+  const aestTime = toZoned(utcDateTime, 'Australia/Brisbane');
+  
+  // Format manually to ensure we get the right format
+  const year = aestTime.year;
+  const month = String(aestTime.month).padStart(2, '0');
+  const day = String(aestTime.day).padStart(2, '0');
+  const hour = String(aestTime.hour).padStart(2, '0');
+  const minute = String(aestTime.minute).padStart(2, '0');
+  const second = String(aestTime.second).padStart(2, '0');
+  
+  // AEST is always +10:00
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}+10:00`;
+}

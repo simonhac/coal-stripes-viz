@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, memo, useMemo } from 'react';
-import { CoalUnit } from '@/shared/types';
+import { GeneratingUnitDTO } from '@/shared/types';
 import { perfMonitor } from '@/shared/performance-monitor';
 
 interface FacilityCanvasProps {
   facilityName: string;
-  units: CoalUnit[];
+  units: GeneratingUnitDTO[];
   dates: string[];
   rowHeights: number[]; // Height for each unit
   useShortLabels: boolean;

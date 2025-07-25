@@ -1,5 +1,11 @@
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { parseDate } from '@internationalized/date';
+import { setupTestLogger } from '../test-helpers';
+
+// Initialize logger for tests
+beforeAll(() => {
+  setupTestLogger();
+});
 
 // Mock the OpenElectricityClient
 jest.mock('openelectricity', () => ({
@@ -56,12 +62,12 @@ jest.mock('openelectricity', () => ({
   }))
 }));
 
-describe('CoalDataService - Year-based Fetching', () => {
-  let service: CoalDataService;
+describe('CapFacDataService - Year-based Fetching', () => {
+  let service: CapFacDataService;
   let consoleSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    service = new CoalDataService('test-api-key');
+    service = new CapFacDataService('test-api-key');
     consoleSpy = jest.spyOn(console, 'log').mockImplementation();
   });
 

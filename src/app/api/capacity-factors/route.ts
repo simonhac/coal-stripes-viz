@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server';
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { isLeapYear } from '@/shared/date-utils';
+import { initializeRequestLogger } from '@/server/request-logger';
+
+// Initialize logger for API routes
+const port = parseInt(process.env.PORT || '3000');
+initializeRequestLogger(port);
 
 // Create a singleton instance of the service to avoid creating multiple API clients
-let serviceInstance: CoalDataService | null = null;
+let serviceInstance: CapFacDataService | null = null;
 
-function getService(): CoalDataService {
+function getService(): CapFacDataService {
   if (!serviceInstance) {
     const apiKey = process.env.OPENELECTRICITY_API_KEY;
     if (!apiKey) {
       throw new Error('API key not configured');
     }
-    serviceInstance = new CoalDataService(apiKey);
+    serviceInstance = new CapFacDataService(apiKey);
   }
   return serviceInstance;
 }

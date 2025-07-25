@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { CoalStripesData, PartialCoalStripesData } from '@/shared/types';
-import { SmartCache } from '@/client/smart-cache';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
+import { CapFacCache, capFacCache } from '@/client/cap-fac-cache';
 import { CalendarDate, today } from '@internationalized/date';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { DRAG_CONFIG } from '@/shared/config';
@@ -11,7 +11,7 @@ interface UseCoalStripesOptions {
 }
 
 interface UseCoalStripesResult {
-  data: CoalStripesData | null;
+  data: GeneratingUnitCapFacHistoryDTO | null;
   loading: boolean;
   error: string | null;
   refetch: () => void;
@@ -25,11 +25,9 @@ interface UseCoalStripesRangeOptions {
 }
 
 interface UseCoalStripesRangeResult {
-  data: CoalStripesData | PartialCoalStripesData | null;
+  data: GeneratingUnitCapFacHistoryDTO | null;
   loading: boolean;
   error: string | null;
-  isPartial: boolean;
-  missingYears: number[];
   refetch: () => void;
   setDateRange: (start: CalendarDate, end: CalendarDate, direction?: 'forward' | 'backward') => void;
   // Current date range being displayed
@@ -44,7 +42,7 @@ interface UseCoalStripesRangeResult {
 export function useCoalStripes(options: UseCoalStripesOptions = {}): UseCoalStripesResult {
   const { requestDays = 365, autoFetch = true } = options;
   
-  const [data, setData] = useState<CoalStripesData | null>(null);
+  const [data, setData] = useState<GeneratingUnitCapFacHistoryDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,13 +102,13 @@ export function useCoalStripes(options: UseCoalStripesOptions = {}): UseCoalStri
  */
 export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): UseCoalStripesRangeResult {
   const { 
-    startDate: initialStartDate = today('Australia/Brisbane').subtract({ days: 364 }),
-    endDate: initialEndDate = today('Australia/Brisbane'),
+    startDate: initialStartDate = today('Australia/Brisbane').subtract({ days: 365 }),
+    endDate: initialEndDate = today('Australia/Brisbane').subtract({ days: 1 }),
     autoFetch = true,
     containerWidth = 1200 // Default fallback, should be passed from component
   } = options;
   
-  const [data, setData] = useState<CoalStripesData | PartialCoalStripesData | null>(null);
+  const [data, setData] = useState<GeneratingUnitCapFacHistoryDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({ start: initialStartDate, end: initialEndDate });
@@ -123,14 +121,11 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
   const lastDaysDelta = useRef<number>(0);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Create SmartCache instance (only once) - this is our ONLY interface to data
-  const smartCacheRef = useRef<SmartCache | null>(null);
-  if (!smartCacheRef.current) {
-    smartCacheRef.current = new SmartCache(10); // Max 10 year chunks for better performance
-  }
+  // Use singleton SmartCache instance - this is our ONLY interface to data
+  const capFacCacheRef = useRef<CapFacCache>(capFacCache);
 
   const fetchData = async (start: CalendarDate, end: CalendarDate) => {
-    if (!smartCacheRef.current) return;
+    if (!capFacCacheRef.current) return;
     
     perfMonitor.start('useCoalStripesRange_fetchData', { 
       start: start.toString(), 
@@ -141,8 +136,8 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
     
     try {
       // SmartCache handles EVERYTHING: cache hits, misses, server calls, partial data, preloading
-      const result = await perfMonitor.measureAsync('useCoalStripesRange_smartCache', 
-        async () => await smartCacheRef.current!.getDataForDateRange(start, end, true),
+      const result = await perfMonitor.measureAsync('useCoalStripesRange_capFacCache', 
+        async () => await capFacCacheRef.current!.getDataForDateRange(start, end, true),
         { start: start.toString(), end: end.toString() }
       );
       setData(result);
@@ -265,9 +260,9 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
   
   // Subscribe to background updates
   useEffect(() => {
-    if (!smartCacheRef.current) return;
+    if (!capFacCacheRef.current) return;
     
-    const unsubscribe = smartCacheRef.current.onBackgroundUpdate((year) => {
+    const unsubscribe = capFacCacheRef.current.onBackgroundUpdate((year) => {
       // Refetch the current date range to get the updated data
       fetchData(dateRange.start, dateRange.end);
     });
@@ -276,15 +271,11 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
   }, [dateRange.start, dateRange.end]);
 
   // Compute derived state
-  const isPartial = data ? 'isPartial' in data && data.isPartial : false;
-  const missingYears = data && 'missingYears' in data ? data.missingYears : [];
 
   return {
     data,
     loading,
     error,
-    isPartial,
-    missingYears,
     refetch,
     setDateRange: setDateRangeAndFetch,
     currentDateRange: visualDateRange, // Use visual date range for display

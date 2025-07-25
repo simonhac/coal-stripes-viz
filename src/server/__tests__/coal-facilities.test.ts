@@ -1,15 +1,19 @@
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
+import { setupTestLogger } from '../test-helpers';
 
-describe('CoalDataService - Facility Filtering', () => {
-  let service: CoalDataService;
+describe('CapFacDataService - Facility Filtering', () => {
+  let service: CapFacDataService;
 
   beforeAll(() => {
+    // Initialize logger for tests
+    setupTestLogger();
+    
     // Use environment variable for API key
     const apiKey = process.env.OPENELECTRICITY_API_KEY;
     if (!apiKey) {
       throw new Error('OPENELECTRICITY_API_KEY environment variable is required for tests');
     }
-    service = new CoalDataService(apiKey);
+    service = new CapFacDataService(apiKey);
   });
 
   afterAll(async () => {

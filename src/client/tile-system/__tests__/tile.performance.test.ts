@@ -1,7 +1,7 @@
 import { Tile } from '../Tile';
 import { TileData } from '../types';
 import { YearDataCache } from '../YearDataCache';
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 function generateMockTileData(facilityName: string, year: number): TileData {
   const daysInYear = year % 4 === 0 ? 366 : 365;
@@ -63,7 +63,7 @@ describe('Tile Performance Test', () => {
         // Simulate year data caching behavior
         if (!yearCache.has(year)) {
           // Simulate fetching year data
-          const yearData: CoalStripesData = {
+          const yearData: GeneratingUnitCapFacHistoryDTO = {
             data: [{
               facility_name: facilityName,
               duid: 'ER01',

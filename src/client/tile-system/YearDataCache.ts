@@ -1,8 +1,8 @@
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 interface CacheEntry {
   year: number;
-  data: CoalStripesData;
+  data: GeneratingUnitCapFacHistoryDTO;
   size: number; // bytes
   lastAccessed: number;
 }
@@ -20,7 +20,7 @@ export class YearDataCache {
   /**
    * Store data for a specific year
    */
-  set(year: number, data: CoalStripesData): void {
+  set(year: number, data: GeneratingUnitCapFacHistoryDTO): void {
     // Remove from access order if exists
     const index = this.accessOrder.indexOf(year);
     if (index > -1) {
@@ -57,7 +57,7 @@ export class YearDataCache {
   /**
    * Get data for a specific year
    */
-  get(year: number): CoalStripesData | null {
+  get(year: number): GeneratingUnitCapFacHistoryDTO | null {
     const entry = this.cache.get(year);
     if (!entry) {
       return null;
@@ -115,3 +115,6 @@ export class YearDataCache {
     }
   }
 }
+
+// Export singleton instance
+export const yearDataCache = new YearDataCache();

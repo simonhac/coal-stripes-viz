@@ -1,13 +1,11 @@
 import { TileKey, RenderedTile } from './types';
+import { LRUCache, CacheStats } from '@/client/lru-cache';
 
 export class TileCache {
-  private cache: Map<string, RenderedTile> = new Map();
-  private accessOrder: string[] = [];
-  private maxSize: number;
-  private totalMemory: number = 0;
+  private cache: LRUCache<RenderedTile>;
 
   constructor(maxSize: number = 50) {
-    this.maxSize = maxSize;
+    this.cache = new LRUCache<RenderedTile>(maxSize);
   }
 
   private getKey(tile: TileKey): string {
@@ -17,44 +15,18 @@ export class TileCache {
   set(tile: RenderedTile): void {
     const key = this.getKey(tile.key);
     
-    // If tile exists, remove from access order
-    if (this.cache.has(key)) {
-      const index = this.accessOrder.indexOf(key);
-      if (index > -1) {
-        this.accessOrder.splice(index, 1);
-      }
-    }
-
-    // Add to end (most recently used)
-    this.accessOrder.push(key);
-    this.cache.set(key, tile);
-
     // Estimate memory usage (rough: 4 bytes per pixel)
     const tileMemory = tile.width * tile.height * 4;
-    this.totalMemory += tileMemory;
-
-    // Evict if over limit
-    while (this.accessOrder.length > this.maxSize) {
-      this.evictOldest();
-    }
+    const label = `${tile.key.year}-${tile.width}`;
+    
+    this.cache.set(key, tile, tileMemory, label);
 
     console.log(`[TILE] Cached: ${key} (${(tileMemory / 1024 / 1024).toFixed(1)}MB)`);
   }
 
   get(key: TileKey): RenderedTile | undefined {
     const keyStr = this.getKey(key);
-    const tile = this.cache.get(keyStr);
-    
-    if (tile) {
-      // Move to end (most recently used)
-      const index = this.accessOrder.indexOf(keyStr);
-      if (index > -1) {
-        this.accessOrder.splice(index, 1);
-        this.accessOrder.push(keyStr);
-      }
-    }
-    
-    return tile;
+    return this.cache.get(keyStr);
   }
 
   has(key: TileKey): boolean {
@@ -64,28 +36,37 @@ export class TileCache {
   clear(): void {
     console.log('[TILE] Cache cleared');
     this.cache.clear();
-    this.accessOrder = [];
-    this.totalMemory = 0;
-  }
-
-  private evictOldest(): void {
-    if (this.accessOrder.length === 0) return;
-    
-    const oldestKey = this.accessOrder.shift()!;
-    const tile = this.cache.get(oldestKey);
-    
-    if (tile) {
-      const tileMemory = tile.width * tile.height * 4;
-      this.totalMemory -= tileMemory;
-      this.cache.delete(oldestKey);
-      console.log(`[TILE] Evicted: ${oldestKey}`);
-    }
   }
 
   getMemoryUsage(): { count: number; totalMB: number } {
+    const stats = this.cache.getStats();
     return {
-      count: this.cache.size,
-      totalMB: this.totalMemory / 1024 / 1024
+      count: stats.numItems,
+      totalMB: stats.totalKB / 1024
     };
   }
+
+  getStats(): { tiles: number; totalMB: number; yearList: number[] } {
+    const stats = this.cache.getStats();
+    const years = new Set<number>();
+    
+    // Extract years from labels (format: "year-width")
+    for (const label of stats.labels) {
+      const parts = label.split('-');
+      const year = parseInt(parts[0]);
+      if (!isNaN(year)) {
+        years.add(year);
+      }
+    }
+    
+    return {
+      tiles: stats.numItems,
+      totalMB: stats.totalKB / 1024,
+      yearList: Array.from(years)
+    };
+  }
+
 }
+
+// Export singleton instance
+export const tileCache = new TileCache();

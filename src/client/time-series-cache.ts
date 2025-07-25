@@ -1,8 +1,8 @@
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 export interface CacheEntry {
   year: number;
-  data: CoalStripesData;
+  data: GeneratingUnitCapFacHistoryDTO;
   lastAccessed: number;
   sizeBytes: number;
 }
@@ -29,7 +29,7 @@ export class TimeSeriesCache {
   /**
    * Store data for a complete year
    */
-  addYear(year: number, data: CoalStripesData): void {
+  addYear(year: number, data: GeneratingUnitCapFacHistoryDTO): void {
     // Remove existing entry if present
     if (this.cache.has(year)) {
       const existing = this.cache.get(year)!;
@@ -60,7 +60,7 @@ export class TimeSeriesCache {
   /**
    * Get data for a specific year
    */
-  getYear(year: number): CoalStripesData | null {
+  getYear(year: number): GeneratingUnitCapFacHistoryDTO | null {
     const entry = this.cache.get(year);
     if (!entry) {
       return null;

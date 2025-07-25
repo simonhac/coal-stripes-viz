@@ -1,11 +1,11 @@
 import { TimeSeriesCache } from '@/client/time-series-cache';
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 describe('TimeSeriesCache', () => {
   let cache: TimeSeriesCache;
   
   // Mock data for testing
-  const createMockData = (year: number): CoalStripesData => {
+  const createMockData = (year: number): GeneratingUnitCapFacHistoryDTO => {
     const daysInYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 366 : 365;
     
     // Create mock capacity factor data

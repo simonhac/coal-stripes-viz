@@ -1,15 +1,19 @@
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { parseDate } from '@internationalized/date';
+import { setupTestLogger } from '../test-helpers';
 
 describe('Unit Sorting Integration Test', () => {
-  let coalDataService: CoalDataService;
+  let coalDataService: CapFacDataService;
   
   beforeAll(() => {
+    // Initialize logger for tests
+    setupTestLogger();
+    
     const apiKey = process.env.OPENELECTRICITY_API_KEY;
     if (!apiKey) {
       throw new Error('OPENELECTRICITY_API_KEY environment variable is required for integration tests');
     }
-    coalDataService = new CoalDataService(apiKey);
+    coalDataService = new CapFacDataService(apiKey);
   });
 
   afterAll(async () => {

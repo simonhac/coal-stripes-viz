@@ -1,24 +1,24 @@
 import { CalendarDate, parseDate, today } from '@internationalized/date';
-import { CoalStripesData } from '@/shared/types';
-import { TimeSeriesCache } from '@/client/time-series-cache';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
+import { LRUCache } from '@/client/lru-cache';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { CACHE_CONFIG } from '@/shared/config';
 import { getDayIndex } from '@/shared/date-utils';
 
 /**
- * Smart cache that handles server communication and caching logic
+ * Capacity factor cache that handles server communication and caching logic
  * This is the ONLY interface between React components and data
  */
-export class SmartCache {
-  private cache: TimeSeriesCache;
-  private pendingRequests = new Map<string, Promise<CoalStripesData>>();
+export class CapFacCache {
+  private cache: LRUCache<GeneratingUnitCapFacHistoryDTO>;
+  private pendingRequests = new Map<string, Promise<GeneratingUnitCapFacHistoryDTO>>();
   private updateCallbacks = new Set<(year: number) => void>();
   private lastFetchTime = 0;
   private enablePreloading: boolean;
   private preloadPromises = new Set<Promise<any>>();
 
   constructor(maxYears: number = CACHE_CONFIG.MAX_CHUNKS, enablePreloading: boolean = CACHE_CONFIG.ENABLE_PRELOADING) {
-    this.cache = new TimeSeriesCache(maxYears);
+    this.cache = new LRUCache<GeneratingUnitCapFacHistoryDTO>(maxYears);
     this.enablePreloading = enablePreloading;
   }
   
@@ -33,9 +33,9 @@ export class SmartCache {
   /**
    * Get data for a specific year
    */
-  async getYearData(year: number): Promise<CoalStripesData | null> {
+  async getYearData(year: number): Promise<GeneratingUnitCapFacHistoryDTO | null> {
     // Check cache first
-    const cached = this.cache.getYear(year);
+    const cached = this.cache.get(year.toString());
     if (cached) {
       return cached;
     }
@@ -68,10 +68,10 @@ export class SmartCache {
     start: CalendarDate, 
     end: CalendarDate,
     isUIRequest: boolean = true
-  ): Promise<CoalStripesData | null> {
+  ): Promise<GeneratingUnitCapFacHistoryDTO | null> {
     const startTime = performance.now();
     
-    perfMonitor.start('smartCache_getDataForDateRange', {
+    perfMonitor.start('capFacCache_getDataForDateRange', {
       start: start.toString(),
       end: end.toString(),
       isUIRequest
@@ -80,7 +80,7 @@ export class SmartCache {
     // Get required years
     const requiredYears = this.getRequiredYears(start, end);
     if (requiredYears.length === 0) {
-      perfMonitor.end('smartCache_getDataForDateRange', { result: 'no_years_required' });
+      perfMonitor.end('capFacCache_getDataForDateRange', { result: 'no_years_required' });
       return null;
     }
 
@@ -90,7 +90,7 @@ export class SmartCache {
     
     // Check if we got all data
     if (yearData.some(data => data === null)) {
-      perfMonitor.end('smartCache_getDataForDateRange', { result: 'failed_to_fetch' });
+      perfMonitor.end('capFacCache_getDataForDateRange', { result: 'failed_to_fetch' });
       return null;
     }
 
@@ -99,7 +99,7 @@ export class SmartCache {
     const elapsed = Math.round(performance.now() - startTime);
     console.log(`✅ Fetched data for ${start.toString()} → ${end.toString()} | ${elapsed}ms`);
     
-    perfMonitor.end('smartCache_getDataForDateRange', { result: 'success' });
+    perfMonitor.end('capFacCache_getDataForDateRange', { result: 'success' });
     return yearData[0];
   }
   
@@ -116,11 +116,11 @@ export class SmartCache {
     const nextYear = currentYear + 1;
     const currentYearValue = new Date().getFullYear();
     
-    if (prevYear >= 2000 && !this.cache.hasYear(prevYear)) {
+    if (prevYear >= 2000 && !this.cache.has(prevYear.toString())) {
       yearsToPreload.push(prevYear);
     }
     
-    if (nextYear <= currentYearValue && !this.cache.hasYear(nextYear)) {
+    if (nextYear <= currentYearValue && !this.cache.has(nextYear.toString())) {
       yearsToPreload.push(nextYear);
     }
     
@@ -147,7 +147,7 @@ export class SmartCache {
   /**
    * Fetch year data from server with retry logic
    */
-  private async fetchYearFromServer(year: number): Promise<CoalStripesData> {
+  private async fetchYearFromServer(year: number): Promise<GeneratingUnitCapFacHistoryDTO> {
     console.log(`📡 Fetching year ${year} from server...`);
     
     const maxAttempts = 5;
@@ -163,7 +163,8 @@ export class SmartCache {
         const data = await response.json();
         
         // Cache the result
-        this.cache.addYear(year, data);
+        const sizeBytes = JSON.stringify(data).length;
+        this.cache.set(year.toString(), data, sizeBytes, year.toString());
         
         // Notify listeners
         this.notifyBackgroundUpdate(year);
@@ -222,7 +223,7 @@ export class SmartCache {
    * Check if a specific year is cached
    */
   hasYear(year: number): boolean {
-    return this.cache.hasYear(year);
+    return this.cache.has(year.toString());
   }
   
   /**
@@ -256,7 +257,15 @@ export class SmartCache {
    * Get cache statistics
    */
   getCacheStats() {
-    return this.cache.getCacheStats();
+    const stats = this.cache.getStats();
+    // Extract years from labels and convert to expected format
+    const cachedYears = stats.labels.map(label => parseInt(label)).filter(year => !isNaN(year)).sort();
+    
+    return {
+      yearCount: stats.numItems,
+      totalMB: stats.totalKB / 1024,
+      cachedYears
+    };
   }
   
   /**
@@ -285,4 +294,8 @@ export class SmartCache {
       await Promise.allSettled(pendingOps);
     }
   }
+
 }
+
+// Export singleton instance
+export const capFacCache = new CapFacCache(10);

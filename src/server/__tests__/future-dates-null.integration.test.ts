@@ -1,16 +1,20 @@
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { parseDate, today } from '@internationalized/date';
 import { getDayIndex } from '@/shared/date-utils';
+import { setupTestLogger } from '../test-helpers';
 
 describe('Null vs Zero Data Handling', () => {
-  let service: CoalDataService;
+  let service: CapFacDataService;
   
   beforeAll(() => {
+    // Initialize logger for tests
+    setupTestLogger();
+    
     const apiKey = process.env.OPENELECTRICITY_API_KEY;
     if (!apiKey) {
       throw new Error('OPENELECTRICITY_API_KEY environment variable is required');
     }
-    service = new CoalDataService(apiKey);
+    service = new CapFacDataService(apiKey);
   });
 
   afterAll(async () => {

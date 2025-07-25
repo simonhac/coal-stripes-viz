@@ -1,13 +1,19 @@
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { getDayIndex } from '@/shared/date-utils';
 import { parseDate } from '@internationalized/date';
+import { setupTestLogger } from '../test-helpers';
+
+// Initialize logger for tests
+beforeAll(() => {
+  setupTestLogger();
+});
 
 describe('Timezone Date Mapping', () => {
   let service: any;
   let originalDate: any;
   
   beforeEach(() => {
-    service = new CoalDataService('dummy-key');
+    service = new CapFacDataService('dummy-key');
     
     // Mock Date to return a fixed date (July 10, 2025) for consistent testing
     originalDate = global.Date;
@@ -33,7 +39,7 @@ describe('Timezone Date Mapping', () => {
     global.Date = originalDate;
   });
   
-  describe('processCoalStripesData date mapping', () => {
+  describe('processGeneratingUnitCapFacHistoryDTO date mapping', () => {
     it('should correctly map AEST timestamps to Brisbane dates', () => {
       // Mock data that simulates what OpenElectricity returns
       // These are AEST timestamps with +10:00 offset
@@ -62,8 +68,8 @@ describe('Timezone Date Mapping', () => {
         }]
       }];
       
-      // Call the private processCoalStripesData method
-      const result = (service as any).processCoalStripesData(
+      // Call the private processGeneratingUnitCapFacHistoryDTO method
+      const result = (service as any).processGeneratingUnitCapFacHistoryDTO(
         mockData,
         mockFacilities,
         parseDate('2025-07-01'),
@@ -106,7 +112,7 @@ describe('Timezone Date Mapping', () => {
         }]
       }];
       
-      const result = (service as any).processCoalStripesData(
+      const result = (service as any).processGeneratingUnitCapFacHistoryDTO(
         mockData,
         mockFacilities,
         parseDate('2025-07-01'),
@@ -144,7 +150,7 @@ describe('Timezone Date Mapping', () => {
         }]
       }];
       
-      const result = (service as any).processCoalStripesData(
+      const result = (service as any).processGeneratingUnitCapFacHistoryDTO(
         mockData,
         mockFacilities,
         parseDate('2025-07-01'),
@@ -187,7 +193,7 @@ describe('Timezone Date Mapping', () => {
       }];
       
       // Should process UTC 23:00 timestamps correctly
-      const result = (service as any).processCoalStripesData(
+      const result = (service as any).processGeneratingUnitCapFacHistoryDTO(
         mockData,
         mockFacilities,
         parseDate('2025-07-02'),

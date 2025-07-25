@@ -1,15 +1,15 @@
-import { SmartCache } from '@/client/smart-cache';
+import { CapFacCache } from '@/client/cap-fac-cache';
 import { parseDate } from '@internationalized/date';
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 // Mock fetch for testing
 global.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
 describe('Year-based Cache Tests', () => {
-  let smartCache: SmartCache;
+  let capFacCache: CapFacCache;
   
   // Helper to create mock year data
-  const createMockYearData = (year: number): CoalStripesData => {
+  const createMockYearData = (year: number): GeneratingUnitCapFacHistoryDTO => {
     const isLeapYear = year % 4 === 0;
     const daysInYear = isLeapYear ? 366 : 365;
     
@@ -41,12 +41,12 @@ describe('Year-based Cache Tests', () => {
   };
   
   beforeEach(() => {
-    smartCache = new SmartCache(5, false); // Disable preloading in tests
+    capFacCache = new CapFacCache(5, false); // Disable preloading in tests
     jest.clearAllMocks();
   });
 
   afterEach(() => {
-    smartCache.clear();
+    capFacCache.clear();
   });
 
   test('should fetch a single year', async () => {
@@ -56,7 +56,7 @@ describe('Year-based Cache Tests', () => {
       json: async () => mockData
     } as Response);
     
-    const data = await smartCache.getYearData(2023);
+    const data = await capFacCache.getYearData(2023);
     
     expect(data).toEqual(mockData);
     expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
@@ -72,7 +72,7 @@ describe('Year-based Cache Tests', () => {
     const start = parseDate('2023-03-01');
     const end = parseDate('2023-09-30');
     
-    const data = await smartCache.getDataForDateRange(start, end);
+    const data = await capFacCache.getDataForDateRange(start, end);
     
     expect(data).toEqual(mockData);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -90,7 +90,7 @@ describe('Year-based Cache Tests', () => {
     const start = parseDate('2022-07-01');
     const end = parseDate('2023-06-30');
     
-    const data = await smartCache.getDataForDateRange(start, end);
+    const data = await capFacCache.getDataForDateRange(start, end);
     
     // Should fetch both years
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -109,7 +109,7 @@ describe('Year-based Cache Tests', () => {
       json: async () => mock2024
     } as Response);
     
-    const data = await smartCache.getYearData(2024);
+    const data = await capFacCache.getYearData(2024);
     
     expect(data).toBeDefined();
     expect(data!.data[0].history.data).toHaveLength(366);
@@ -123,7 +123,7 @@ describe('Year-based Cache Tests', () => {
       json: async () => mock2023
     } as Response);
     
-    const data = await smartCache.getYearData(2023);
+    const data = await capFacCache.getYearData(2023);
     
     expect(data).toBeDefined();
     expect(data!.data[0].history.data).toHaveLength(365);
@@ -138,18 +138,18 @@ describe('Year-based Cache Tests', () => {
     } as Response);
     
     // First request
-    await smartCache.getYearData(2023);
+    await capFacCache.getYearData(2023);
     expect(fetch).toHaveBeenCalledTimes(1);
     
     // Second request - should use cache
-    const cachedData = await smartCache.getYearData(2023);
+    const cachedData = await capFacCache.getYearData(2023);
     expect(fetch).toHaveBeenCalledTimes(1); // No additional call
     expect(cachedData).toEqual(mock2023);
   });
 
   test('should evict old years when cache is full', async () => {
     // Create a small cache
-    const smallCache = new SmartCache(2, false);
+    const smallCache = new CapFacCache(2, false);
     
     // Mock responses for 3 years
     for (let year = 2021; year <= 2023; year++) {
@@ -178,10 +178,10 @@ describe('Year-based Cache Tests', () => {
         ok: true,
         json: async () => createMockYearData(year)
       } as Response);
-      await smartCache.getYearData(year);
+      await capFacCache.getYearData(year);
     }
     
-    const stats = smartCache.getCacheStats();
+    const stats = capFacCache.getCacheStats();
     expect(stats.yearCount).toBe(3);
     expect(stats.cachedYears).toEqual([2020, 2021, 2022]);
     expect(stats.totalMB).toBeGreaterThan(0);

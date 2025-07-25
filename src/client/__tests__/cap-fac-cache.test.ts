@@ -1,6 +1,6 @@
-import { SmartCache } from '@/client/smart-cache';
+import { CapFacCache } from '@/client/cap-fac-cache';
 import { parseDate } from '@internationalized/date';
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 // Mock fetch for testing - provide a default mock that always works
 global.fetch = jest.fn().mockResolvedValue({
@@ -14,7 +14,7 @@ global.fetch = jest.fn().mockResolvedValue({
 } as Response) as jest.MockedFunction<typeof fetch>;
 
 // Helper to create mock year data
-const createMockYearData = (year: number): CoalStripesData => {
+const createMockYearData = (year: number): GeneratingUnitCapFacHistoryDTO => {
   const daysInYear = year % 4 === 0 ? 366 : 365;
   
   return {
@@ -43,12 +43,12 @@ const createMockYearData = (year: number): CoalStripesData => {
   };
 };
 
-describe('SmartCache Architecture', () => {
-  let smartCache: SmartCache;
+describe('CapFacCache Architecture', () => {
+  let capFacCache: CapFacCache;
   let consoleErrorSpy: jest.SpyInstance;
   
   beforeEach(() => {
-    smartCache = new SmartCache(3, false); // Disable preloading in tests
+    capFacCache = new CapFacCache(3, false); // Disable preloading in tests
     jest.clearAllMocks();
     // Reset fetch mock and provide default implementation
     (global.fetch as jest.MockedFunction<typeof fetch>).mockReset();
@@ -67,8 +67,8 @@ describe('SmartCache Architecture', () => {
 
   afterEach(async () => {
     // Wait for any pending operations to complete
-    await smartCache.waitForPendingOperations();
-    smartCache.clear();
+    await capFacCache.waitForPendingOperations();
+    capFacCache.clear();
     jest.clearAllMocks();
     consoleErrorSpy.mockRestore();
   });
@@ -81,8 +81,8 @@ describe('SmartCache Architecture', () => {
       json: async () => mockData
     } as Response);
     
-    // Component should only interact with SmartCache
-    const data = await smartCache.getYearData(2023);
+    // Component should only interact with CapFacCache
+    const data = await capFacCache.getYearData(2023);
     
     expect(data).toEqual(mockData);
     expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
@@ -96,11 +96,11 @@ describe('SmartCache Architecture', () => {
       json: async () => mockData
     } as Response);
     
-    const data1 = await smartCache.getYearData(2023);
+    const data1 = await capFacCache.getYearData(2023);
     expect(fetch).toHaveBeenCalledTimes(1);
     
     // Second call - should hit cache
-    const data2 = await smartCache.getYearData(2023);
+    const data2 = await capFacCache.getYearData(2023);
     expect(fetch).toHaveBeenCalledTimes(1); // No additional call
     expect(data2).toEqual(data1);
   });
@@ -121,8 +121,8 @@ describe('SmartCache Architecture', () => {
     } as Response);
     
     // Start two requests before the first completes
-    const promise1 = smartCache.getYearData(2023);
-    const promise2 = smartCache.getYearData(2023);
+    const promise1 = capFacCache.getYearData(2023);
+    const promise2 = capFacCache.getYearData(2023);
     
     // Should only make one fetch call
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -147,7 +147,7 @@ describe('SmartCache Architecture', () => {
     const start = parseDate('2023-03-01');
     const end = parseDate('2023-08-31');
     
-    const data = await smartCache.getDataForDateRange(start, end);
+    const data = await capFacCache.getDataForDateRange(start, end);
     
     expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
     expect(data).toEqual(mock2023);
@@ -155,7 +155,7 @@ describe('SmartCache Architecture', () => {
 
   test('should preload adjacent years when enabled', async () => {
     // Create cache with preloading enabled
-    const preloadCache = new SmartCache(3, true);
+    const preloadCache = new CapFacCache(3, true);
     
     try {
       const mock2023 = createMockYearData(2023);
@@ -193,7 +193,7 @@ describe('SmartCache Architecture', () => {
 
   test('should notify subscribers of background updates', async () => {
     const updateCallback = jest.fn();
-    const unsubscribe = smartCache.onBackgroundUpdate(updateCallback);
+    const unsubscribe = capFacCache.onBackgroundUpdate(updateCallback);
     
     const mockData = createMockYearData(2023);
     (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
@@ -201,7 +201,7 @@ describe('SmartCache Architecture', () => {
       json: async () => mockData
     } as Response);
     
-    await smartCache.getYearData(2023);
+    await capFacCache.getYearData(2023);
     
     expect(updateCallback).toHaveBeenCalledWith(2023);
     
@@ -214,7 +214,7 @@ describe('SmartCache Architecture', () => {
       json: async () => createMockYearData(2024)
     } as Response);
     
-    await smartCache.getYearData(2024);
+    await capFacCache.getYearData(2024);
     expect(updateCallback).not.toHaveBeenCalled();
   });
 
@@ -227,10 +227,10 @@ describe('SmartCache Architecture', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => mock2022 } as Response)
       .mockResolvedValueOnce({ ok: true, json: async () => mock2023 } as Response);
     
-    await smartCache.getYearData(2022);
-    await smartCache.getYearData(2023);
+    await capFacCache.getYearData(2022);
+    await capFacCache.getYearData(2023);
     
-    const stats = smartCache.getCacheStats();
+    const stats = capFacCache.getCacheStats();
     expect(stats.yearCount).toBe(2);
     expect(stats.cachedYears).toEqual([2022, 2023]);
     expect(stats.totalMB).toBeGreaterThan(0);
@@ -243,13 +243,13 @@ describe('SmartCache Architecture', () => {
       json: async () => mockData
     } as Response);
     
-    await smartCache.getYearData(2023);
-    expect(smartCache.hasYear(2023)).toBe(true);
+    await capFacCache.getYearData(2023);
+    expect(capFacCache.hasYear(2023)).toBe(true);
     
-    smartCache.clear();
-    expect(smartCache.hasYear(2023)).toBe(false);
+    capFacCache.clear();
+    expect(capFacCache.hasYear(2023)).toBe(false);
     
-    const stats = smartCache.getCacheStats();
+    const stats = capFacCache.getCacheStats();
     expect(stats.yearCount).toBe(0);
   });
 });

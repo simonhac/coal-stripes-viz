@@ -6,7 +6,7 @@
 export const CACHE_CONFIG = {
   MAX_CHUNKS: 50,                    // Maximum number of year chunks to keep in cache
   ENABLE_PRELOADING: true,           // Whether to enable background preloading
-  RATE_LIMIT_DELAY: 2000,           // Milliseconds between API calls (2 seconds)
+  RATE_LIMIT_DELAY: 250,            // Milliseconds between API calls (250ms)
   PRELOAD_PAGES_PRIMARY: 5,         // Number of pages to preload in primary direction
   PRELOAD_PAGES_OPPOSITE: 1,        // Number of pages to preload in opposite direction
 } as const;
@@ -46,4 +46,23 @@ export const TILE_CONFIG = {
   DEBUG_BORDER_COLOR: '#9333ea',    // Purple color for debug border
   DEBUG_TEXT_SIZE: 40,              // Font size for year text
   DEBUG_TEXT_COLOR: '#9333ea',      // Purple color for year text
+} as const;
+
+// Request queue configuration
+export const REQUEST_QUEUE_CONFIG = {
+  // Rate limiting
+  DEFAULT_MIN_INTERVAL: 200,        // Minimum 200ms between requests
+  MAX_CONCURRENT_REQUESTS: 5,       // Max parallel requests
+  
+  // Retry policy
+  MAX_RETRIES: 4,                   // Maximum retry attempts
+  RETRY_DELAY_BASE: 1000,           // Base retry delay (1s)
+  RETRY_DELAY_MAX: 30000,           // Maximum retry delay (30s)
+  
+  // Timeouts
+  REQUEST_TIMEOUT: 15000,           // 30 second timeout per request
+  
+  // Circuit breaker
+  CIRCUIT_BREAKER_THRESHOLD: 5,     // Open circuit after 5 consecutive failures
+  CIRCUIT_BREAKER_RESET_TIME: 60000 // Reset circuit after 1 minute
 } as const;

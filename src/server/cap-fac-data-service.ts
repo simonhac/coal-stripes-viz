@@ -1,7 +1,7 @@
-import { OpenElectricityClient } from 'openelectricity';
+import { QueuedOpenElectricityClient } from './openelectricity-queue';
 import { 
-  CoalStripesData, 
-  CoalUnit
+  GeneratingUnitCapFacHistoryDTO, 
+  GeneratingUnitDTO
 } from '@/shared/types';
 import { CalendarDate, parseDate } from '@internationalized/date';
 import { getAESTDateTimeString, isLeapYear, getDaysBetween, parseAESTDateString } from '@/shared/date-utils';
@@ -25,13 +25,13 @@ interface Facility {
   units: UnitRecord[];
 }
 
-export class CoalDataService {
-  private client: OpenElectricityClient;
+export class CapFacDataService {
+  private client: QueuedOpenElectricityClient;
   private facilitiesCache: Facility[] | null = null;
   private facilitiesFetchPromise: Promise<Facility[]> | null = null;
 
   constructor(apiKey: string) {
-    this.client = new OpenElectricityClient({ apiKey });
+    this.client = new QueuedOpenElectricityClient(apiKey);
   }
 
   /**
@@ -51,8 +51,12 @@ export class CoalDataService {
     this.facilitiesCache = null;
     this.facilitiesFetchPromise = null;
     
-    // The OpenElectricityClient doesn't expose a cleanup method,
-    // but we can null out the reference to help with garbage collection
+    // Clear any pending requests in the queue
+    if (this.client) {
+      this.client.clearQueue();
+    }
+    
+    // Null out the reference to help with garbage collection
     this.client = null as any;
   }
 
@@ -60,7 +64,7 @@ export class CoalDataService {
    * Fetch capacity factors for coal units for a specific year
    * Always returns data for the full year with today and future dates nulled out
    */
-  async getCapacityFactors(year: number): Promise<CoalStripesData> {
+  async getCapacityFactors(year: number): Promise<GeneratingUnitCapFacHistoryDTO> {
     const startTime = performance.now();
     
     // Always work with full years - no partial years allowed
@@ -89,16 +93,23 @@ export class CoalDataService {
       // Combine the data
       allData = [...firstHalfData, ...secondHalfData];
     } else {
-      // Normal fetch for non-leap years or partial years
+      // Normal fetch for non-leap years
       allData = await this.fetchEnergyData(facilities, startDate.toString(), endDate.toString());
     }
     
-    const coalStripesData = this.processCoalStripesData(allData, facilities, startDate, endDate);
+    const coalStripesData = this.processGeneratingUnitCapFacHistoryDTO(allData, facilities, startDate, endDate);
     
     const elapsed = Math.round(performance.now() - startTime);
     console.log(`✅ API response: ${year} | ${elapsed}ms`);
     
     return coalStripesData;
+  }
+
+  /**
+   * Get queue statistics for monitoring
+   */
+  public getQueueStats() {
+    return this.client ? this.client.getQueueStats() : null;
   }
 
 
@@ -264,14 +275,14 @@ export class CoalDataService {
 
 
   /**
-   * Process raw energy data into CoalStripesData format
+   * Process raw energy data into GeneratingUnitCapFacHistoryDTO format
    */
-  private processCoalStripesData(
+  private processGeneratingUnitCapFacHistoryDTO(
     data: any[],
     facilities: Facility[],
     requestedStartDate: CalendarDate,
     requestedEndDate: CalendarDate
-  ): CoalStripesData {
+  ): GeneratingUnitCapFacHistoryDTO {
     const startTime = performance.now();
     
     // Sort facilities by network, region, then facility name
@@ -289,7 +300,7 @@ export class CoalDataService {
     });
 
     // Create unit data structures
-    const coalUnits: CoalUnit[] = [];
+    const coalUnits: GeneratingUnitDTO[] = [];
     
     // Process each facility
     sortedFacilities.forEach(facility => {
@@ -364,7 +375,7 @@ export class CoalDataService {
           currentDate = currentDate.add({ days: 1 });
         }
 
-        const coalUnit: CoalUnit = {
+        const coalUnit: GeneratingUnitDTO = {
           network: facility.facility_network.toLowerCase(),
           region: facility.facility_region || undefined,
           data_type: 'energy',
@@ -414,7 +425,7 @@ export class CoalDataService {
       version: metadata.version,
       created_at: metadata.created_at,
       data: coalUnits
-    } as CoalStripesData;
+    } as GeneratingUnitCapFacHistoryDTO;
   }
 }
 
@@ -427,5 +438,5 @@ export async function getCoalDataService(): Promise<CoalDataService> {
     throw new Error('OPENELECTRICITY_API_KEY environment variable is not set');
   }
   
-  return new CoalDataService(apiKey);
+  return new CapFacDataService(apiKey);
 }

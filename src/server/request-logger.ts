@@ -1,0 +1,229 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
+export interface LogEntry {
+  timestamp: Date;
+  eventType: 'QUEUED' | 'STARTED' | 'COMPLETED' | 'FAILED' | 'RETRY' | 'CIRCUIT_OPEN' | 'CIRCUIT_CLOSED';
+  requestId?: string;
+  method?: string;
+  path?: string;
+  priority?: number;
+  attempt?: number;
+  maxAttempts?: number;
+  status?: number;
+  duration?: number;
+  size?: string;
+  error?: string;
+  delay?: number;
+  threshold?: number;
+  failures?: number;
+  resetIn?: number;
+}
+
+export class RequestLogger {
+  private logDir: string;
+  private port: number;
+  private requestCounter: number = 0;
+  private currentLogFile: string | null = null;
+  private currentDate: string | null = null;
+
+  constructor(port: number) {
+    this.port = port;
+    this.logDir = path.join(process.cwd(), 'logs');
+    this.ensureLogDirectory();
+    this.initializeLogFile();
+  }
+
+  private ensureLogDirectory(): void {
+    if (!fs.existsSync(this.logDir)) {
+      fs.mkdirSync(this.logDir, { recursive: true });
+    }
+  }
+
+  private initializeLogFile(): void {
+    // Get the initial log file name
+    const logFile = path.join(this.logDir, this.getLogFileName());
+    
+    // Write the opening log entry
+    const timestamp = this.formatTimestamp(new Date());
+    const logLine = `${timestamp} [LOG_OPENED] port=${this.port} pid=${process.pid}\n`;
+    
+    fs.appendFileSync(logFile, logLine);
+  }
+
+  private getLogFileName(): string {
+    const now = new Date();
+    const dateStr = this.formatDate(now);
+    
+    // Check if we need a new log file (date changed)
+    if (dateStr !== this.currentDate) {
+      this.currentDate = dateStr;
+      const timeStr = this.formatTime(now);
+      this.currentLogFile = `${dateStr}_${timeStr}_capfac_${this.port}.log`;
+      this.requestCounter = 0; // Reset counter for new day
+    }
+    
+    return this.currentLogFile!;
+  }
+
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  }
+
+  private formatTime(date: Date): string {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${hours}${minutes}${seconds}`;
+  }
+
+  private formatTimestamp(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const ms = String(date.getMilliseconds()).padStart(3, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
+  }
+
+  public getNextRequestId(): string {
+    this.requestCounter++;
+    return `ID${this.requestCounter}`;
+  }
+
+  public log(entry: LogEntry): void {
+    const logFile = path.join(this.logDir, this.getLogFileName());
+    const timestamp = this.formatTimestamp(entry.timestamp);
+    let logLine = `${timestamp} [${entry.eventType}]`;
+
+    // Add request-specific information
+    if (entry.requestId) {
+      logLine += ` ${entry.requestId}`;
+    }
+
+    if (entry.method && entry.path) {
+      logLine += ` ${entry.method} ${entry.path}`;
+    }
+
+    // Add event-specific details
+    switch (entry.eventType) {
+      case 'QUEUED':
+        if (entry.priority !== undefined) {
+          logLine += ` priority=${entry.priority}`;
+        }
+        break;
+
+      case 'STARTED':
+        if (entry.attempt && entry.maxAttempts) {
+          logLine += ` attempt=${entry.attempt}/${entry.maxAttempts}`;
+        }
+        break;
+
+      case 'COMPLETED':
+        if (entry.status) {
+          logLine += ` status=${entry.status}`;
+        }
+        if (entry.duration) {
+          logLine += ` duration=${entry.duration}ms`;
+        }
+        if (entry.size) {
+          logLine += ` size=${entry.size}`;
+        }
+        break;
+
+      case 'FAILED':
+        if (entry.status) {
+          logLine += ` status=${entry.status}`;
+        }
+        if (entry.duration) {
+          logLine += ` duration=${entry.duration}ms`;
+        }
+        if (entry.error) {
+          logLine += ` error="${entry.error}"`;
+        }
+        break;
+
+      case 'RETRY':
+        if (entry.attempt && entry.maxAttempts) {
+          logLine += ` attempt=${entry.attempt}/${entry.maxAttempts}`;
+        }
+        if (entry.delay) {
+          logLine += ` delay=${entry.delay}ms`;
+        }
+        break;
+
+      case 'CIRCUIT_OPEN':
+        if (entry.threshold) {
+          logLine += ` threshold=${entry.threshold}`;
+        }
+        if (entry.failures) {
+          logLine += ` failures=${entry.failures}`;
+        }
+        if (entry.resetIn) {
+          logLine += ` reset_in=${entry.resetIn}ms`;
+        }
+        break;
+
+      case 'CIRCUIT_CLOSED':
+        // No additional info needed
+        break;
+    }
+
+    logLine += '\n';
+
+    // Append to log file
+    fs.appendFileSync(logFile, logLine);
+  }
+
+  public cleanOldLogs(retentionDays: number = 30): void {
+    const now = Date.now();
+    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+
+    try {
+      const files = fs.readdirSync(this.logDir);
+      
+      files.forEach(file => {
+        if (file.endsWith('.log') && file.includes('capfac-')) {
+          const filePath = path.join(this.logDir, file);
+          const stats = fs.statSync(filePath);
+          
+          if (now - stats.mtimeMs > retentionMs) {
+            fs.unlinkSync(filePath);
+            console.log(`Deleted old log file: ${file}`);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error cleaning old logs:', error);
+    }
+  }
+}
+
+// Singleton instance
+let loggerInstance: RequestLogger | null = null;
+
+export function initializeRequestLogger(port: number): void {
+  if (!loggerInstance) {
+    loggerInstance = new RequestLogger(port);
+    
+    // Set up daily cleanup
+    setInterval(() => {
+      loggerInstance!.cleanOldLogs();
+    }, 24 * 60 * 60 * 1000); // Run once per day
+    
+    // Run initial cleanup
+    loggerInstance.cleanOldLogs();
+  }
+}
+
+export function getRequestLogger(): RequestLogger {
+  if (!loggerInstance) {
+    throw new Error('Request logger not initialized. Call initializeRequestLogger(port) first.');
+  }
+  return loggerInstance;
+}

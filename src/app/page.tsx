@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesRange } from '../hooks/useCoalStripes';
-import { CoalUnit } from '../lib/types';
+import { GeneratingUnitDTO } from '@/shared/types';
 import { parseDate, today } from '@internationalized/date';
 import { OptimizedStripeCanvas } from '../components/OptimizedStripeCanvas';
 import { TileViewport } from '../components/TileViewport';
+import { TileManager } from '../client/tile-system/TileManager';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { UI_CONFIG } from '../lib/config';
 import './opennem.css';
@@ -32,10 +33,10 @@ function getCoalProportionColor(capacityFactor: number | null): string {
 // Group units by region
 interface RegionGroup {
   name: string;
-  units: CoalUnit[];
+  units: GeneratingUnitDTO[];
 }
 
-function groupUnitsByRegion(units: CoalUnit[]): RegionGroup[] {
+function groupUnitsByRegion(units: GeneratingUnitDTO[]): RegionGroup[] {
   const regions: Record<string, RegionGroup> = {
     NSW1: { name: 'New South Wales', units: [] },
     QLD1: { name: 'Queensland', units: [] },
@@ -54,7 +55,7 @@ function groupUnitsByRegion(units: CoalUnit[]): RegionGroup[] {
   return Object.values(regions).filter(r => r.units.length > 0);
 }
 
-function getMonthLabels(dates: string[], units: CoalUnit[], data: any, useShortLabels: boolean = false) {
+function getMonthLabels(dates: string[], units: GeneratingUnitDTO[], data: any, useShortLabels: boolean = false) {
   const monthGroups: Record<string, { 
     dates: string[]; 
     monthYear: string; 
@@ -189,6 +190,7 @@ export default function Home() {
   const stripesContainerRef = useRef<HTMLDivElement>(null);
   const firstFacilityRef = useRef<HTMLDivElement>(null);
   const [isFirstFacilityFocused, setIsFirstFacilityFocused] = useState(false);
+  const tileManagerRef = useRef<TileManager | null>(null);
   
   // Calculate container width for accurate drag sensitivity
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -212,6 +214,37 @@ export default function Home() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [paintCount, setPaintCount] = useState(0);
   
+  // Initialize TileManager
+  useEffect(() => {
+    if (!tileManagerRef.current) {
+      tileManagerRef.current = new TileManager(50); // Cache up to 50 tiles
+    }
+  }, []);
+  
+  // Set up year data in TileManager when data changes
+  useEffect(() => {
+    if (!tileManagerRef.current || !data || !currentDateRange) return;
+    
+    // Set year data for the years we need
+    const years = new Set([currentDateRange.start.year, currentDateRange.end.year]);
+    
+    for (const year of years) {
+      // The data from useCoalStripesRange already contains the units for the date range
+      tileManagerRef.current.setYearData(year, data);
+    }
+    
+    // Set viewport info
+    if (stripesContainerRef.current) {
+      const rect = stripesContainerRef.current.getBoundingClientRect();
+      tileManagerRef.current.setViewport({
+        startDate: currentDateRange.start.toDate('Australia/Brisbane'),
+        endDate: currentDateRange.end.toDate('Australia/Brisbane'),
+        width: rect.width,
+        height: rect.height,
+        pixelsPerDay: rect.width / 365
+      });
+    }
+  }, [data, currentDateRange]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -636,7 +669,7 @@ export default function Home() {
                     }
                     facilities[unit.facility_name].push(unit);
                     return facilities;
-                  }, {} as Record<string, CoalUnit[]>)
+                  }, {} as Record<string, GeneratingUnitDTO[]>)
                 ).map(([facilityName, facilityUnits], facilityIndex) => {
                   // Check if this is the very first facility
                   const isFirstFacility = region.name === regionsWithData[0].name && facilityIndex === 0;
@@ -649,6 +682,11 @@ export default function Home() {
                     const minHeight = useShortLabels ? 16 : 12;
                     return Math.max(minHeight, Math.min(40, unit.capacity / 30));
                   });
+                  
+                  // Set unit heights in TileManager
+                  if (tileManagerRef.current) {
+                    tileManagerRef.current.setUnitHeights(facilityName, rowHeights);
+                  }
                   
                   return (
                     <div key={facilityName} className="opennem-facility-group">
@@ -690,10 +728,10 @@ export default function Home() {
                             </div>
                           )}
                           
-                          {currentDateRange && (
+                          {currentDateRange && tileManagerRef.current && (
                             <TileViewport
                               facilityName={facilityName}
-                              units={facilityUnits}
+                              tileManager={tileManagerRef.current}
                               dates={dates}
                               unitHeights={rowHeights}
                               startYear={currentDateRange.start.year}
@@ -763,15 +801,6 @@ export default function Home() {
           })}
         </div>
 
-        {/* Partial data warning */}
-        {isPartial && missingYears && missingYears.length > 0 && (
-          <div className="opennem-partial-warning">
-            <p>
-              ⚠️ Partial data: Missing years {missingYears.join(', ')}. 
-              These will load in the background.
-            </p>
-          </div>
-        )}
         </div>
       </div>
     </>

@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TileManager } from '@/client/tile-system/TileManager';
 import { TileKey, RenderedTile } from '@/client/tile-system/types';
-import { SmartCache } from '@/client/smart-cache';
+import { CapFacCache } from '@/client/cap-fac-cache';
+import { CACHE_CONFIG } from '@/shared/config';
 
 export default function TilesTestPage() {
   const [tiles, setTiles] = useState<Map<string, HTMLCanvasElement | null>>(new Map());
@@ -12,20 +13,20 @@ export default function TilesTestPage() {
   const [error, setError] = useState<string | null>(null);
   const [tileErrors, setTileErrors] = useState<Map<string, string>>(new Map());
   const tileManagerRef = useRef<TileManager | null>(null);
-  const smartCacheRef = useRef<SmartCache | null>(null);
+  const capFacCacheRef = useRef<CapFacCache | null>(null);
   const containerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Initialize on mount
   useEffect(() => {
     tileManagerRef.current = new TileManager(20); // Cache up to 20 tiles
-    smartCacheRef.current = new SmartCache(10, false); // Cache up to 10 years
+    capFacCacheRef.current = new CapFacCache(10, false); // Cache up to 10 years
     
     // Initial render
     renderAllTiles();
 
     return () => {
       tileManagerRef.current = null;
-      smartCacheRef.current?.clear();
+      capFacCacheRef.current?.clear();
     };
   }, []);
 
@@ -55,7 +56,7 @@ export default function TilesTestPage() {
         console.log(`Fetching data for ${year}...`);
         
         // Fetch the year data through SmartCache (which handles retries)
-        const yearData = await smartCacheRef.current!.getYearData(year);
+        const yearData = await capFacCacheRef.current!.getYearData(year);
         
         if (yearData) {
           console.log(`Got data for ${year}, filtering for Bayswater...`);
@@ -170,6 +171,11 @@ export default function TilesTestPage() {
         next.delete(keyStr);
         return next;
       });
+      
+      // Add rate limiting delay between fetches (except for the last one)
+      if (year !== years[years.length - 1]) {
+        await new Promise(resolve => setTimeout(resolve, CACHE_CONFIG.RATE_LIMIT_DELAY));
+      }
     }
 
     const elapsed = performance.now() - startTime;

@@ -1,11 +1,11 @@
 import { TimeSeriesCache } from '@/client/time-series-cache';
-import { SmartCache } from '@/client/smart-cache';
-import { CoalStripesData, CoalUnit } from '@/shared/types';
+import { CapFacCache } from '@/client/cap-fac-cache';
+import { GeneratingUnitCapFacHistoryDTO, GeneratingUnitDTO } from '@/shared/types';
 import { parseDate } from '@internationalized/date';
 
 describe('Cache Performance Tests', () => {
   // Helper to create realistic mock data for a year
-  const createYearData = (year: number, numUnits: number = 50): CoalStripesData => {
+  const createYearData = (year: number, numUnits: number = 50): GeneratingUnitCapFacHistoryDTO => {
     const isLeapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
     const daysInYear = isLeapYear ? 366 : 365;
     const startDate = `${year}-01-01`;
@@ -16,7 +16,7 @@ describe('Cache Performance Tests', () => {
     const yearStart = parseDate(startDate);
     
     // Create units with realistic data
-    const units: CoalUnit[] = [];
+    const units: GeneratingUnitDTO[] = [];
     
     for (let i = 0; i < numUnits; i++) {
       const unitData: (number | null)[] = new Array(daysInYear);
@@ -126,14 +126,14 @@ describe('Cache Performance Tests', () => {
     });
   });
 
-  describe('SmartCache performance', () => {
-    test('SmartCache performance with background operations', async () => {
+  describe('CapFacCache performance', () => {
+    test('CapFacCache performance with background operations', async () => {
       // Mock fetch
       global.fetch = jest.fn();
       const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
       
       // Create cache
-      const smartCache = new SmartCache(5, true); // Enable preloading
+      const capFacCache = new CapFacCache(5, true); // Enable preloading
       
       // Setup fetch responses
       for (let year = 2016; year <= 2025; year++) {
@@ -143,14 +143,14 @@ describe('Cache Performance Tests', () => {
         } as Response));
       }
       
-      console.log('\n🏁 Starting SmartCache performance test...');
+      console.log('\n🏁 Starting CapFacCache performance test...');
       
       // Measure initial fetch performance
       const fetchTimes: number[] = [];
       
       for (let year = 2020; year <= 2023; year++) {
         const start = performance.now();
-        await smartCache.getYearData(year);
+        await capFacCache.getYearData(year);
         const elapsed = performance.now() - start;
         fetchTimes.push(elapsed);
         console.log(`📡 Fetched ${year}: ${elapsed.toFixed(1)}ms`);
@@ -162,7 +162,7 @@ describe('Cache Performance Tests', () => {
       for (let i = 0; i < 50; i++) {
         const year = 2020 + Math.floor(Math.random() * 4);
         const start = performance.now();
-        const data = await smartCache.getYearData(year);
+        const data = await capFacCache.getYearData(year);
         const elapsed = performance.now() - start;
         cacheTimes.push(elapsed);
         expect(data).not.toBeNull();
@@ -172,18 +172,18 @@ describe('Cache Performance Tests', () => {
       console.log(`\n📊 Cache hit performance: ${avgCache.toFixed(3)}ms average`);
       
       // Test preloading performance
-      smartCache.preloadAdjacentYears(2022);
+      capFacCache.preloadAdjacentYears(2022);
       
       // Wait a bit for preloading
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      const stats = smartCache.getCacheStats();
+      const stats = capFacCache.getCacheStats();
       console.log(`📦 Final cache: ${stats.yearCount} years, ${stats.totalMB.toFixed(2)}MB`);
       
       // Cache hits should be very fast
       expect(avgCache).toBeLessThan(1);
       
-      smartCache.clear();
+      capFacCache.clear();
     });
   });
 });

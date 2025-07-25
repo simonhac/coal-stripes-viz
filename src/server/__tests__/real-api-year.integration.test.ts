@@ -1,16 +1,20 @@
-import { CoalDataService } from '@/server/coal-data-service';
+import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { today, parseDate } from '@internationalized/date';
 import { isLeapYear, getDayIndex } from '@/shared/date-utils';
+import { setupTestLogger } from '../test-helpers';
 
 describe('Real API Year-based Tests', () => {
-  let coalDataService: CoalDataService;
+  let coalDataService: CapFacDataService;
   
   beforeAll(() => {
+    // Initialize logger for tests
+    setupTestLogger();
+    
     const apiKey = process.env.OPENELECTRICITY_API_KEY;
     if (!apiKey) {
       throw new Error('OPENELECTRICITY_API_KEY environment variable is required for integration tests');
     }
-    coalDataService = new CoalDataService(apiKey);
+    coalDataService = new CapFacDataService(apiKey);
   });
 
   // Remove afterEach - it's not needed and may be causing issues
@@ -190,7 +194,7 @@ describe('Real API Year-based Tests', () => {
     if (!apiKey) {
       throw new Error('OPENELECTRICITY_API_KEY environment variable is required');
     }
-    const freshService = new CoalDataService(apiKey);
+    const freshService = new CapFacDataService(apiKey);
     
     try {
       // First request - will fetch facilities from API

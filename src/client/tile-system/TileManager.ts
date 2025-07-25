@@ -1,8 +1,8 @@
 import { TileKey, TileData, TileStatus, ViewportInfo, RenderedTile } from './types';
-import { TileCache } from './TileCache';
-import { YearDataCache } from './YearDataCache';
+import { TileCache, tileCache } from './TileCache';
+import { YearDataCache, yearDataCache } from './YearDataCache';
 import { Tile } from './Tile';
-import { CoalStripesData } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
 interface RenderQueueItem {
   key: TileKey;
@@ -19,8 +19,9 @@ export class TileManager {
   private unitHeights: Map<string, number[]> = new Map(); // facility -> unit heights
 
   constructor(maxTileCache: number = 50, maxYearCache: number = 10) {
-    this.tileCache = new TileCache(maxTileCache);
-    this.yearDataCache = new YearDataCache(maxYearCache);
+    // Use singleton instances instead of creating new ones
+    this.tileCache = tileCache;
+    this.yearDataCache = yearDataCache;
   }
 
   private getKey(tile: TileKey): string {
@@ -44,7 +45,7 @@ export class TileManager {
   }
 
   // Set data directly instead of fetching from API
-  setYearData(year: number, data: CoalStripesData): void {
+  setYearData(year: number, data: GeneratingUnitCapFacHistoryDTO): void {
     this.yearDataCache.set(year, data);
   }
 
