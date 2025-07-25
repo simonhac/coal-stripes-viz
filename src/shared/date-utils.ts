@@ -1,4 +1,4 @@
-import { fromDate, toZoned, CalendarDate, parseDate } from '@internationalized/date';
+import { fromDate, toZoned, CalendarDate, parseDate, today } from '@internationalized/date';
 
 /**
  * Calculate the number of days between two CalendarDate objects
@@ -167,4 +167,13 @@ export function getAESTDateTimeString(date: Date = new Date()): string {
   
   // AEST is always +10:00
   return `${year}-${month}-${day}T${hour}:${minute}:${second}+10:00`;
+}
+
+/**
+ * Get today's date in AEST (Brisbane time)
+ * 
+ * @returns CalendarDate object representing today in Australian Eastern Standard Time
+ */
+export function getTodayAEST(): CalendarDate {
+  return today('Australia/Brisbane');
 }

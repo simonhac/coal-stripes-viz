@@ -1,9 +1,9 @@
-import { CalendarDate, parseDate, today } from '@internationalized/date';
+import { CalendarDate, parseDate } from '@internationalized/date';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 import { LRUCache } from '@/client/lru-cache';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { CACHE_CONFIG } from '@/shared/config';
-import { getDayIndex } from '@/shared/date-utils';
+import { getDayIndex, getTodayAEST } from '@/shared/date-utils';
 
 /**
  * Capacity factor cache that handles server communication and caching logic
@@ -60,48 +60,6 @@ export class CapFacCache {
     return fetchPromise;
   }
 
-  /**
-   * Get data for a date range (for compatibility)
-   * Note: This now fetches complete years that cover the range
-   */
-  async getDataForDateRange(
-    start: CalendarDate, 
-    end: CalendarDate,
-    isUIRequest: boolean = true
-  ): Promise<GeneratingUnitCapFacHistoryDTO | null> {
-    const startTime = performance.now();
-    
-    perfMonitor.start('capFacCache_getDataForDateRange', {
-      start: start.toString(),
-      end: end.toString(),
-      isUIRequest
-    });
-    
-    // Get required years
-    const requiredYears = this.getRequiredYears(start, end);
-    if (requiredYears.length === 0) {
-      perfMonitor.end('capFacCache_getDataForDateRange', { result: 'no_years_required' });
-      return null;
-    }
-
-    // Fetch all required years
-    const yearPromises = requiredYears.map(year => this.getYearData(year));
-    const yearData = await Promise.all(yearPromises);
-    
-    // Check if we got all data
-    if (yearData.some(data => data === null)) {
-      perfMonitor.end('capFacCache_getDataForDateRange', { result: 'failed_to_fetch' });
-      return null;
-    }
-
-    // For now, just return the first year's data
-    // The tile system will handle multi-year rendering
-    const elapsed = Math.round(performance.now() - startTime);
-    console.log(`✅ Fetched data for ${start.toString()} → ${end.toString()} | ${elapsed}ms`);
-    
-    perfMonitor.end('capFacCache_getDataForDateRange', { result: 'success' });
-    return yearData[0];
-  }
   
   /**
    * Preload years adjacent to the current view
@@ -114,7 +72,7 @@ export class CapFacCache {
     // Preload 1 year before and after
     const prevYear = currentYear - 1;
     const nextYear = currentYear + 1;
-    const currentYearValue = new Date().getFullYear();
+    const currentYearValue = getTodayAEST().year;
     
     if (prevYear >= 2000 && !this.cache.has(prevYear.toString())) {
       yearsToPreload.push(prevYear);

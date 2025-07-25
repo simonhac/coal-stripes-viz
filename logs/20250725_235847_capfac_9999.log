@@ -1,0 +1,82 @@
+2025-07-25 23:58:47.350 [LOG_OPENED] port=9999 pid=68897
+2025-07-25 23:58:47.353 [LOG_OPENED] port=9999 pid=68896
+2025-07-25 23:58:47.361 [LOG_OPENED] port=9999 pid=68898
+2025-07-25 23:58:47.362 [QUEUED] ID1 GET /facilities priority=1
+2025-07-25 23:58:47.362 [STARTED] ID1 GET /facilities attempt=1/5
+2025-07-25 23:58:47.365 [LOG_OPENED] port=9999 pid=68899
+2025-07-25 23:58:47.368 [QUEUED] ID1 GET /facilities priority=1
+2025-07-25 23:58:47.368 [STARTED] ID1 GET /facilities attempt=1/5
+2025-07-25 23:58:47.370 [QUEUED] ID1 GET /facilities priority=1
+2025-07-25 23:58:47.370 [STARTED] ID1 GET /facilities attempt=1/5
+2025-07-25 23:58:47.372 [QUEUED] ID1 GET /facilities priority=1
+2025-07-25 23:58:47.372 [STARTED] ID1 GET /facilities attempt=1/5
+2025-07-25 23:58:48.347 [FAILED] ID1 GET /facilities duration=977ms error="Permission denied. Check API key or your access level"
+2025-07-25 23:58:48.347 [RETRY] ID1 GET /facilities attempt=2/5 delay=1000ms
+2025-07-25 23:58:48.407 [FAILED] ID1 GET /facilities duration=1035ms error="Permission denied. Check API key or your access level"
+2025-07-25 23:58:48.407 [RETRY] ID1 GET /facilities attempt=2/5 delay=1000ms
+2025-07-25 23:58:48.408 [FAILED] ID1 GET /facilities duration=1040ms error="Permission denied. Check API key or your access level"
+2025-07-25 23:58:48.408 [RETRY] ID1 GET /facilities attempt=2/5 delay=1000ms
+2025-07-25 23:58:48.949 [COMPLETED] ID1 GET /facilities status=200 duration=1587ms
+2025-07-25 23:58:48.966 [QUEUED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:58:48.967 [STARTED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:58:48.968 [QUEUED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:58:49.170 [STARTED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:58:49.349 [STARTED] ID1 GET /facilities attempt=2/5
+2025-07-25 23:58:49.409 [STARTED] ID1 GET /facilities attempt=2/5
+2025-07-25 23:58:49.409 [STARTED] ID1 GET /facilities attempt=2/5
+2025-07-25 23:58:51.081 [COMPLETED] ID1 GET /facilities status=200 duration=1732ms
+2025-07-25 23:58:51.089 [QUEUED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 priority=0
+2025-07-25 23:58:51.089 [STARTED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 attempt=1/5
+2025-07-25 23:58:51.092 [QUEUED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 priority=0
+2025-07-25 23:58:51.181 [COMPLETED] ID1 GET /facilities status=200 duration=1772ms
+2025-07-25 23:58:51.183 [COMPLETED] ID1 GET /facilities status=200 duration=1774ms
+2025-07-25 23:58:51.199 [QUEUED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:58:51.199 [STARTED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:58:51.200 [QUEUED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:58:51.292 [STARTED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 attempt=1/5
+2025-07-25 23:58:51.347 [COMPLETED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=2380ms
+2025-07-25 23:58:51.368 [COMPLETED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=2198ms
+2025-07-25 23:58:51.401 [STARTED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:58:51.576 [QUEUED] ID4 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2024-01-01&dateEnd=2024-07-01 priority=0
+2025-07-25 23:58:51.576 [STARTED] ID4 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2024-01-01&dateEnd=2024-07-01 attempt=1/5
+2025-07-25 23:58:51.577 [QUEUED] ID5 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2024-01-01&dateEnd=2024-07-01 priority=0
+2025-07-25 23:58:51.778 [STARTED] ID5 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2024-01-01&dateEnd=2024-07-01 attempt=1/5
+2025-07-25 23:58:53.355 [COMPLETED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 status=200 duration=2266ms
+2025-07-25 23:58:53.851 [COMPLETED] ID5 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2024-01-01&dateEnd=2024-07-01 status=200 duration=2073ms
+2025-07-25 23:58:54.305 [COMPLETED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=3106ms
+2025-07-25 23:58:54.774 [COMPLETED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 status=200 duration=3482ms
+2025-07-25 23:58:54.913 [COMPLETED] ID3 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=3512ms
+2025-07-25 23:58:55.364 [COMPLETED] ID4 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2024-01-01&dateEnd=2024-07-01 status=200 duration=3788ms
+2025-07-25 23:58:55.376 [QUEUED] ID6 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2024-07-01&dateEnd=2025-01-01 priority=0
+2025-07-25 23:58:55.376 [STARTED] ID6 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2024-07-01&dateEnd=2025-01-01 attempt=1/5
+2025-07-25 23:58:55.377 [QUEUED] ID7 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2024-07-01&dateEnd=2025-01-01 priority=0
+2025-07-25 23:58:55.577 [STARTED] ID7 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2024-07-01&dateEnd=2025-01-01 attempt=1/5
+2025-07-25 23:58:57.029 [COMPLETED] ID7 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2024-07-01&dateEnd=2025-01-01 status=200 duration=1452ms
+2025-07-25 23:58:57.327 [COMPLETED] ID6 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2024-07-01&dateEnd=2025-01-01 status=200 duration=1951ms
+2025-07-25 23:58:57.518 [QUEUED] ID8 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 priority=0
+2025-07-25 23:58:57.519 [STARTED] ID8 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 attempt=1/5
+2025-07-25 23:58:57.519 [QUEUED] ID9 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 priority=0
+2025-07-25 23:58:57.720 [STARTED] ID9 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 attempt=1/5
+2025-07-25 23:58:59.237 [COMPLETED] ID9 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 status=200 duration=1517ms
+2025-07-25 23:58:59.509 [COMPLETED] ID8 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2025-01-01&dateEnd=2026-01-01 status=200 duration=1990ms
+2025-07-25 23:58:59.647 [QUEUED] ID10 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:58:59.647 [STARTED] ID10 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:58:59.648 [QUEUED] ID11 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:58:59.848 [STARTED] ID11 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:59:01.735 [COMPLETED] ID11 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=1887ms
+2025-07-25 23:59:02.026 [COMPLETED] ID10 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=2379ms
+2025-07-25 23:59:02.238 [QUEUED] ID12 GET /facilities priority=1
+2025-07-25 23:59:02.238 [STARTED] ID12 GET /facilities attempt=1/5
+2025-07-25 23:59:03.200 [COMPLETED] ID12 GET /facilities status=200 duration=962ms
+2025-07-25 23:59:03.202 [QUEUED] ID13 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2022-01-01&dateEnd=2023-01-01 priority=0
+2025-07-25 23:59:03.202 [STARTED] ID13 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2022-01-01&dateEnd=2023-01-01 attempt=1/5
+2025-07-25 23:59:03.203 [QUEUED] ID14 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2022-01-01&dateEnd=2023-01-01 priority=0
+2025-07-25 23:59:03.403 [STARTED] ID14 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2022-01-01&dateEnd=2023-01-01 attempt=1/5
+2025-07-25 23:59:05.272 [COMPLETED] ID14 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2022-01-01&dateEnd=2023-01-01 status=200 duration=1869ms
+2025-07-25 23:59:05.834 [COMPLETED] ID13 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2022-01-01&dateEnd=2023-01-01 status=200 duration=2632ms
+2025-07-25 23:59:06.040 [QUEUED] ID15 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:59:06.041 [STARTED] ID15 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:59:06.041 [QUEUED] ID16 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
+2025-07-25 23:59:06.241 [STARTED] ID16 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
+2025-07-25 23:59:08.177 [COMPLETED] ID16 GET /data/facilities/WEM?facilities=BLUEWATERS%2CCOLLIE%2CMUJA&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=1936ms
+2025-07-25 23:59:08.524 [COMPLETED] ID15 GET /data/facilities/NEM?facilities=BAYSW%2CCALL_B%5B...and+13+others%5D&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=2483ms

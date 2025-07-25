@@ -6,7 +6,7 @@ import { REQUEST_QUEUE_CONFIG } from '@/shared/config';
  * Wrapper around OpenElectricityClient that adds request queuing,
  * rate limiting, and retry logic.
  */
-export class QueuedOpenElectricityClient {
+export class OEClientQueued {
   private client: OpenElectricityClient;
   private requestQueue: RequestQueue;
 

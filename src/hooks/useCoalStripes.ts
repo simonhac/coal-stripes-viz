@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 import { CapFacCache, capFacCache } from '@/client/cap-fac-cache';
-import { CalendarDate, today } from '@internationalized/date';
+import { CalendarDate } from '@internationalized/date';
+import { getTodayAEST } from '@/shared/date-utils';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { DRAG_CONFIG } from '@/shared/config';
 
@@ -98,12 +99,12 @@ export function useCoalStripes(options: UseCoalStripesOptions = {}): UseCoalStri
 
 /**
  * Enhanced hook for client-side cached data with date range support
- * Uses SmartCache as the ONLY interface to data - cache handles everything
+ * Uses CapFacCache as the ONLY interface to data - cache handles everything
  */
 export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): UseCoalStripesRangeResult {
   const { 
-    startDate: initialStartDate = today('Australia/Brisbane').subtract({ days: 365 }),
-    endDate: initialEndDate = today('Australia/Brisbane').subtract({ days: 1 }),
+    startDate: initialStartDate = getTodayAEST().subtract({ days: 365 }),
+    endDate: initialEndDate = getTodayAEST().subtract({ days: 1 }),
     autoFetch = true,
     containerWidth = 1200 // Default fallback, should be passed from component
   } = options;
@@ -135,10 +136,11 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
     setError(null);
     
     try {
-      // SmartCache handles EVERYTHING: cache hits, misses, server calls, partial data, preloading
+      // Fetch the year containing the start date
+      const yearToFetch = start.year;
       const result = await perfMonitor.measureAsync('useCoalStripesRange_capFacCache', 
-        async () => await capFacCacheRef.current!.getDataForDateRange(start, end, true),
-        { start: start.toString(), end: end.toString() }
+        async () => await capFacCacheRef.current!.getYearData(yearToFetch),
+        { year: yearToFetch }
       );
       setData(result);
     } catch (err) {
@@ -193,7 +195,7 @@ export function useCoalStripesRange(options: UseCoalStripesRangeOptions = {}): U
       const newEnd = originalDateRange.current.end.add({ days: daysDelta });
       
       // Get yesterday as the latest possible date
-      const yesterday = today('Australia/Brisbane').subtract({ days: 1 });
+      const yesterday = getTodayAEST().subtract({ days: 1 });
       
       // Check boundaries
       let constrainedStart = newStart;

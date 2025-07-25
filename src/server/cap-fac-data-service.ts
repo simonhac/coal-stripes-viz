@@ -1,10 +1,10 @@
-import { QueuedOpenElectricityClient } from './openelectricity-queue';
+import { OEClientQueued } from './queued-oeclient';
 import { 
   GeneratingUnitCapFacHistoryDTO, 
   GeneratingUnitDTO
 } from '@/shared/types';
 import { CalendarDate, parseDate } from '@internationalized/date';
-import { getAESTDateTimeString, isLeapYear, getDaysBetween, parseAESTDateString } from '@/shared/date-utils';
+import { getAESTDateTimeString, isLeapYear, getDaysBetween, parseAESTDateString, getTodayAEST } from '@/shared/date-utils';
 
 // Define types for the new API
 interface UnitRecord {
@@ -26,12 +26,12 @@ interface Facility {
 }
 
 export class CapFacDataService {
-  private client: QueuedOpenElectricityClient;
+  private client: OEClientQueued;
   private facilitiesCache: Facility[] | null = null;
   private facilitiesFetchPromise: Promise<Facility[]> | null = null;
 
   constructor(apiKey: string) {
-    this.client = new QueuedOpenElectricityClient(apiKey);
+    this.client = new OEClientQueued(apiKey);
   }
 
   /**
@@ -353,9 +353,7 @@ export class CapFacDataService {
         let currentDate = start;
         
         // Get today's date in Brisbane time for comparison
-        const todayBrisbane = parseDate(new Date().toLocaleDateString('en-CA', { 
-          timeZone: 'Australia/Brisbane' 
-        }));
+        const todayBrisbane = getTodayAEST();
         
         while (currentDate.compare(end) <= 0) {
           const dateStr = currentDate.toString();

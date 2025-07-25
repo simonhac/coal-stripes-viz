@@ -62,44 +62,7 @@ describe('Year-based Cache Tests', () => {
     expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
   });
 
-  test('should handle date ranges within a single year', async () => {
-    const mockData = createMockYearData(2023);
-    (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockData
-    } as Response);
-    
-    const start = parseDate('2023-03-01');
-    const end = parseDate('2023-09-30');
-    
-    const data = await capFacCache.getDataForDateRange(start, end);
-    
-    expect(data).toEqual(mockData);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
-  });
 
-  test('should handle date ranges spanning multiple years', async () => {
-    const mock2022 = createMockYearData(2022);
-    const mock2023 = createMockYearData(2023);
-    
-    (global.fetch as jest.MockedFunction<typeof fetch>)
-      .mockResolvedValueOnce({ ok: true, json: async () => mock2022 } as Response)
-      .mockResolvedValueOnce({ ok: true, json: async () => mock2023 } as Response);
-    
-    const start = parseDate('2022-07-01');
-    const end = parseDate('2023-06-30');
-    
-    const data = await capFacCache.getDataForDateRange(start, end);
-    
-    // Should fetch both years
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2022');
-    expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
-    
-    // Currently returns first year's data (simplified behavior)
-    expect(data).toEqual(mock2022);
-  });
 
   test('should handle leap years correctly', async () => {
     const mock2024 = createMockYearData(2024); // Leap year

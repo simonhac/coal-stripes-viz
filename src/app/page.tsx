@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useCoalStripesRange } from '../hooks/useCoalStripes';
 import { GeneratingUnitDTO } from '@/shared/types';
-import { parseDate, today } from '@internationalized/date';
+import { parseDate } from '@internationalized/date';
+import { getTodayAEST } from '@/shared/date-utils';
 import { OptimizedStripeCanvas } from '../components/OptimizedStripeCanvas';
 import { TileViewport } from '../components/TileViewport';
 import { TileManager } from '../client/tile-system/TileManager';
@@ -350,7 +351,7 @@ export default function Home() {
         const newEnd = currentDateRange.end.add({ months: monthsToMove });
         
         // Get yesterday as the latest possible date
-        const yesterday = today('Australia/Brisbane').subtract({ days: 1 });
+        const yesterday = getTodayAEST().subtract({ days: 1 });
         
         // Check boundaries - don't go past yesterday
         if (newEnd.compare(yesterday) > 0) {

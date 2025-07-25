@@ -1,6 +1,6 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
-import { today, parseDate } from '@internationalized/date';
-import { isLeapYear, getDayIndex } from '@/shared/date-utils';
+import { parseDate } from '@internationalized/date';
+import { isLeapYear, getDayIndex, getTodayAEST } from '@/shared/date-utils';
 import { setupTestLogger } from '../test-helpers';
 
 describe('Real API Year-based Tests', () => {
@@ -70,7 +70,7 @@ describe('Real API Year-based Tests', () => {
   }, 15000); // 15 second timeout // Longer timeout for two API requests (leap year splits)
 
   test('should fetch current year (partial) from real API', async () => {
-    const currentYear = today('Australia/Brisbane').year;
+    const currentYear = getTodayAEST().year;
     console.log(`\n🌐 Testing current year ${currentYear} with REAL API...`);
     
     const result = await coalDataService.getCapacityFactors(currentYear);
@@ -101,7 +101,7 @@ describe('Real API Year-based Tests', () => {
     
     // For NEM units, check that we have data up to yesterday (in AEST)
     // Today in AEST
-    const todayAEST = today('Australia/Brisbane');
+    const todayAEST = getTodayAEST();
     const yesterdayAEST = todayAEST.subtract({ days: 1 });
     const yearStart = parseDate(`${currentYear}-01-01`);
     

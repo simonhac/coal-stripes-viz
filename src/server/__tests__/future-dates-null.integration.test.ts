@@ -1,6 +1,6 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
-import { parseDate, today } from '@internationalized/date';
-import { getDayIndex } from '@/shared/date-utils';
+import { parseDate } from '@internationalized/date';
+import { getDayIndex, getTodayAEST } from '@/shared/date-utils';
 import { setupTestLogger } from '../test-helpers';
 
 describe('Null vs Zero Data Handling', () => {
@@ -28,7 +28,7 @@ describe('Null vs Zero Data Handling', () => {
     console.log('\n🔮 Testing partial and future date handling...');
     
     // Get today's date in Australian timezone
-    const todayAEST = today('Australia/Brisbane');
+    const todayAEST = getTodayAEST();
     const currentYear = todayAEST.year;
     const todayStr = todayAEST.toString();
     

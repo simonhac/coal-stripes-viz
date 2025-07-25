@@ -136,22 +136,6 @@ describe('CapFacCache Architecture', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  test('should handle date range requests by fetching complete years', async () => {
-    const mock2023 = createMockYearData(2023);
-    (global.fetch as jest.MockedFunction<typeof fetch>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mock2023
-    } as Response);
-    
-    // Request a date range within one year
-    const start = parseDate('2023-03-01');
-    const end = parseDate('2023-08-31');
-    
-    const data = await capFacCache.getDataForDateRange(start, end);
-    
-    expect(fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
-    expect(data).toEqual(mock2023);
-  });
 
   test('should preload adjacent years when enabled', async () => {
     // Create cache with preloading enabled

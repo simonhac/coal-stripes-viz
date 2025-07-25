@@ -1,5 +1,5 @@
-import { getAESTDateTimeString, getDaysBetween, getDayIndex, getDateFromIndex, isLeapYear, parseAESTDateString } from '@/shared/date-utils';
-import { CalendarDate } from '@internationalized/date';
+import { getAESTDateTimeString, getDaysBetween, getDayIndex, getDateFromIndex, isLeapYear, parseAESTDateString, getTodayAEST } from '@/shared/date-utils';
+import { CalendarDate, today } from '@internationalized/date';
 
 describe('Date Utilities', () => {
   describe('getAESTDateTimeString', () => {
@@ -305,6 +305,42 @@ describe('Date Utilities', () => {
       expect(newYear.year).toBe(2025);
       expect(newYear.month).toBe(1);
       expect(newYear.day).toBe(1);
+    });
+  });
+
+  describe('getTodayAEST', () => {
+    test('should return a CalendarDate object', () => {
+      const result = getTodayAEST();
+      expect(result).toBeInstanceOf(CalendarDate);
+    });
+
+    test('should return today in AEST timezone', () => {
+      const result = getTodayAEST();
+      const expectedToday = today('Australia/Brisbane');
+      
+      expect(result.year).toBe(expectedToday.year);
+      expect(result.month).toBe(expectedToday.month);
+      expect(result.day).toBe(expectedToday.day);
+    });
+
+    test('should match the date part of a formatted AEST datetime', () => {
+      const todayAEST = getTodayAEST();
+      const nowAEST = getAESTDateTimeString();
+      
+      // Extract date part from the datetime string
+      const datePart = nowAEST.split('T')[0];
+      const [year, month, day] = datePart.split('-').map(Number);
+      
+      expect(todayAEST.year).toBe(year);
+      expect(todayAEST.month).toBe(month);
+      expect(todayAEST.day).toBe(day);
+    });
+
+    test('should be consistent across multiple calls', () => {
+      const result1 = getTodayAEST();
+      const result2 = getTodayAEST();
+      
+      expect(result1.toString()).toBe(result2.toString());
     });
   });
 });
