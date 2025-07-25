@@ -1,8 +1,0 @@
-2025-07-25 23:28:45.148 [LOG_OPENED] port=9999 pid=58740
-2025-07-25 23:28:45.151 [QUEUED] ID1 GET /facilities priority=1
-2025-07-25 23:28:45.151 [STARTED] ID1 GET /facilities attempt=1/5
-2025-07-25 23:28:45.151 [COMPLETED] ID1 GET /facilities status=200
-2025-07-25 23:28:45.152 [LOG_OPENED] port=9999 pid=58741
-2025-07-25 23:28:45.158 [QUEUED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CERARING&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 priority=0
-2025-07-25 23:28:45.353 [STARTED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CERARING&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 attempt=1/5
-2025-07-25 23:28:45.361 [COMPLETED] ID2 GET /data/facilities/NEM?facilities=BAYSW%2CERARING&metrics=energy&interval=1d&dateStart=2023-01-01&dateEnd=2024-01-01 status=200 duration=8ms
