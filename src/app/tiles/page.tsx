@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TileManager } from '@/client/tile-system/TileManager';
 import { TileKey, RenderedTile } from '@/client/tile-system/types';
-import { CapFacCache } from '@/client/cap-fac-cache';
+import { yearDataVendor } from '@/client/year-data-vendor';
 import { CACHE_CONFIG } from '@/shared/config';
 
 export default function TilesTestPage() {
@@ -13,20 +13,20 @@ export default function TilesTestPage() {
   const [error, setError] = useState<string | null>(null);
   const [tileErrors, setTileErrors] = useState<Map<string, string>>(new Map());
   const tileManagerRef = useRef<TileManager | null>(null);
-  const capFacCacheRef = useRef<CapFacCache | null>(null);
+  // Use the singleton yearDataVendor instead of creating a new instance
   const containerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Initialize on mount
   useEffect(() => {
     tileManagerRef.current = new TileManager(20); // Cache up to 20 tiles
-    capFacCacheRef.current = new CapFacCache(10, false); // Cache up to 10 years
+    // yearDataVendor is already initialized as a singleton
     
     // Initial render
     renderAllTiles();
 
     return () => {
       tileManagerRef.current = null;
-      capFacCacheRef.current?.clear();
+      yearDataVendor.clear();
     };
   }, []);
 
@@ -56,7 +56,7 @@ export default function TilesTestPage() {
         console.log(`Fetching data for ${year}...`);
         
         // Fetch the year data through SmartCache (which handles retries)
-        const yearData = await capFacCacheRef.current!.getYearData(year);
+        const yearData = await yearDataVendor.requestYear(year);
         
         if (yearData) {
           console.log(`Got data for ${year}, filtering for Bayswater...`);

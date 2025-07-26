@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { perfMonitor } from '@/shared/performance-monitor';
-import { capFacCache } from '@/client/cap-fac-cache';
+import { yearDataVendor } from '@/client/year-data-vendor';
 import { tileCache } from '@/client/tile-system/TileCache';
 import type { CacheStats } from '@/client/lru-cache';
 
@@ -23,7 +23,7 @@ export const PerformanceDisplay: React.FC = () => {
       // Update cache stats if in cache mode
       if (displayMode === 'caches') {
         setCacheStats({
-          capFac: capFacCache.getCacheStats(),
+          capFac: yearDataVendor.getCacheStats(),
           tile: tileCache.getCacheStats()
         });
       }

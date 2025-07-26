@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
-import { CapFacCache, capFacCache } from '@/client/cap-fac-cache';
+import { yearDataVendor } from '@/client/year-data-vendor';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST } from '@/shared/date-utils';
 import { perfMonitor } from '@/shared/performance-monitor';

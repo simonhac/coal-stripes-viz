@@ -1,6 +1,6 @@
 import { TileKey, TileData, TileStatus, ViewportInfo, RenderedTile } from './types';
 import { TileCache, tileCache } from './TileCache';
-import { YearDataCache, yearDataCache } from './YearDataCache';
+import { yearDataVendor } from '@/client/year-data-vendor';
 import { Tile } from './Tile';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 
@@ -11,17 +11,15 @@ interface RenderQueueItem {
 
 export class TileManager {
   private tileCache: TileCache;
-  private yearDataCache: YearDataCache;
   private tileStatus: Map<string, TileStatus> = new Map();
   private renderQueue: RenderQueueItem[] = [];
   private isRendering = false;
   private viewport: ViewportInfo | null = null;
   private unitHeights: Map<string, number[]> = new Map(); // facility -> unit heights
 
-  constructor(maxTileCache: number = 50, maxYearCache: number = 10) {
-    // Use singleton instances instead of creating new ones
+  constructor(maxTileCache: number = 50) {
+    // Use singleton instances
     this.tileCache = tileCache;
-    this.yearDataCache = yearDataCache;
   }
 
   private getKey(tile: TileKey): string {
@@ -44,9 +42,9 @@ export class TileManager {
     this.unitHeights.set(facilityName, heights);
   }
 
-  // Set data directly instead of fetching from API
+  // This method is no longer needed - data is fetched via yearDataVendor
   setYearData(year: number, data: GeneratingUnitCapFacHistoryDTO): void {
-    this.yearDataCache.set(year, data);
+    console.warn('[DEPRECATED] TileManager.setYearData() - data is now fetched via yearDataVendor');
   }
 
   async fetchTileData(key: TileKey): Promise<TileData> {
@@ -54,12 +52,8 @@ export class TileManager {
     this.updateStatus(key, { state: 'loading' });
 
     try {
-      // Check if we have the year data cached
-      const yearData = this.yearDataCache.get(key.year);
-      
-      if (!yearData) {
-        throw new Error(`Year ${key.year} data not available in cache`);
-      }
+      // Fetch year data from vendor
+      const yearData = await yearDataVendor.requestYear(key.year);
 
       // Extract facility data from year data
       const facilityUnits = yearData.data.filter(unit => 
@@ -231,13 +225,13 @@ export class TileManager {
 
   getCacheStats() {
     const tileStats = this.tileCache.getMemoryUsage();
-    const yearStats = this.yearDataCache.getStats();
+    const yearStats = yearDataVendor.getCacheStats();
     return {
       tiles: tileStats.count,
       tileMemoryMB: tileStats.totalMB,
-      years: yearStats.years,
-      yearMemoryMB: yearStats.totalMB,
-      cachedYears: yearStats.yearList
+      years: yearStats.numItems,
+      yearMemoryMB: yearStats.totalKB / 1024,
+      cachedYears: yearStats.labels.map(label => parseInt(label)).filter(year => !isNaN(year))
     };
   }
   
