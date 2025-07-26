@@ -27,4 +27,3 @@ export interface GeneratingUnitCapFacHistoryDTO {
   created_at: string;
   data: GeneratingUnitDTO[];
 }
-
