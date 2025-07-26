@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { yearDataVendor } from '@/client/year-data-vendor';
-import { tileCache } from '@/client/tile-system/TileCache';
 import type { CacheStats } from '@/client/lru-cache';
 
 type DisplayMode = 'performance' | 'caches';
@@ -12,7 +11,7 @@ export const PerformanceDisplay: React.FC = () => {
   const [metrics, setMetrics] = useState<Record<string, { count: number; avgDuration: number; totalDuration: number }>>({});
   const [showDetails, setShowDetails] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('performance');
-  const [cacheStats, setCacheStats] = useState<{ capFac: CacheStats | null; tile: CacheStats | null }>({ capFac: null, tile: null });
+  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -22,10 +21,7 @@ export const PerformanceDisplay: React.FC = () => {
       
       // Update cache stats if in cache mode
       if (displayMode === 'caches') {
-        setCacheStats({
-          capFac: yearDataVendor.getCacheStats(),
-          tile: tileCache.getCacheStats()
-        });
+        setCacheStats(yearDataVendor.getCacheStats());
       }
     }, 500); // Update twice per second
 
@@ -52,8 +48,10 @@ export const PerformanceDisplay: React.FC = () => {
       borderRadius: '5px',
       fontFamily: 'monospace',
       fontSize: '12px',
-      minWidth: '200px',
-      zIndex: 10000
+      width: '500px',
+      maxWidth: '500px',
+      zIndex: 10000,
+      overflow: 'hidden'
     }}>
       <div style={{ marginBottom: '5px' }}>
         FPS: <span style={{ color: fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0' }}>
@@ -67,7 +65,12 @@ export const PerformanceDisplay: React.FC = () => {
         </div>
       )}
       
-      <div style={{ marginBottom: '5px' }}>
+      <div style={{ 
+        marginBottom: '5px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '5px'
+      }}>
         <button 
           onClick={() => setDisplayMode(displayMode === 'performance' ? 'caches' : 'performance')}
           style={{ 
@@ -76,8 +79,7 @@ export const PerformanceDisplay: React.FC = () => {
             border: '1px solid #0f0',
             borderRadius: '3px',
             padding: '2px 5px',
-            cursor: 'pointer',
-            marginRight: '5px'
+            cursor: 'pointer'
           }}
         >
           {displayMode === 'performance' ? 'Caches' : 'Performance'}
@@ -106,8 +108,7 @@ export const PerformanceDisplay: React.FC = () => {
             border: '1px solid #0f0',
             borderRadius: '3px',
             padding: '2px 5px',
-            cursor: 'pointer',
-            marginRight: '5px'
+            cursor: 'pointer'
           }}
         >
           Log Report
@@ -157,45 +158,68 @@ export const PerformanceDisplay: React.FC = () => {
           borderTop: '1px solid #0f0',
           paddingTop: '5px'
         }}>
-          {/* Render both caches with the same structure */}
-          {['capFac', 'tile'].map(cacheType => {
-            const stats = cacheStats[cacheType as keyof typeof cacheStats];
-            const cacheName = cacheType === 'capFac' ? 'CapFac Cache' : 'Tile Cache';
-            
-            if (!stats) return null;
-            
-            return (
-              <div key={cacheType} style={{ marginBottom: '10px' }}>
-                <div style={{ color: '#0f0', fontSize: '12px', marginBottom: '5px' }}>{cacheName}:</div>
-                <div style={{ marginLeft: '10px', fontSize: '10px', color: '#888' }}>
-                  Items: {stats.numItems} | 
-                  Size: {(stats.totalKB / 1024).toFixed(2)}MB
+          {cacheStats ? (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ color: '#0f0', fontSize: '12px', marginBottom: '5px' }}>Year Data Cache:</div>
+              <div style={{ marginLeft: '10px', fontSize: '10px', color: '#888' }}>
+                Items: {cacheStats.numItems} | 
+                Size: {(cacheStats.totalKB / 1024).toFixed(2)}MB
+              </div>
+              {cacheStats.labels.length > 0 && (
+                <div style={{ 
+                  marginLeft: '10px', 
+                  marginTop: '5px',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px'
+                }}>
+                  {cacheStats.labels.map(label => (
+                    <span
+                      key={label}
+                      style={{
+                        display: 'inline-block',
+                        padding: '2px 6px',
+                        backgroundColor: '#444',
+                        color: '#999',
+                        borderRadius: '10px',
+                        fontSize: '9px',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {label}
+                    </span>
+                  ))}
                 </div>
-                {stats.labels.length > 0 && (
-                  <div style={{ marginLeft: '10px', marginTop: '5px' }}>
-                    {stats.labels.map(label => (
+              )}
+              {cacheStats.pendingLabels && cacheStats.pendingLabels.length > 0 && (
+                <div style={{ marginLeft: '10px', marginTop: '5px' }}>
+                  <div style={{ fontSize: '10px', color: '#ff0', marginBottom: '3px' }}>Pending:</div>
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '4px'
+                  }}>
+                    {cacheStats.pendingLabels.map(label => (
                       <span
                         key={label}
                         style={{
                           display: 'inline-block',
                           padding: '2px 6px',
-                          margin: '2px',
-                          backgroundColor: '#444',
-                          color: '#999',
+                          backgroundColor: '#554400',
+                          color: '#ff0',
                           borderRadius: '10px',
-                          fontSize: '9px'
+                          fontSize: '9px',
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         {label}
                       </span>
                     ))}
                   </div>
-                )}
-              </div>
-            );
-          })}
-          
-          {!cacheStats.capFac && !cacheStats.tile && (
+                </div>
+              )}
+            </div>
+          ) : (
             <div style={{ color: '#888', fontSize: '10px' }}>No cache data available</div>
           )}
         </div>

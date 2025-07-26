@@ -9,7 +9,8 @@ module.exports = {
     'real-api-year\\.integration\\.test\\.ts$',
     'future-dates-null\\.integration\\.test\\.ts$',
     'unit-sorting\\.integration\\.test\\.ts$',
-    '\\.performance\\.test\\.ts$'
+    '\\.performance\\.test\\.ts$',
+    '/helpers/'
   ],
   testTimeout: 5000 // 5 seconds for unit tests
 };

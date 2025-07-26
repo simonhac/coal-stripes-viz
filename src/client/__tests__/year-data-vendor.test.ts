@@ -1,5 +1,9 @@
 import { YearDataVendor } from '../year-data-vendor';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
+import { CapFacYear } from '../cap-fac-year';
+import { MockCanvas } from './helpers/mock-canvas';
+
+global.OffscreenCanvas = MockCanvas as any;
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -17,12 +21,20 @@ describe('YearDataVendor', () => {
   });
 
   const mockYearData = (year: number): GeneratingUnitCapFacHistoryDTO => ({
-    status: 'ok',
+    type: 'capacity_factors',
+    version: '1.0',
+    created_at: new Date().toISOString(),
     data: [
       {
-        duid: 'TEST01',
-        facility_name: 'Test Facility',
+        network: 'TEST',
+        region: 'TEST1',
+        data_type: 'capacity_factor',
+        units: 'MW',
         capacity: 100,
+        duid: 'TEST01',
+        facility_code: 'TESTFAC',
+        facility_name: 'Test Facility',
+        fueltech: 'black_coal',
         history: {
           data: Array(365).fill(50),
           start: `${year}-01-01`,
@@ -43,7 +55,10 @@ describe('YearDataVendor', () => {
 
       const result = await vendor.requestYear(2023);
       
-      expect(result).toEqual(mockData);
+      expect(result.year).toBe(2023);
+      expect(result.data).toEqual(mockData);
+      expect(result.facilityTiles.size).toBe(1);
+      expect(result.facilityTiles.has('TESTFAC')).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023', expect.any(Object));
     });
 
@@ -61,7 +76,9 @@ describe('YearDataVendor', () => {
       jest.clearAllMocks();
       const result = await vendor.requestYear(2023);
       
-      expect(result).toEqual(mockData);
+      expect(result.year).toBe(2023);
+      expect(result.data).toEqual(mockData);
+      expect(result.facilityTiles.size).toBe(1);
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
@@ -82,9 +99,10 @@ describe('YearDataVendor', () => {
       const results = await Promise.all(promises);
       
       // All should get the same data
-      expect(results[0]).toEqual(mockData);
-      expect(results[1]).toEqual(mockData);
-      expect(results[2]).toEqual(mockData);
+      expect(results[0].year).toBe(2023);
+      expect(results[0].data).toEqual(mockData);
+      expect(results[1].data).toEqual(mockData);
+      expect(results[2].data).toEqual(mockData);
       
       // But fetch should only be called once
       expect(global.fetch).toHaveBeenCalledTimes(1);

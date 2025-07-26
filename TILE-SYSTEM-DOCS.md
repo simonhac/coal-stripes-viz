@@ -1,10 +1,28 @@
-# Tile System Documentation
+# Facility Tile Vendor Documentation
 
 ## Overview
 
-The tile system is a performance optimization for rendering capacity factor visualizations. It pre-renders year-long strips of data into canvas tiles that can be efficiently composited when displaying date ranges. This avoids re-rendering the same data repeatedly during user interactions like panning.
+The facility tile vendor is a performance optimization for rendering capacity factor visualizations for a facility. It pre-renders year-long strips of data for each unit in a facility into a canvas tile that can be efficiently composited when displaying date ranges. This avoids re-rendering the same data repeatedly during user interactions like panning.
+
+The tile represents a facility in a given year. Using the faclity's code and the requested year we can assign it a label, eg "ERR-2025" which can be used as the cache key.
+
+We are rebuilding this from the ground up, to eventuyally replace the tile system (see src/client/tile-system). Don't make any reference to it.
+
 
 ## Architecture Components
+
+Much like the yearDataVendor, the FacilityTileVendor is based on an LRUcache.
+
+The clients of the 
+
+The height of the 
+
+
+
+Later we will add a preloading manager, but for now don't include any preloading.
+
+
+
 
 ### 1. TileManager (`src/client/tile-system/TileManager.ts`)
 The central orchestrator that manages the entire tile lifecycle:
@@ -20,24 +38,21 @@ Key methods:
 - `getTile()`: Returns a rendered tile from cache or queues it for rendering
 - `processRenderQueue()`: Async worker that renders tiles in priority order
 
-### 2. YearDataCache (`src/client/tile-system/YearDataCache.ts`)
-An LRU cache for raw year data from the API:
-- **Purpose**: Stores `GeneratingUnitCapFacHistoryDTO` objects by year
-- **Capacity**: Default 10 years, evicts least recently used
-- **Memory Tracking**: Estimates size using JSON.stringify length
-- **Access Ordering**: Maintains access order for LRU eviction
+### 2. FacilityYearTileCache (`src/client/tile-system/YearDataCache.ts`)
+Holds tiles for facilities, for a particular pixel width.
+Uses the LRUcache, much like yearDataVendor.
+- main function: async requestTile(facility: string, year: number): Promise<GeneratingUnitCapFacHistoryDTO> {
+- **Purpose**: Holds tiles for facilities, for a particular pixel width.
+- **Capacity**: Default 100 tiles
+- **Memory Tracking**: 4 bytes per pixel (width × height × 4)
+- **Key Format**: `{facilityCode}-{year}-{width}w`
+
 
 Key features:
 - Data is set externally (not fetched by the cache)
 - Provides memory usage statistics
 - Singleton instance exported as `yearDataCache`
 
-### 3. TileCache (`src/client/tile-system/TileCache.ts`)
-An LRU cache for rendered canvas tiles:
-- **Purpose**: Stores pre-rendered `RenderedTile` objects
-- **Capacity**: Default 50 tiles
-- **Memory Estimation**: 4 bytes per pixel (width × height × 4)
-- **Key Format**: `facilityName-year`
 
 Key features:
 - Wraps a generic LRU cache implementation
@@ -45,9 +60,9 @@ Key features:
 - Clears on viewport width changes
 - Singleton instance exported as `tileCache`
 
-### 4. Tile (`src/client/tile-system/Tile.ts`)
-The rendering engine for individual tiles:
-- **Input**: TileData (facility, year, units with capacity factors)
+### 4. FacilityYearTile
+The rendering engine for individual tiles should have the exact same output as src/client/tile-system/Tile.ts 
+- **Input**: facility, year, units with capacity factors, canvas width
 - **Output**: Canvas with colored stripes representing capacity factors
 - **Color Mapping**:
   - `null`: Light blue (#e6f3ff) - missing data
@@ -58,13 +73,12 @@ Rendering process:
 1. Creates canvas (OffscreenCanvas if available)
 2. Renders each unit as horizontal bands
 3. Each day is a vertical stripe colored by capacity factor
-4. Adds subtle separator lines between units
 5. Optional debug overlay shows year number
 
-### 5. TileViewport (`src/components/TileViewport.tsx`)
+### 5. FacilityDateRangeViewport
 React component that composites tiles into the viewport:
-- **Props**: Facility name, date range, unit heights, tile manager
-- **Rendering**: 
+- **Props**: Facility name, startDate, endDate
+- **Rendering**:
   1. Calculates which year tiles are needed
   2. Requests tiles from TileManager
   3. Composites tile portions onto viewport canvas
@@ -74,6 +88,7 @@ Key logic:
 - Always displays 365 days (1 year) in the viewport
 - May need 1 or 2 tiles depending on date range
 - Calculates source/destination coordinates for copying
+- Has a function to translate coordinates back to a specific unit and date
 
 ## Data Flow
 

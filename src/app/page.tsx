@@ -6,8 +6,8 @@ import { GeneratingUnitDTO } from '@/shared/types';
 import { parseDate } from '@internationalized/date';
 import { getTodayAEST } from '@/shared/date-utils';
 import { OptimizedStripeCanvas } from '../components/OptimizedStripeCanvas';
-import { TileViewport } from '../components/TileViewport';
-import { TileManager } from '../client/tile-system/TileManager';
+// import { TileViewport } from '../components/TileViewport';
+// import { TileManager } from '../client/tile-system/TileManager';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { UI_CONFIG } from '@/shared/config';
 import './opennem.css';
@@ -191,7 +191,7 @@ export default function Home() {
   const stripesContainerRef = useRef<HTMLDivElement>(null);
   const firstFacilityRef = useRef<HTMLDivElement>(null);
   const [isFirstFacilityFocused, setIsFirstFacilityFocused] = useState(false);
-  const tileManagerRef = useRef<TileManager | null>(null);
+  // const tileManagerRef = useRef<TileManager | null>(null);
   
   // Calculate container width for accurate drag sensitivity
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -214,36 +214,36 @@ export default function Home() {
   const [paintCount, setPaintCount] = useState(0);
   
   // Initialize TileManager
-  useEffect(() => {
-    if (!tileManagerRef.current) {
-      tileManagerRef.current = new TileManager(50); // Cache up to 50 tiles
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (!tileManagerRef.current) {
+  //     tileManagerRef.current = new TileManager(50); // Cache up to 50 tiles
+  //   }
+  // }, []);
   
   // Set up year data in TileManager when data changes
-  useEffect(() => {
-    if (!tileManagerRef.current || !data || !currentDateRange) return;
-    
-    // Set year data for the years we need
-    const years = new Set([currentDateRange.start.year, currentDateRange.end.year]);
-    
-    for (const year of years) {
-      // The data from useCoalStripesRange already contains the units for the date range
-      tileManagerRef.current.setYearData(year, data);
-    }
-    
-    // Set viewport info
-    if (stripesContainerRef.current) {
-      const rect = stripesContainerRef.current.getBoundingClientRect();
-      tileManagerRef.current.setViewport({
-        startDate: currentDateRange.start.toDate('Australia/Brisbane'),
-        endDate: currentDateRange.end.toDate('Australia/Brisbane'),
-        width: rect.width,
-        height: rect.height,
-        pixelsPerDay: rect.width / 365
-      });
-    }
-  }, [data, currentDateRange]);
+  // useEffect(() => {
+  //   if (!tileManagerRef.current || !data || !currentDateRange) return;
+  //   
+  //   // Set year data for the years we need
+  //   const years = new Set([currentDateRange.start.year, currentDateRange.end.year]);
+  //   
+  //   for (const year of years) {
+  //     // The data from useCoalStripesRange already contains the units for the date range
+  //     tileManagerRef.current.setYearData(year, data);
+  //   }
+  //   
+  //   // Set viewport info
+  //   if (stripesContainerRef.current) {
+  //     const rect = stripesContainerRef.current.getBoundingClientRect();
+  //     tileManagerRef.current.setViewport({
+  //       startDate: currentDateRange.start.toDate('Australia/Brisbane'),
+  //       endDate: currentDateRange.end.toDate('Australia/Brisbane'),
+  //       width: rect.width,
+  //       height: rect.height,
+  //       pixelsPerDay: rect.width / 365
+  //     });
+  //   }
+  // }, [data, currentDateRange]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -683,9 +683,9 @@ export default function Home() {
                   });
                   
                   // Set unit heights in TileManager
-                  if (tileManagerRef.current) {
-                    tileManagerRef.current.setUnitHeights(facilityName, rowHeights);
-                  }
+                  // if (tileManagerRef.current) {
+                  //   tileManagerRef.current.setUnitHeights(facilityName, rowHeights);
+                  // }
                   
                   return (
                     <div key={facilityName} className="opennem-facility-group">
@@ -727,7 +727,8 @@ export default function Home() {
                             </div>
                           )}
                           
-                          {currentDateRange && tileManagerRef.current && (
+                          {/* TileViewport temporarily disabled - tile system being refactored */}
+                          {/* {currentDateRange && tileManagerRef.current && (
                             <TileViewport
                               facilityName={facilityName}
                               tileManager={tileManagerRef.current}
@@ -736,7 +737,7 @@ export default function Home() {
                               startYear={currentDateRange.start.year}
                               endYear={currentDateRange.end.year}
                             />
-                          )}
+                          )} */}
                           
                           {/* Red vertical line on hover - only for first facility */}
                           {isFirstFacility && (

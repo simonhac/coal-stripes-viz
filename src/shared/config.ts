@@ -2,15 +2,6 @@
  * Central configuration for the coal stripes visualization
  */
 
-// Cache configuration
-export const CACHE_CONFIG = {
-  MAX_CHUNKS: 50,                    // Maximum number of year chunks to keep in cache
-  ENABLE_PRELOADING: true,           // Whether to enable background preloading
-  RATE_LIMIT_DELAY: 250,            // Milliseconds between API calls (250ms)
-  PRELOAD_PAGES_PRIMARY: 5,         // Number of pages to preload in primary direction
-  PRELOAD_PAGES_OPPOSITE: 1,        // Number of pages to preload in opposite direction
-} as const;
-
 // Drag interaction configuration  
 export const DRAG_CONFIG = {
   DEBOUNCE_DELAY: 150,              // Milliseconds to debounce drag updates
@@ -51,8 +42,8 @@ export const TILE_CONFIG = {
 // Request queue configuration
 export const REQUEST_QUEUE_CONFIG = {
   // Rate limiting
-  DEFAULT_MIN_INTERVAL: 200,        // Minimum 200ms between requests
-  MAX_CONCURRENT_REQUESTS: 5,       // Max parallel requests
+  DEFAULT_MIN_INTERVAL: 100,        // Minimum 100ms between requests
+  MAX_CONCURRENT_REQUESTS: 10,      // Max parallel requests
   
   // Retry policy
   MAX_RETRIES: 4,                   // Maximum retry attempts
@@ -60,7 +51,7 @@ export const REQUEST_QUEUE_CONFIG = {
   RETRY_DELAY_MAX: 30000,           // Maximum retry delay (30s)
   
   // Timeouts
-  REQUEST_TIMEOUT: 15000,           // 30 second timeout per request
+  REQUEST_TIMEOUT: 20000,           // 15 second timeout per request
   
   // Circuit breaker
   CIRCUIT_BREAKER_THRESHOLD: 5,     // Open circuit after 5 consecutive failures

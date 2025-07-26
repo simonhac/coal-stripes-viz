@@ -1,21 +1,22 @@
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 import { LRUCache } from '@/client/lru-cache';
+import { CapFacYear, createCapFacYear } from './cap-fac-year';
 
 interface PendingFetch {
-  promise: Promise<GeneratingUnitCapFacHistoryDTO>;
+  promise: Promise<CapFacYear>;
   abort: AbortController;
 }
 
 /**
- * Vendor for year-based capacity factor data
+ * Vendor for year-based capacity factor data with pre-rendered tiles
  * Always returns a promise - resolved immediately for cached data
  */
 export class YearDataVendor {
-  private cache: LRUCache<GeneratingUnitCapFacHistoryDTO>;
+  private cache: LRUCache<CapFacYear>;
   private pendingFetches: Map<number, PendingFetch>;
 
   constructor(maxYears: number = 10) {
-    this.cache = new LRUCache<GeneratingUnitCapFacHistoryDTO>(maxYears);
+    this.cache = new LRUCache<CapFacYear>(maxYears);
     this.pendingFetches = new Map();
   }
 
@@ -23,7 +24,7 @@ export class YearDataVendor {
    * Request data for a specific year
    * @returns Promise that resolves with the data (immediately if cached)
    */
-  async requestYear(year: number): Promise<GeneratingUnitCapFacHistoryDTO> {
+  async requestYear(year: number): Promise<CapFacYear> {
     // Check cache first
     const cached = this.cache.get(year.toString());
     if (cached) {
@@ -92,9 +93,9 @@ export class YearDataVendor {
   }
 
   /**
-   * Fetch year data from server
+   * Fetch year data from server and create tiles
    */
-  private async fetchYear(year: number, signal: AbortSignal): Promise<GeneratingUnitCapFacHistoryDTO> {
+  private async fetchYear(year: number, signal: AbortSignal): Promise<CapFacYear> {
     console.log(`📡 Fetching year ${year} from server...`);
     
     try {
@@ -106,13 +107,19 @@ export class YearDataVendor {
       
       const data: GeneratingUnitCapFacHistoryDTO = await response.json();
       
-      // Cache the result
-      const sizeBytes = JSON.stringify(data).length;
-      this.cache.set(year.toString(), data, sizeBytes, year.toString());
+      // Create CapFacYear with pre-rendered tiles
+      console.log(`🎨 Creating tiles for year ${year}...`);
+      const startTime = performance.now();
+      const capFacYear = createCapFacYear(year, data);
+      const createTime = performance.now() - startTime;
+      console.log(`✅ Created ${capFacYear.facilityTiles.size} facility tiles in ${createTime.toFixed(0)}ms`);
       
-      console.log(`✅ Successfully fetched year ${year} (${(sizeBytes / 1024 / 1024).toFixed(2)}MB)`);
+      // Cache the result with the total size (JSON + canvas memory)
+      this.cache.set(year.toString(), capFacYear, capFacYear.totalSizeBytes, year.toString());
       
-      return data;
+      console.log(`✅ Successfully fetched year ${year} (${(capFacYear.totalSizeBytes / 1024 / 1024).toFixed(2)}MB)`);
+      
+      return capFacYear;
     } catch (error: any) {
       if (error.name === 'AbortError') {
         throw new Error(`Request cancelled for year ${year}`);
