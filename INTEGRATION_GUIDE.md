@@ -1,36 +1,23 @@
 # Integration Guide for Performance Optimizations
 
-## Quick Start
+## Current Architecture
 
-To integrate the performance optimizations into your existing page, make these changes:
+The application uses an optimized tile-based rendering system for visualizing coal capacity factors:
 
-### 1. Import the Optimized Components
+### Key Components
 
-Replace:
-```typescript
-import { StripeCanvas } from '../components/StripeCanvas';
-```
+1. **OptimizedStripeCanvas**: The main visualization component that renders capacity factor data as colored stripes
+2. **PerformanceDisplay**: Real-time performance monitoring widget (toggle with Cmd+P)
+3. **FacilityYearTile**: Optimized tile renderer using integer colors for 5x faster rendering
+4. **YearDataVendor**: Manages year-based data fetching and caching with pre-rendered tiles
 
-With:
+### Usage Example
+
 ```typescript
 import { OptimizedStripeCanvas } from '../components/OptimizedStripeCanvas';
-import { VirtualScroller } from '../components/VirtualScroller';
-```
+import { PerformanceDisplay } from '../components/PerformanceDisplay';
 
-### 2. Replace StripeCanvas Usage
-
-Replace:
-```typescript
-<StripeCanvas
-  unit={unit}
-  dates={dates}
-  height={rowHeight}
-  onHover={handleHover}
-/>
-```
-
-With:
-```typescript
+// In your component:
 <OptimizedStripeCanvas
   unit={unit}
   dates={dates}
@@ -39,26 +26,26 @@ With:
 />
 ```
 
-### 3. Implement Virtual Scrolling (Optional but Recommended)
+## Performance Features
 
-For maximum performance with 50+ units, wrap your unit list with VirtualScroller. See `page-optimized.tsx` for a complete example.
-
-### 4. Key Differences
-
-- **OptimizedStripeCanvas**: Pre-renders stripes for faster redraws, uses memoization
-- **VirtualScroller**: Only renders visible items, dramatically reducing DOM nodes
-- Cache optimizations are automatic - no changes needed
+- **Integer Color Optimization**: Uses pre-computed 32-bit integers instead of string colors
+- **Tile-based Rendering**: Pre-renders facility data as tiles for instant display
+- **Smart Caching**: LRU cache with configurable memory limits
+- **Direct Pixel Manipulation**: Uses Uint32Array for fast canvas operations
 
 ## Testing
 
-1. The server is running on http://localhost:3003
+1. The server runs on http://localhost:3003
 2. Open the performance display with Cmd+P
-3. Compare canvas render times before/after
-4. You should see:
-   - Fewer canvas operations
-   - Faster render times
-   - Smoother dragging
+3. Visit `/tile-test` to see the tile rendering system in action
+4. Monitor:
+   - FPS and render times
+   - Memory usage
+   - Cache hit rates
 
-## Rollback
+## Configuration
 
-If you need to rollback, simply revert to using `StripeCanvas` instead of `OptimizedStripeCanvas`.
+See `src/shared/config.ts` for performance tuning options:
+- `YEAR_DATA_CACHE_MAX_YEARS`: Maximum years to cache (default: 5)
+- `TILE_CONFIG`: Tile rendering settings
+- `REQUEST_QUEUE_CONFIG`: API request management
