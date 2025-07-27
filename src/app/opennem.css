@@ -263,7 +263,7 @@ header a {
   height: 16px;
   margin-top: 5px;
   margin-left: 140px; /* Align with facility data */
-  flex: 1; /* Match the stripe data width */
+  width: 365px; /* Match the stripe data width */
   overflow: hidden; /* Clip content */
 }
 
@@ -348,7 +348,7 @@ header a {
 }
 
 .opennem-stripe-data {
-  flex: 1;
+  width: 365px;
   display: flex;
   position: relative;
   overflow: hidden;

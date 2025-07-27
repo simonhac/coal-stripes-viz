@@ -1,36 +1,13 @@
 import React, { useEffect, useRef, memo, useMemo } from 'react';
 import { GeneratingUnitDTO } from '@/shared/types';
 import { perfMonitor } from '@/shared/performance-monitor';
+import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 
 interface OptimizedStripeCanvasProps {
   unit: GeneratingUnitDTO;
   dates: string[];
   height: number;
   onHover?: (dateIndex: number | null, pixelX?: number, stripeWidth?: number) => void;
-}
-
-// Pre-calculate colors for all possible capacity factors
-const COLOR_CACHE = new Map<number | null, string>();
-
-function getCoalProportionColor(capacityFactor: number | null): string {
-  // Check cache first
-  if (COLOR_CACHE.has(capacityFactor)) {
-    return COLOR_CACHE.get(capacityFactor)!;
-  }
-
-  let color: string;
-  if (capacityFactor === null || capacityFactor === undefined) {
-    color = '#e6f3ff';
-  } else if (capacityFactor < 25) {
-    color = '#ef4444';
-  } else {
-    const clampedCapacity = Math.min(100, Math.max(25, capacityFactor));
-    const greyValue = Math.round(255 * (1 - clampedCapacity / 100));
-    color = `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
-  }
-
-  COLOR_CACHE.set(capacityFactor, color);
-  return color;
 }
 
 // Memoized canvas component - only re-renders when props actually change
@@ -99,7 +76,7 @@ export const OptimizedStripeCanvas = memo(({
         }
       }
       
-      const color = getCoalProportionColor(capacityFactor);
+      const color = getProportionColorHex(capacityFactor);
       
       ctx.fillStyle = color;
       ctx.fillRect(

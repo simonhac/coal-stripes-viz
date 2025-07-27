@@ -22161,3 +22161,569 @@ NEM data request: 100%
 ✅ API response: 2017 | 5452ms
 🌐 API: Returning data for year 2017
  GET /api/capacity-factors?year=2017 200 in 5523ms
+ ⨯ ./src/app/page.tsx:425:15
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:425:19
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m                   [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 69ms
+ GET /favicon.ico 500 in 21ms
+ ⨯ ./src/app/page.tsx:425:15
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:425:19
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m                   [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 53ms
+ GET /favicon.ico 500 in 30ms
+ ⨯ ./src/app/page.tsx:425:15
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:425:17
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })}
+ [90m     |[39m                 [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 53ms
+ GET /favicon.ico 500 in 20ms
+ ⨯ ./src/app/page.tsx:425:15
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:425:17
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })}
+ [90m     |[39m                 [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 47ms
+ GET /favicon.ico 500 in 14ms
+ ⨯ ./src/app/page.tsx:425:15
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:425:19
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m                   [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 50ms
+ GET /favicon.ico 500 in 15ms
+ ⨯ ./src/app/page.tsx:425:15
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:425:19
+Parsing ecmascript source code failed
+[0m [90m 423 |[39m                   [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 424 |[39m                 )[33m;[39m
+[31m[1m>[22m[39m[90m 425 |[39m               })()}
+ [90m     |[39m                   [31m[1m^[22m[39m
+ [90m 426 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 427 |[39m           [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 428 |[39m         [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 29ms
+ GET /favicon.ico 500 in 30ms
+ ✓ Compiled / in 5ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/favicon.ico/[__metadata_id__]/route/app-paths-manifest.json'
+}
+ ✓ Compiled in 37ms

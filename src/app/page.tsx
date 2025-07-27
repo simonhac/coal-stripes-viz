@@ -5,19 +5,21 @@ import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST, getDayIndex, getDaysBetween } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
+import { CompositeTile } from '../components/CompositeTile';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { FacilityYearTile } from '@/client/facility-year-tile';
+import { CapFacYear } from '@/client/cap-fac-year';
+import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 import './opennem.css';
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tiles, setTiles] = useState<Map<string, FacilityYearTile>>(new Map());
+  const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
   const [dateRange, setDateRange] = useState<{ start: CalendarDate; end: CalendarDate } | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const stripeDataRef = useRef<HTMLDivElement>(null);
 
   // Function to load tiles for a given date range
   const loadTilesForDateRange = async (start: CalendarDate, end: CalendarDate) => {
@@ -33,25 +35,13 @@ export default function Home() {
       const yearDataPromises = years.map(year => yearDataVendor.requestYear(year));
       const yearDataResults = await Promise.all(yearDataPromises);
       
-      // Create tiles for display
-      const newTiles = new Map<string, FacilityYearTile>();
-      
-      // For now, just get the first facility from NSW
+      // Update year data map
+      const newYearDataMap = new Map(yearDataMap);
       for (const yearData of yearDataResults) {
-        // Get all facility tiles
-        const facilities = Array.from(yearData.facilityTiles.entries());
-        
-        if (facilities.length > 0) {
-          // Get the first facility tile for testing
-          const [facilityCode, tile] = facilities[0];
-          
-          console.log(`Loaded tile for ${facilityCode} year ${yearData.year}`);
-          
-          newTiles.set(`${facilityCode}-${yearData.year}`, tile);
-        }
+        newYearDataMap.set(yearData.year, yearData);
       }
       
-      setTiles(newTiles);
+      setYearDataMap(newYearDataMap);
       setDateRange({ start, end });
       setIsNavigating(false);
     } catch (err) {
@@ -260,95 +250,106 @@ export default function Home() {
             </div>
             <div className="opennem-region-content">
               {/* Display tiles */}
-              {tiles.size > 0 && (
-                <div className="opennem-facility-group">
-                  <div className="opennem-stripe-row" style={{ display: 'flex' }}>
-                    <div className="opennem-facility-label">
-                      {/* Get facility name from first tile */}
-                      {Array.from(tiles.values())[0].getFacilityName()}
-                    </div>
-                    <div 
-                      ref={stripeDataRef}
-                      className="opennem-stripe-data"
-                      tabIndex={0}
-                      style={{ cursor: 'grab' }}
+              {(() => {
+                if (!dateRange) return null;
+                
+                // Get first facility code from any available year data
+                let firstFacilityCode: string | null = null;
+                for (const [year, yearData] of yearDataMap) {
+                  const facilities = Array.from(yearData.facilityTiles.keys());
+                  if (facilities.length > 0) {
+                    firstFacilityCode = facilities[0];
+                    break;
+                  }
+                }
+                
+                if (!firstFacilityCode) return null;
+                
+                return (
+                  <div className="opennem-facility-group">
+                    <CompositeTile
+                      dateRange={dateRange}
+                      facilityCode={firstFacilityCode}
+                      onHover={updateTooltip}
+                      onHoverEnd={hideTooltip}
                       onFocus={() => setIsFocused(true)}
                       onBlur={() => setIsFocused(false)}
-                    >
-                      <div className="opennem-stripe-data-inner" style={{ display: 'flex', height: '100%' }}>
-                        {Array.from(tiles.entries()).map(([key, tile]) => {
-                          const year = tile.getYear();
-                          const canvas = tile.getCanvas();
-                          
-                          // Calculate day range for this year
-                          let startDay = 0;
-                          let endDay = tile.getDaysCount() - 1; // 0-indexed
+                    />
+                    
+                    {/* Month bar */}
+                    <div className="opennem-region-x-axis">
+                      <div className="opennem-region-x-axis-inner">
+                        {(() => {
+                          // Get region capacity factors for NSW for the displayed months
+                          const monthBars: { label: string; color: string; width: number; left: number }[] = [];
                           
                           if (dateRange) {
-                            if (year === dateRange.start.year) {
-                              startDay = getDayIndex(dateRange.start);
-                            }
-                            if (year === dateRange.end.year) {
-                              endDay = getDayIndex(dateRange.end);
+                            let currentDate = dateRange.start;
+                            let currentLeft = 0;
+                            
+                            while (currentDate.compare(dateRange.end) <= 0) {
+                              const monthStart = currentDate;
+                              const year = monthStart.year;
+                              const month = monthStart.month;
+                              const monthLabel = monthStart.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
+                                month: 'short',
+                                timeZone: 'Australia/Brisbane'
+                              });
+                              
+                              // Calculate month end
+                              let monthEnd = monthStart.set({ day: monthStart.calendar.getDaysInMonth(monthStart) });
+                              if (monthEnd.compare(dateRange.end) > 0) {
+                                monthEnd = dateRange.end;
+                              }
+                              
+                              // Get capacity factor for this month
+                              const yearData = yearDataMap.get(year);
+                              let capacityFactor: number | null = null;
+                              
+                              if (yearData && yearData.regionCapacityFactors.has('NSW1')) {
+                                const monthlyFactors = yearData.regionCapacityFactors.get('NSW1');
+                                if (monthlyFactors && month >= 1 && month <= 12) {
+                                  capacityFactor = monthlyFactors[month - 1];
+                                }
+                              }
+                              
+                              // Calculate width and position in pixels (1 day = 1 pixel)
+                              const daysInMonth = getDaysBetween(monthStart, monthEnd) + 1;
+                              const width = daysInMonth;
+                              
+                              monthBars.push({
+                                label: monthLabel.charAt(0), // Single letter for month
+                                color: getProportionColorHex(capacityFactor),
+                                width,
+                                left: currentLeft
+                              });
+                              
+                              currentLeft += width;
+                              
+                              // Move to next month
+                              currentDate = monthStart.add({ months: 1 }).set({ day: 1 });
                             }
                           }
                           
-                          const width = endDay - startDay + 1;
-                          console.log(`Rendering tile ${key}: canvas dimensions ${canvas.width}x${canvas.height}, showing days ${startDay}-${endDay}`);
-                          
-                          // For display, we need to convert the canvas to an img element
-                          return (
-                            <div key={key} style={{ height: '100%', display: 'flex' }}>
-                              <canvas
-                                ref={(el) => {
-                                  if (el) {
-                                    const ctx = el.getContext('2d');
-                                    if (ctx) {
-                                      el.width = width;
-                                      el.height = canvas.height;
-                                      
-                                      // Handle both HTMLCanvasElement and OffscreenCanvas
-                                      if (canvas instanceof HTMLCanvasElement || canvas instanceof OffscreenCanvas) {
-                                        ctx.drawImage(
-                                          canvas,
-                                          startDay, 0, width, canvas.height,
-                                          0, 0, width, canvas.height
-                                        );
-                                        console.log(`Drew ${width} days from canvas to display`);
-                                      }
-                                    }
-                                  }
-                                }}
-                                style={{ height: '100%', imageRendering: 'pixelated' }}
-                                onMouseMove={(e) => {
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  const x = e.clientX - rect.left;
-                                  const y = e.clientY - rect.top;
-                                  
-                                  // Adjust x coordinate based on the start day
-                                  const tileX = x + startDay;
-                                  
-                                  const tooltipData = tile.getTooltipData(tileX, y);
-                                  if (tooltipData) {
-                                    updateTooltip({
-                                      ...tooltipData,
-                                      x: e.clientX,
-                                      y: e.clientY
-                                    });
-                                  }
-                                }}
-                                onMouseLeave={() => {
-                                  hideTooltip();
-                                }}
-                              />
+                          return monthBars.map((month, idx) => (
+                            <div
+                              key={idx}
+                              className="opennem-month-label"
+                              style={{ 
+                                backgroundColor: month.color,
+                                width: `${month.width}px`,
+                                left: `${month.left}px`
+                              }}
+                            >
+                              {month.label}
                             </div>
-                          );
-                        })}
+                          ));
+                        })()}
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>

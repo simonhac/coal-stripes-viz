@@ -2,48 +2,7 @@ import { GeneratingUnitDTO } from '@/shared/types';
 import { TILE_CONFIG } from '@/shared/config';
 import { CalendarDate } from '@internationalized/date';
 import { getDateFromIndex } from '@/shared/date-utils';
-
-// Singleton colour cache - pre-computed as 32-bit RGBA integers
-const COLOR_CACHE = new Map<number | null, number>();
-
-// Pre-compute all colours at startup as 32-bit integers (RGBA)
-function initializeColorCache(): void {
-  // Add null value - light blue (#e6f3ff)
-  COLOR_CACHE.set(null, 0xffe6f3ff); // ABGR format for little-endian
-  
-  // Pre-compute all integer capacity factors from 0 to 100
-  for (let i = 0; i <= 100; i++) {
-    let r: number, g: number, b: number;
-    if (i < 25) {
-      // Red (#ef4444)
-      r = 0xef;
-      g = 0x44;
-      b = 0x44;
-    } else {
-      // Grayscale based on capacity
-      const greyValue = Math.round(255 * (1 - i / 100));
-      r = greyValue;
-      g = greyValue;
-      b = greyValue;
-    }
-    // Store as ABGR (little-endian) with full alpha
-    const color = (0xff << 24) | (b << 16) | (g << 8) | r;
-    COLOR_CACHE.set(i, color);
-  }
-}
-
-// Initialize the cache immediately
-initializeColorCache();
-
-function getCoalProportionColorInt(capacityFactor: number | null): number {
-  if (capacityFactor === null || capacityFactor === undefined) {
-    return COLOR_CACHE.get(null)!;
-  }
-  
-  // Round to nearest integer and clamp to 0-100
-  const rounded = Math.round(Math.min(100, Math.max(0, capacityFactor)));
-  return COLOR_CACHE.get(rounded)!;
-}
+import { capacityFactorColorMap } from '@/shared/capacity-factor-color-map';
 
 export class FacilityYearTile {
   private facilityCode: string;
@@ -133,7 +92,7 @@ export class FacilityYearTile {
         
         for (let dayIndex = 0; dayIndex < unit.history.data.length; dayIndex++) {
           const capacityFactor = unit.history.data[dayIndex];
-          const color = getCoalProportionColorInt(capacityFactor);
+          const color = capacityFactorColorMap.getIntColor(capacityFactor);
           
           // Fill the column for this day
           for (let y = 0; y < unitHeight; y++) {
@@ -163,7 +122,7 @@ export class FacilityYearTile {
         
         for (let dayIndex = 0; dayIndex < unit.history.data.length; dayIndex++) {
           const capacityFactor = unit.history.data[dayIndex];
-          const color = getCoalProportionColorInt(capacityFactor);
+          const color = capacityFactorColorMap.getIntColor(capacityFactor);
           
           // Extract RGBA components from the 32-bit color
           const r = color & 0xFF;
