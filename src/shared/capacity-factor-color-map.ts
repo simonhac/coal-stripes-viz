@@ -61,7 +61,7 @@ class CapacityFactorColorMap {
   }
 
   getIntColor(capacityFactor: number | null): number {
-    // Light blue for missing data (0xFFe6f3ff in ABGR format)
+    // Light blue for missing data (0xFFFFF3E6 in ABGR format)
     if (capacityFactor === null || capacityFactor === undefined) return 0xFFFFF3E6;
     
     // Round and clamp to valid range

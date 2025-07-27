@@ -45,7 +45,6 @@ export function CapFacXAxis({
         .then(yearData => {
           // Ignore if we've moved to different years
           if (!currentYears.has(year)) {
-            console.log(`CapFacXAxis: Ignoring stale response for year ${year}`);
             return;
           }
           
@@ -58,7 +57,6 @@ export function CapFacXAxis({
         .catch(err => {
           // Ignore if we've moved to different years
           if (!currentYears.has(year)) {
-            console.log(`CapFacXAxis: Ignoring stale error for year ${year}`);
             return;
           }
           

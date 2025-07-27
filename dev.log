@@ -22730,3 +22730,28 @@ Import traces:
  ✓ Compiled in 13ms
  ✓ Compiled in 17ms
  ✓ Compiled in 13ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/app/_not-found/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/app/_not-found/page/app-build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
+}
+ GET /favicon.ico 200 in 254ms

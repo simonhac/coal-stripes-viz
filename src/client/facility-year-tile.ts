@@ -37,7 +37,8 @@ export class FacilityYearTile {
   private calculateUnitHeights(useShortLabels: boolean = false): number[] {
     return this.units.map(unit => {
       const minHeight = useShortLabels ? 16 : 12;
-      return Math.max(minHeight, Math.min(40, unit.capacity / 30));
+      // Ensure heights are always integers to avoid fractional pixel positions
+      return Math.round(Math.max(minHeight, Math.min(40, unit.capacity / 30)));
     });
   }
 
@@ -91,6 +92,7 @@ export class FacilityYearTile {
       this.units.forEach((unit, unitIndex) => {
         const unitHeight = unitHeights[unitIndex];
         
+        
         for (let dayIndex = 0; dayIndex < unit.history.data.length; dayIndex++) {
           const capacityFactor = unit.history.data[dayIndex];
           const color = capacityFactorColorMap.getIntColor(capacityFactor);
@@ -98,6 +100,8 @@ export class FacilityYearTile {
           // Fill the column for this day
           for (let y = 0; y < unitHeight; y++) {
             const pixelIndex = (yOffset + y) * width + dayIndex;
+            
+            
             pixels[pixelIndex] = color;
           }
         }

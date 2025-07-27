@@ -62,17 +62,14 @@ export function CompositeTile({
     setRightTileState(startYear !== endYear ? 'pendingData' : 'idle');
     
     // Load left tile without waiting
-    console.log(`Requesting year ${startYear} for facility ${facilityCode}`);
     yearDataVendor.requestYear(startYear)
       .then(leftYearData => {
         // Ignore if we've moved to a different year
         if (currentStartYear !== startYear) {
-          console.log(`Ignoring stale response for year ${startYear}`);
           return;
         }
         
         const leftFacilityTile = leftYearData.facilityTiles.get(facilityCode);
-        console.log(`Year ${startYear} loaded, has facility ${facilityCode}: ${!!leftFacilityTile}`);
         if (leftFacilityTile) {
           setLeftTile(leftFacilityTile);
           setLeftTileState('hasData');
@@ -84,7 +81,6 @@ export function CompositeTile({
       .catch(error => {
         // Ignore if we've moved to a different year
         if (currentStartYear !== startYear) {
-          console.log(`Ignoring stale error for year ${startYear}`);
           return;
         }
         
@@ -98,7 +94,6 @@ export function CompositeTile({
         .then(rightYearData => {
           // Ignore if we've moved to different years
           if (currentStartYear !== startYear || currentEndYear !== endYear) {
-            console.log(`Ignoring stale response for year ${endYear}`);
             return;
           }
           
@@ -116,7 +111,6 @@ export function CompositeTile({
         .catch(error => {
           // Ignore if we've moved to different years
           if (currentStartYear !== startYear || currentEndYear !== endYear) {
-            console.log(`Ignoring stale error for year ${endYear}`);
             return;
           }
           

@@ -74,7 +74,7 @@ export class PerformanceMonitor {
         if (duration > PERF_CONFIG.SLOW_OPERATION_THRESHOLD) { // Slower than 60fps
           console.warn(`⚠️ SLOW: ${name} took ${duration.toFixed(2)}ms`, metadata);
         } else {
-          console.log(`⏱️ END: ${name} took ${duration.toFixed(2)}ms`, metadata);
+          // console.log(`⏱️ END: ${name} took ${duration.toFixed(2)}ms`, metadata);
         }
         
         break;
