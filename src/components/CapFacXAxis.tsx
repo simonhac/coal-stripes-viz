@@ -1,20 +1,72 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween } from '@/shared/date-utils';
 import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 import { CapFacYear } from '@/client/cap-fac-year';
+import { yearDataVendor } from '@/client/year-data-vendor';
 
 interface CapFacXAxisProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
-  yearDataMap: Map<number, CapFacYear>;
   regionCode?: string;
 }
 
 export function CapFacXAxis({ 
   dateRange, 
-  yearDataMap,
   regionCode = 'NSW1'
 }: CapFacXAxisProps) {
+  const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
+
+  useEffect(() => {
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
+    const years = startYear === endYear ? [startYear] : [startYear, endYear];
+    
+    // Track current request years to ignore stale responses
+    const currentYears = new Set(years);
+    
+    // Clear data for years we no longer need
+    setYearDataMap(prevMap => {
+      const newMap = new Map();
+      for (const [year, data] of prevMap) {
+        if (currentYears.has(year)) {
+          newMap.set(year, data);
+        }
+      }
+      return newMap;
+    });
+    
+    // Fetch year data without waiting
+    years.forEach(year => {
+      yearDataVendor.requestYear(year)
+        .then(yearData => {
+          // Ignore if we've moved to different years
+          if (!currentYears.has(year)) {
+            console.log(`CapFacXAxis: Ignoring stale response for year ${year}`);
+            return;
+          }
+          
+          setYearDataMap(prevMap => {
+            const newMap = new Map(prevMap);
+            newMap.set(yearData.year, yearData);
+            return newMap;
+          });
+        })
+        .catch(err => {
+          // Ignore if we've moved to different years
+          if (!currentYears.has(year)) {
+            console.log(`CapFacXAxis: Ignoring stale error for year ${year}`);
+            return;
+          }
+          
+          console.error(`CapFacXAxis: Failed to load year ${year}:`, err);
+        });
+    });
+    
+    // Cleanup function to mark requests as stale
+    return () => {
+      currentYears.clear();
+    };
+  }, [dateRange]);
   const monthBars: { label: string; color: string; width: number; left: number }[] = [];
   
   let currentDate = dateRange.start;

@@ -10,61 +10,42 @@ import { CapFacTooltip, TooltipData } from '../components/CapFacTooltip';
 import { CapFacXAxis } from '../components/CapFacXAxis';
 import { DateRange } from '../components/DateRange';
 import { yearDataVendor } from '@/client/year-data-vendor';
-import { CapFacYear } from '@/client/cap-fac-year';
 import './opennem.css';
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
   const [dateRange, setDateRange] = useState<{ start: CalendarDate; end: CalendarDate } | null>(null);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Function to load tiles for a given date range
-  const loadTilesForDateRange = async (start: CalendarDate, end: CalendarDate) => {
-    try {
-      setIsNavigating(true);
-      
-      // Determine which years we need
-      const startYear = start.year;
-      const endYear = end.year;
-      const years = startYear === endYear ? [startYear] : [startYear, endYear];
-      
-      // Fetch year data
-      const yearDataPromises = years.map(year => yearDataVendor.requestYear(year));
-      const yearDataResults = await Promise.all(yearDataPromises);
-      
-      // Update year data map
-      const newYearDataMap = new Map(yearDataMap);
-      for (const yearData of yearDataResults) {
-        newYearDataMap.set(yearData.year, yearData);
-      }
-      
-      setYearDataMap(newYearDataMap);
-      setDateRange({ start, end });
-      setIsNavigating(false);
-    } catch (err) {
-      console.error('Error loading tiles:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-      setIsNavigating(false);
-    }
-  };
-
   // Initial load
   useEffect(() => {
     async function initialLoad() {
-      setLoading(true);
-      
-      // Calculate date range for last 12 months
-      const today = getTodayAEST();
-      const endDate = today.subtract({ days: 1 }); // Yesterday
-      const startDate = endDate.subtract({ months: 12 }).add({ days: 1 }); // 12 months ago
-      
-      await loadTilesForDateRange(startDate, endDate);
-      setLoading(false);
+      try {
+        // Calculate date range for last 12 months
+        const today = getTodayAEST();
+        const endDate = today.subtract({ days: 1 }); // Yesterday
+        const startDate = endDate.subtract({ months: 12 }).add({ days: 1 }); // 12 months ago
+        
+        // Determine which years we need
+        const startYear = startDate.year;
+        const endYear = endDate.year;
+        const years = startYear === endYear ? [startYear] : [startYear, endYear];
+        
+        // Load all required years
+        const yearPromises = years.map(year => yearDataVendor.requestYear(year));
+        await Promise.all(yearPromises);
+        
+        // Only set date range after data is loaded
+        setDateRange({ start: startDate, end: endDate });
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to load initial data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load initial data');
+        setLoading(false);
+      }
     }
     
     initialLoad();
@@ -90,7 +71,15 @@ export default function Home() {
         const newStart = dateRange.start.subtract({ months: monthsToMove });
         const newEnd = dateRange.end.subtract({ months: monthsToMove });
         
-        loadTilesForDateRange(newStart, newEnd);
+        setDateRange({ start: newStart, end: newEnd });
+        
+        // Preload the new year if needed
+        const years = new Set([newStart.year, newEnd.year]);
+        years.forEach(year => {
+          yearDataVendor.requestYear(year).catch(err => {
+            console.error(`Failed to preload year ${year}:`, err);
+          });
+        });
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         // Right arrow - pan forward in time (more recent)
@@ -107,9 +96,17 @@ export default function Home() {
           const constrainedEnd = yesterday;
           const constrainedStart = newStart.subtract({ days: Math.abs(daysOver) });
           
-          loadTilesForDateRange(constrainedStart, constrainedEnd);
+          setDateRange({ start: constrainedStart, end: constrainedEnd });
         } else {
-          loadTilesForDateRange(newStart, newEnd);
+          setDateRange({ start: newStart, end: newEnd });
+          
+          // Preload the new year if needed
+          const years = new Set([newStart.year, newEnd.year]);
+          years.forEach(year => {
+            yearDataVendor.requestYear(year).catch(err => {
+              console.error(`Failed to preload year ${year}:`, err);
+            });
+          });
         }
       }
     };
@@ -160,10 +157,6 @@ export default function Home() {
         <div 
           ref={containerRef} 
           className="opennem-stripes-viz"
-          style={{ 
-            opacity: isNavigating ? 0.6 : 1,
-            transition: 'opacity 100ms ease-out'
-          }}
         >
           <div className="opennem-region">
             <div className="opennem-region-header">
@@ -174,17 +167,9 @@ export default function Home() {
               {(() => {
                 if (!dateRange) return null;
                 
-                // Get first facility code from any available year data
-                let firstFacilityCode: string | null = null;
-                for (const [year, yearData] of yearDataMap) {
-                  const facilities = Array.from(yearData.facilityTiles.keys());
-                  if (facilities.length > 0) {
-                    firstFacilityCode = facilities[0];
-                    break;
-                  }
-                }
-                
-                if (!firstFacilityCode) return null;
+                // For now, hardcode the first facility code
+                // In a real app, this would come from a facility selector
+                const firstFacilityCode = 'ERARING';
                 
                 return (
                   <div className="opennem-facility-group">
@@ -199,7 +184,6 @@ export default function Home() {
                     
                     <CapFacXAxis 
                       dateRange={dateRange}
-                      yearDataMap={yearDataMap}
                       regionCode="NSW1"
                     />
                   </div>

@@ -32,6 +32,7 @@ export function CompositeTile({
   const [rightTile, setRightTile] = useState<FacilityYearTile | null>(null);
   const [leftTileState, setLeftTileState] = useState<TileState>('idle');
   const [rightTileState, setRightTileState] = useState<TileState>('idle');
+  const lastKnownHeightRef = useRef<number>(12); // Default height
 
   const drawPendingState = (ctx: CanvasRenderingContext2D, x: number, width: number, height: number) => {
     ctx.fillStyle = '#00ff00';
@@ -49,6 +50,10 @@ export function CompositeTile({
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
     
+    // Track current request years to ignore stale responses
+    let currentStartYear = startYear;
+    let currentEndYear = endYear;
+    
     // Reset states when date range changes
     setLeftTile(null);
     setRightTile(null);
@@ -59,6 +64,12 @@ export function CompositeTile({
     console.log(`Requesting year ${startYear} for facility ${facilityCode}`);
     yearDataVendor.requestYear(startYear)
       .then(leftYearData => {
+        // Ignore if we've moved to a different year
+        if (currentStartYear !== startYear) {
+          console.log(`Ignoring stale response for year ${startYear}`);
+          return;
+        }
+        
         const leftFacilityTile = leftYearData.facilityTiles.get(facilityCode);
         console.log(`Year ${startYear} loaded, has facility ${facilityCode}: ${!!leftFacilityTile}`);
         if (leftFacilityTile) {
@@ -70,6 +81,12 @@ export function CompositeTile({
         }
       })
       .catch(error => {
+        // Ignore if we've moved to a different year
+        if (currentStartYear !== startYear) {
+          console.log(`Ignoring stale error for year ${startYear}`);
+          return;
+        }
+        
         console.error(`Failed to load year ${startYear}:`, error);
         setLeftTileState('error');
       });
@@ -78,6 +95,12 @@ export function CompositeTile({
     if (startYear !== endYear) {
       yearDataVendor.requestYear(endYear)
         .then(rightYearData => {
+          // Ignore if we've moved to different years
+          if (currentStartYear !== startYear || currentEndYear !== endYear) {
+            console.log(`Ignoring stale response for year ${endYear}`);
+            return;
+          }
+          
           const rightFacilityTile = rightYearData.facilityTiles.get(facilityCode);
           if (rightFacilityTile) {
             setRightTile(rightFacilityTile);
@@ -90,10 +113,22 @@ export function CompositeTile({
           }
         })
         .catch(error => {
+          // Ignore if we've moved to different years
+          if (currentStartYear !== startYear || currentEndYear !== endYear) {
+            console.log(`Ignoring stale error for year ${endYear}`);
+            return;
+          }
+          
           console.error(`Failed to load year ${endYear}:`, error);
           setRightTileState('error');
         });
     }
+    
+    // Cleanup function to mark requests as stale
+    return () => {
+      currentStartYear = -1;
+      currentEndYear = -1;
+    };
   }, [dateRange, facilityCode]);
 
   useEffect(() => {
@@ -107,12 +142,14 @@ export function CompositeTile({
     canvas.width = 365;
     canvas.style.width = '365px';
     
-    // Set height from available tiles or use default
-    let canvasHeight = 12; // Default height
+    // Set height from available tiles or use last known height
+    let canvasHeight = lastKnownHeightRef.current;
     if (leftTile) {
       canvasHeight = leftTile.getCanvas().height;
+      lastKnownHeightRef.current = canvasHeight; // Update last known height
     } else if (rightTile) {
       canvasHeight = rightTile.getCanvas().height;
+      lastKnownHeightRef.current = canvasHeight; // Update last known height
     }
     canvas.height = canvasHeight;
     canvas.style.height = `${canvasHeight}px`;
