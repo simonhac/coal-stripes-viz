@@ -319,6 +319,9 @@ header a {
 .opennem-facility-group {
   margin-bottom: 2px;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .opennem-facility-group:last-child {

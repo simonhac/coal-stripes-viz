@@ -18,6 +18,7 @@ export default function Home() {
   const [dateRange, setDateRange] = useState<{ start: CalendarDate; end: CalendarDate } | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
+  const [nswFacilities, setNswFacilities] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Initial load
@@ -36,7 +37,21 @@ export default function Home() {
         
         // Load all required years
         const yearPromises = years.map(year => yearDataVendor.requestYear(year));
-        await Promise.all(yearPromises);
+        const yearResults = await Promise.all(yearPromises);
+        
+        // Extract NSW facilities from the loaded data
+        const nswFacilityCodes = new Set<string>();
+        for (const yearData of yearResults) {
+          for (const unit of yearData.data.data) {
+            if (unit.region === 'NSW1') {
+              nswFacilityCodes.add(unit.facility_code);
+            }
+          }
+        }
+        
+        // Sort facilities alphabetically by code
+        const sortedFacilities = Array.from(nswFacilityCodes).sort();
+        setNswFacilities(sortedFacilities);
         
         // Only set date range after data is loaded
         setDateRange({ start: startDate, end: endDate });
@@ -166,22 +181,22 @@ export default function Home() {
             <div className="opennem-region-content">
               {/* Display tiles */}
               {(() => {
-                if (!dateRange) return null;
-                
-                // For now, hardcode the first facility code
-                // In a real app, this would come from a facility selector
-                const firstFacilityCode = 'ERARING';
+                if (!dateRange || nswFacilities.length === 0) return null;
                 
                 return (
                   <div className="opennem-facility-group">
-                    <CompositeTile
-                      dateRange={dateRange}
-                      facilityCode={firstFacilityCode}
-                      onHover={setTooltipData}
-                      onHoverEnd={() => setTooltipData(null)}
-                      onFocus={() => setIsFocused(true)}
-                      onBlur={() => setIsFocused(false)}
-                    />
+                    {/* Display all NSW facilities */}
+                    {nswFacilities.map(facilityCode => (
+                      <CompositeTile
+                        key={facilityCode}
+                        dateRange={dateRange}
+                        facilityCode={facilityCode}
+                        onHover={setTooltipData}
+                        onHoverEnd={() => setTooltipData(null)}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                      />
+                    ))}
                     
                     <CapFacXAxis 
                       dateRange={dateRange}

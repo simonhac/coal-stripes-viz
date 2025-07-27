@@ -12,6 +12,9 @@ export const PerformanceDisplay: React.FC = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('performance');
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  const [position, setPosition] = useState({ x: window.innerWidth - 520, y: 10 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -37,22 +40,59 @@ export const PerformanceDisplay: React.FC = () => {
     setMetrics({});
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragStart]);
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: 10,
-      right: 10,
-      background: 'rgba(0, 0, 0, 0.8)',
-      color: '#0f0',
-      padding: '10px',
-      borderRadius: '5px',
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      width: '500px',
-      maxWidth: '500px',
-      zIndex: 10000,
-      overflow: 'hidden'
-    }}>
+    <div 
+      onMouseDown={handleMouseDown}
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        background: 'rgba(0, 0, 0, 0.8)',
+        color: '#0f0',
+        padding: '10px',
+        borderRadius: '5px',
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        width: '500px',
+        maxWidth: '500px',
+        zIndex: 10000,
+        overflow: 'hidden',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        userSelect: 'none'
+      }}>
       <div style={{ marginBottom: '5px' }}>
         FPS: <span style={{ color: fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0' }}>
           {fps.toFixed(1)}
