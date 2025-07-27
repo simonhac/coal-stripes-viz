@@ -1,5 +1,7 @@
 import { GeneratingUnitDTO } from '@/shared/types';
 import { TILE_CONFIG } from '@/shared/config';
+import { CalendarDate } from '@internationalized/date';
+import { getDateFromIndex } from '@/shared/date-utils';
 
 // Singleton colour cache - pre-computed as 32-bit RGBA integers
 const COLOR_CACHE = new Map<number | null, number>();
@@ -45,12 +47,26 @@ function getCoalProportionColorInt(capacityFactor: number | null): number {
 
 export class FacilityYearTile {
   private facilityCode: string;
+  private facilityName: string;
   private year: number;
   private units: GeneratingUnitDTO[];
   private canvas: OffscreenCanvas | HTMLCanvasElement | null = null;
+  private unitHeights: number[] | null = null;
 
   constructor(facilityCode: string, year: number, units: GeneratingUnitDTO[]) {
+    if (!facilityCode) {
+      throw new Error('Facility code must not be null');
+    }
+    if (!units || units.length === 0) {
+      throw new Error('Units array must not be empty');
+    }
+    const facilityName = units[0].facility_name;
+    if (!facilityName) {
+      throw new Error('Facility name must not be null');
+    }
+    
     this.facilityCode = facilityCode;
+    this.facilityName = facilityName;
     this.year = year;
     this.units = units;
   }
@@ -70,6 +86,7 @@ export class FacilityYearTile {
     const width = daysInYear;
     
     const unitHeights = this.calculateUnitHeights(useShortLabels);
+    this.unitHeights = unitHeights; // Store for tooltip lookups
     const height = unitHeights.reduce((sum, h) => sum + h, 0);
 
     if (!this.canvas) {
@@ -175,6 +192,7 @@ export class FacilityYearTile {
     
     // Draw debug overlay if needed (this still needs string colors)
     if (TILE_CONFIG.SHOW_DEBUG_OVERLAY) {
+      // Draw border using config values
       ctx.strokeStyle = TILE_CONFIG.DEBUG_BORDER_COLOR;
       ctx.lineWidth = TILE_CONFIG.DEBUG_BORDER_WIDTH;
       ctx.strokeRect(
@@ -184,20 +202,113 @@ export class FacilityYearTile {
         height - TILE_CONFIG.DEBUG_BORDER_WIDTH
       );
 
+      // Draw year text 4 times, equally spaced, 25% smaller
       ctx.fillStyle = TILE_CONFIG.DEBUG_TEXT_COLOR;
-      ctx.font = `bold ${TILE_CONFIG.DEBUG_TEXT_SIZE}px sans-serif`;
+      const fontSize = Math.floor(TILE_CONFIG.DEBUG_TEXT_SIZE * 0.75);
+      ctx.font = `bold ${fontSize}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(
-        this.year.toString(),
-        width / 2,
-        height / 2
-      );
+      
+      const yearText = this.year.toString();
+      const positions = [0.2, 0.4, 0.6, 0.8]; // 20%, 40%, 60%, 80% across the width
+      
+      positions.forEach(xPos => {
+        ctx.fillText(
+          yearText,
+          width * xPos,
+          height / 2
+        );
+      });
     }
 
     const renderTime = performance.now() - startTime;
     console.log(`[FacilityYearTile] Rendered: ${this.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
 
     return this.canvas;
+  }
+
+  /**
+   * Get tooltip data for a given x,y position within the tile
+   * @param x X coordinate within the tile (0-based)
+   * @param y Y coordinate within the tile (0-based)
+   * @returns Tooltip data including date and capacity factor, or null if out of bounds
+   */
+  getTooltipData(x: number, y: number): {
+    date: CalendarDate;
+    capacityFactor: number | null;
+    facilityCode: string;
+    facilityName: string;
+    unitName: string;
+  } | null {
+    // Check bounds
+    if (!this.unitHeights || x < 0 || y < 0) {
+      return null;
+    }
+
+    // Find which unit this y coordinate falls into
+    let yOffset = 0;
+    let unitIndex = -1;
+    
+    for (let i = 0; i < this.unitHeights.length; i++) {
+      const unitHeight = this.unitHeights[i];
+      if (y >= yOffset && y < yOffset + unitHeight) {
+        unitIndex = i;
+        break;
+      }
+      yOffset += unitHeight;
+    }
+
+    if (unitIndex === -1 || unitIndex >= this.units.length) {
+      return null;
+    }
+
+    const unit = this.units[unitIndex];
+    
+    // x coordinate is the day index
+    const dayIndex = Math.floor(x);
+    
+    // Check day bounds
+    if (dayIndex < 0 || dayIndex >= unit.history.data.length) {
+      return null;
+    }
+
+    const capacityFactor = unit.history.data[dayIndex];
+    const date = getDateFromIndex(this.year, dayIndex);
+
+    return {
+      date,
+      capacityFactor,
+      facilityCode: this.facilityCode,
+      facilityName: this.facilityName,
+      unitName: unit.duid
+    };
+  }
+
+  /**
+   * Get the year this tile represents
+   */
+  getYear(): number {
+    return this.year;
+  }
+
+  /**
+   * Get the number of days in this tile
+   */
+  getDaysCount(): number {
+    return this.canvas!.width;
+  }
+
+  /**
+   * Get the facility code
+   */
+  getFacilityCode(): string {
+    return this.facilityCode;
+  }
+
+  /**
+   * Get the facility name
+   */
+  getFacilityName(): string {
+    return this.facilityName;
   }
 }

@@ -32,9 +32,9 @@ export const API_CONFIG = {
 
 // Tile rendering configuration
 export const TILE_CONFIG = {
-  SHOW_DEBUG_OVERLAY: true,         // Show purple border and year text on tiles
-  DEBUG_BORDER_WIDTH: 8,            // Width of debug border in pixels
-  DEBUG_BORDER_COLOR: '#9333ea',    // Purple color for debug border
+  SHOW_DEBUG_OVERLAY: true,         // Show yellow border and year text on tiles
+  DEBUG_BORDER_WIDTH: 3,            // Width of debug border in pixels
+  DEBUG_BORDER_COLOR: 'yellow',     // Yellow color for debug border
   DEBUG_TEXT_SIZE: 40,              // Font size for year text
   DEBUG_TEXT_COLOR: '#9333ea',      // Purple color for year text
 } as const;
