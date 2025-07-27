@@ -54,7 +54,7 @@ export default function TilesTestPage() {
       }
       
       perfMonitor.start('tiles_render_single', { year });
-      const canvas = facilityTile.render();
+      const canvas = facilityTile.getCanvas();
       perfMonitor.end('tiles_render_single', { year, status: 'success' });
       
       if (!canvas) {

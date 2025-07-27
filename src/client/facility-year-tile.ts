@@ -69,6 +69,9 @@ export class FacilityYearTile {
     this.facilityName = facilityName;
     this.year = year;
     this.units = units;
+    
+    // Render the canvas immediately with shortLabels
+    this.renderCanvas(true);
   }
 
   private calculateUnitHeights(useShortLabels: boolean = false): number[] {
@@ -78,7 +81,7 @@ export class FacilityYearTile {
     });
   }
 
-  render(useShortLabels: boolean = false): OffscreenCanvas | HTMLCanvasElement {
+  private renderCanvas(useShortLabels: boolean = false): void {
     const startTime = performance.now();
     
     // Width is exactly the number of days
@@ -223,8 +226,13 @@ export class FacilityYearTile {
 
     const renderTime = performance.now() - startTime;
     console.log(`[FacilityYearTile] Rendered: ${this.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
+  }
 
-    return this.canvas;
+  /**
+   * Get the pre-rendered canvas
+   */
+  getCanvas(): OffscreenCanvas | HTMLCanvasElement {
+    return this.canvas!;
   }
 
   /**
@@ -310,5 +318,13 @@ export class FacilityYearTile {
    */
   getFacilityName(): string {
     return this.facilityName;
+  }
+
+  /**
+   * Get the memory size of the rendered canvas in bytes
+   */
+  getSizeBytes(): number {
+    // Canvas memory: width * height * 4 bytes per pixel (RGBA)
+    return this.canvas!.width * this.canvas!.height * 4;
   }
 }

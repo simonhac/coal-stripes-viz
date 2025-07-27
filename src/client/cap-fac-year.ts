@@ -38,13 +38,9 @@ export function createCapFacYear(
   const jsonSizeBytes = JSON.stringify(data).length;
   let canvasSizeBytes = 0;
   
-  // Pre-render all tiles and calculate canvas memory
+  // Calculate canvas memory
   for (const tile of facilityTiles.values()) {
-    const canvas = tile.render();
-    if (canvas) {
-      // Canvas memory: width * height * 4 bytes per pixel (RGBA)
-      canvasSizeBytes += canvas.width * canvas.height * 4;
-    }
+    canvasSizeBytes += tile.getSizeBytes();
   }
   
   const totalSizeBytes = jsonSizeBytes + canvasSizeBytes;

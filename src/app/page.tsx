@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { getTodayAEST, getDayIndex } from '@/shared/date-utils';
+import { getTodayAEST, getDayIndex, getDaysBetween } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { yearDataVendor } from '@/client/year-data-vendor';
@@ -14,80 +14,131 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [tiles, setTiles] = useState<Map<string, FacilityYearTile>>(new Map());
   const [dateRange, setDateRange] = useState<{ start: CalendarDate; end: CalendarDate } | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const stripeDataRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    async function loadTiles() {
-      try {
-        setLoading(true);
+  // Function to load tiles for a given date range
+  const loadTilesForDateRange = async (start: CalendarDate, end: CalendarDate) => {
+    try {
+      setIsNavigating(true);
+      
+      // Determine which years we need
+      const startYear = start.year;
+      const endYear = end.year;
+      const years = startYear === endYear ? [startYear] : [startYear, endYear];
+      
+      // Fetch year data
+      const yearDataPromises = years.map(year => yearDataVendor.requestYear(year));
+      const yearDataResults = await Promise.all(yearDataPromises);
+      
+      // Create tiles for display
+      const newTiles = new Map<string, FacilityYearTile>();
+      
+      // For now, just get the first facility from NSW
+      for (const yearData of yearDataResults) {
+        // Get all facility tiles
+        const facilities = Array.from(yearData.facilityTiles.entries());
         
-        // Calculate date range for last 12 months
-        const today = getTodayAEST();
-        const endDate = today.subtract({ days: 1 }); // Yesterday
-        const startDate = endDate.subtract({ months: 12 }).add({ days: 1 }); // 12 months ago
-        
-        setDateRange({ start: startDate, end: endDate });
-        
-        // Determine which years we need
-        const startYear = startDate.year;
-        const endYear = endDate.year;
-        const years = startYear === endYear ? [startYear] : [startYear, endYear];
-        
-        // Fetch year data
-        const yearDataPromises = years.map(year => yearDataVendor.requestYear(year));
-        const yearDataResults = await Promise.all(yearDataPromises);
-        
-        // Create tiles for display
-        const newTiles = new Map<string, FacilityYearTile>();
-        
-        // For now, just get the first facility from NSW
-        for (const yearData of yearDataResults) {
-          // Get all facility tiles
-          const facilities = Array.from(yearData.facilityTiles.entries());
+        if (facilities.length > 0) {
+          // Get the first facility tile for testing
+          const [facilityCode, tile] = facilities[0];
           
-          if (facilities.length > 0) {
-            // Get the first facility tile for testing
-            const [facilityCode, tile] = facilities[0];
-            
-            console.log(`Loaded tile for ${facilityCode} year ${yearData.year}`);
-            
-            newTiles.set(`${facilityCode}-${yearData.year}`, tile);
-          }
+          console.log(`Loaded tile for ${facilityCode} year ${yearData.year}`);
+          
+          newTiles.set(`${facilityCode}-${yearData.year}`, tile);
         }
-        
-        setTiles(newTiles);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error loading tiles:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-        setLoading(false);
       }
+      
+      setTiles(newTiles);
+      setDateRange({ start, end });
+      setIsNavigating(false);
+    } catch (err) {
+      console.error('Error loading tiles:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setIsNavigating(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    async function initialLoad() {
+      setLoading(true);
+      
+      // Calculate date range for last 12 months
+      const today = getTodayAEST();
+      const endDate = today.subtract({ days: 1 }); // Yesterday
+      const startDate = endDate.subtract({ months: 12 }).add({ days: 1 }); // 12 months ago
+      
+      await loadTilesForDateRange(startDate, endDate);
+      setLoading(false);
     }
     
-    loadTiles();
+    initialLoad();
   }, []);
 
-  // Format date range
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Only handle arrow keys if stripe data is focused
+      if (!isFocused || !dateRange) return;
+
+      const isShift = e.shiftKey;
+      const monthsToMove = isShift ? 6 : 1;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        // Left arrow - pan backward in time (older)
+        const newStart = dateRange.start.subtract({ months: monthsToMove });
+        const newEnd = dateRange.end.subtract({ months: monthsToMove });
+        
+        loadTilesForDateRange(newStart, newEnd);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        // Right arrow - pan forward in time (more recent)
+        const newStart = dateRange.start.add({ months: monthsToMove });
+        const newEnd = dateRange.end.add({ months: monthsToMove });
+        
+        // Get yesterday as the latest possible date
+        const yesterday = getTodayAEST().subtract({ days: 1 });
+        
+        // Check boundaries - don't go past yesterday
+        if (newEnd.compare(yesterday) > 0) {
+          // Adjust to end at yesterday
+          const daysOver = getDaysBetween(yesterday, newEnd);
+          const constrainedEnd = yesterday;
+          const constrainedStart = newStart.subtract({ days: Math.abs(daysOver) });
+          
+          loadTilesForDateRange(constrainedStart, constrainedEnd);
+        } else {
+          loadTilesForDateRange(newStart, newEnd);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [dateRange, isFocused]);
+
+  // Format date range for display
   const formatDateRange = () => {
-    const today = getTodayAEST();
-    const endDate = today.subtract({ days: 1 });
-    const startDate = endDate.subtract({ months: 12 }).add({ days: 1 });
+    if (!dateRange) return 'Loading...';
     
-    const startFormatted = startDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-      day: 'numeric',
-      month: 'long', 
-      year: 'numeric',
-      timeZone: 'Australia/Brisbane'
-    });
+    const format = (date: CalendarDate) => 
+      date.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
+        day: 'numeric',
+        month: 'long', 
+        year: 'numeric',
+        timeZone: 'Australia/Brisbane'
+      });
     
-    const endFormatted = endDate.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-      day: 'numeric',
-      month: 'long', 
-      year: 'numeric',
-      timeZone: 'Australia/Brisbane'
-    });
-    
-    return `${startFormatted} – ${endFormatted}`;
+    return `${format(dateRange.start)} – ${format(dateRange.end)}`;
   };
 
   // Tooltip functions
@@ -195,7 +246,14 @@ export default function Home() {
         </div>
 
         {/* Main Stripes Visualization */}
-        <div ref={containerRef} className="opennem-stripes-viz">
+        <div 
+          ref={containerRef} 
+          className="opennem-stripes-viz"
+          style={{ 
+            opacity: isNavigating ? 0.6 : 1,
+            transition: 'opacity 100ms ease-out'
+          }}
+        >
           <div className="opennem-region">
             <div className="opennem-region-header">
               New South Wales
@@ -209,11 +267,18 @@ export default function Home() {
                       {/* Get facility name from first tile */}
                       {Array.from(tiles.values())[0].getFacilityName()}
                     </div>
-                    <div className="opennem-stripe-data">
+                    <div 
+                      ref={stripeDataRef}
+                      className="opennem-stripe-data"
+                      tabIndex={0}
+                      style={{ cursor: 'grab' }}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
+                    >
                       <div className="opennem-stripe-data-inner" style={{ display: 'flex', height: '100%' }}>
                         {Array.from(tiles.entries()).map(([key, tile]) => {
                           const year = tile.getYear();
-                          const canvas = tile.render();
+                          const canvas = tile.getCanvas();
                           
                           // Calculate day range for this year
                           let startDay = 0;
