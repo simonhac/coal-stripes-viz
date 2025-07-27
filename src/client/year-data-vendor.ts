@@ -127,6 +127,13 @@ export class YearDataVendor {
       throw error;
     }
   }
+
+  /**
+   * Clear all cached data - useful when feature flags change
+   */
+  clearCache(): void {
+    this.cache.clear();
+  }
 }
 
 // Export singleton instance

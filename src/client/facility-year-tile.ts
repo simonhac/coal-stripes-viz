@@ -3,6 +3,7 @@ import { TILE_CONFIG } from '@/shared/config';
 import { CalendarDate } from '@internationalized/date';
 import { getDateFromIndex } from '@/shared/date-utils';
 import { capacityFactorColorMap } from '@/shared/capacity-factor-color-map';
+import { featureFlags } from '@/shared/feature-flags';
 
 export class FacilityYearTile {
   private facilityCode: string;
@@ -152,8 +153,8 @@ export class FacilityYearTile {
       console.warn('Skipping putImageData in test environment');
     }
     
-    // Draw debug overlay if needed (this still needs string colors)
-    if (TILE_CONFIG.SHOW_DEBUG_OVERLAY) {
+    // Draw debug overlay if tileDebugging feature flag is enabled
+    if (featureFlags.get('tileDebugging')) {
       // Draw border using config values
       ctx.strokeStyle = TILE_CONFIG.DEBUG_BORDER_COLOR;
       ctx.lineWidth = TILE_CONFIG.DEBUG_BORDER_WIDTH;
