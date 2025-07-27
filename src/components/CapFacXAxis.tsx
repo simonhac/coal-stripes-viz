@@ -8,11 +8,15 @@ import { yearDataVendor } from '@/client/year-data-vendor';
 interface CapFacXAxisProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
   regionCode?: string;
+  onHover?: (tooltipData: any) => void;
+  onHoverEnd?: () => void;
 }
 
 export function CapFacXAxis({ 
   dateRange, 
-  regionCode = 'NSW1'
+  regionCode = 'NSW1',
+  onHover,
+  onHoverEnd
 }: CapFacXAxisProps) {
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
 
@@ -67,7 +71,7 @@ export function CapFacXAxis({
       currentYears.clear();
     };
   }, [dateRange]);
-  const monthBars: { label: string; color: string; width: number; left: number }[] = [];
+  const monthBars: { label: string; color: string; width: number; left: number; date: CalendarDate; capacityFactor: number | null }[] = [];
   
   let currentDate = dateRange.start;
   let currentLeft = 0;
@@ -106,7 +110,9 @@ export function CapFacXAxis({
       label: monthLabel.charAt(0), // Single letter for month
       color: getProportionColorHex(capacityFactor),
       width,
-      left: currentLeft
+      left: currentLeft,
+      date: monthStart,
+      capacityFactor
     });
     
     currentLeft += width;
@@ -115,6 +121,17 @@ export function CapFacXAxis({
     currentDate = monthStart.add({ months: 1 }).set({ day: 1 });
   }
   
+  const handleMouseEnter = (month: typeof monthBars[0]) => {
+    if (onHover) {
+      onHover({
+        date: month.date,
+        label: 'New South Wales',
+        capacityFactor: month.capacityFactor,
+        isRegion: true
+      });
+    }
+  };
+
   return (
     <div className="opennem-region-x-axis">
       <div className="opennem-region-x-axis-inner">
@@ -127,6 +144,8 @@ export function CapFacXAxis({
               width: `${month.width}px`,
               left: `${month.left}px`
             }}
+            onMouseEnter={() => handleMouseEnter(month)}
+            onMouseLeave={onHoverEnd}
           >
             {month.label}
           </div>

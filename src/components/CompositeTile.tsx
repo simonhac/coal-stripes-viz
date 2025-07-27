@@ -232,11 +232,14 @@ export function CompositeTile({
         const tileX = x + leftStartDay;
         const tooltipData = leftTile.getTooltipData(tileX, y);
         if (tooltipData) {
-          onHover({
-            ...tooltipData,
-            x: e.clientX,
-            y: e.clientY
-          });
+          // Convert to new format
+          const formattedData: any = {
+            date: tooltipData.date,
+            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            capacityFactor: tooltipData.capacityFactor,
+            isRegion: false
+          };
+          onHover(formattedData);
         }
       }
     } else if (startYear !== endYear) {
@@ -245,11 +248,14 @@ export function CompositeTile({
         const tileX = x - leftWidth;
         const tooltipData = rightTile.getTooltipData(tileX, y);
         if (tooltipData) {
-          onHover({
-            ...tooltipData,
-            x: e.clientX,
-            y: e.clientY
-          });
+          // Convert to new format
+          const formattedData: any = {
+            date: tooltipData.date,
+            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            capacityFactor: tooltipData.capacityFactor,
+            isRegion: false
+          };
+          onHover(formattedData);
         }
       }
     }

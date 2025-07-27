@@ -249,6 +249,9 @@ header a {
   letter-spacing: 0.5px;
   padding-left: 6px;
   margin-left: 0;
+  display: flex;
+  align-items: flex-end; /* Align bottoms */
+  justify-content: space-between;
 }
 
 .opennem-region-content {
@@ -400,34 +403,76 @@ header a {
   z-index: 10;
 }
 
-/* Tooltip */
-.opennem-tooltip {
-  position: fixed;
-  background: rgba(0, 0, 0, 0.9);
-  color: white;
-  padding: 8px 12px;
-  border-radius: var(--header-hover-radius);
-  font-size: 12px;
-  line-height: 1.4;
-  pointer-events: none;
-  z-index: 1000;
-  min-width: 150px;
-  max-width: 200px;
+/* Tooltip - OpenElectricity style */
+.hover-date-value {
+  display: flex;
+  align-items: center;
+  height: 19px;
+  font-family: var(--font-stack);
+  font-size: 9.9px;
   white-space: nowrap;
+  flex-wrap: nowrap;
+  margin-left: auto; /* Push to the right */
 }
 
-.opennem-tooltip-date {
+.hover-date,
+.hover-values {
+  background: rgba(255, 255, 255, 0.5);
+  padding: 3px 12px 2px;
+  white-space: nowrap;
+  display: inline-flex;
+}
+
+.hover-date {
   font-weight: 600;
-  margin-bottom: 4px;
+  background-color: rgba(227, 74, 51, 0.1); /* opennem-primary with 0.1 opacity */
+  color: #444;
+  border-radius: 1px;
+  flex-shrink: 0;
 }
 
-.opennem-tooltip-facility {
-  color: #ccc;
-  margin-bottom: 2px;
+.hover-values {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 1px;
+  flex-shrink: 0;
+  font-weight: 400;
 }
 
-.opennem-tooltip-value {
-  color: #ccc;
+.facility-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hover-values strong {
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.tooltip-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.total-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #666;
+  padding-left: 16px;
+  border-left: 1px solid #e5e5e5;
+}
+
+.total-value strong {
+  color: #333;
+  font-weight: 600;
 }
 
 /* Responsive design */

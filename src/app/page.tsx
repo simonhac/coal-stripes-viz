@@ -160,7 +160,8 @@ export default function Home() {
         >
           <div className="opennem-region">
             <div className="opennem-region-header">
-              New South Wales
+              <span>New South Wales</span>
+              <CapFacTooltip data={tooltipData} />
             </div>
             <div className="opennem-region-content">
               {/* Display tiles */}
@@ -185,6 +186,8 @@ export default function Home() {
                     <CapFacXAxis 
                       dateRange={dateRange}
                       regionCode="NSW1"
+                      onHover={setTooltipData}
+                      onHoverEnd={() => setTooltipData(null)}
                     />
                   </div>
                 );
@@ -193,9 +196,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-      
-      {/* Tooltip */}
-      <CapFacTooltip data={tooltipData} />
     </>
   );
 }
