@@ -34,11 +34,9 @@ export function CompositeTile({
   const [leftTileState, setLeftTileState] = useState<TileState>('idle');
   const [rightTileState, setRightTileState] = useState<TileState>('idle');
   const lastKnownHeightRef = useRef<number>(12); // Default height
-
-  const drawPendingState = (ctx: CanvasRenderingContext2D, x: number, width: number, height: number) => {
-    ctx.fillStyle = '#00ff00';
-    ctx.fillRect(x, 0, width, height);
-  };
+  const animationFrameRef = useRef<number | null>(null);
+  const shimmerOffsetRef = useRef<number>(0);
+  const lastAnimationTimeRef = useRef<number>(performance.now());
 
   const drawErrorState = (ctx: CanvasRenderingContext2D, x: number, width: number, height: number) => {
     ctx.fillStyle = '#ff0000';
@@ -142,6 +140,12 @@ export function CompositeTile({
       return;
     }
 
+    // Cancel any existing animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     // Set canvas size to exactly 365 pixels wide
     canvas.width = 365;
     canvas.style.width = '365px';
@@ -158,63 +162,117 @@ export function CompositeTile({
     canvas.height = canvasHeight;
     canvas.style.height = `${canvasHeight}px`;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
     
-    let currentX = 0;
-    
-    // Draw left tile
+    // Calculate dimensions
     const leftStartDay = getDayIndex(dateRange.start);
     const leftEndDay = startYear === endYear 
       ? getDayIndex(dateRange.end) 
       : (leftTile ? leftTile.getDaysCount() - 1 : getDayIndex(new CalendarDate(startYear, 12, 31)));
     const leftWidth = leftEndDay - leftStartDay + 1;
     
-    // Calculate right tile info for logging
-    const rightStartDay = 0;
-    const rightEndDay = startYear !== endYear ? getDayIndex(dateRange.end) : -1;
+    const rightWidth = startYear !== endYear ? getDayIndex(dateRange.end) + 1 : 0;
     
-    console.log(`CompositeTile: LEFT state: ${leftTileState}, tile: ${!!leftTile}, year: ${startYear}, start-end: ${leftStartDay}-${leftEndDay}. RIGHT state: ${rightTileState}, tile: ${!!rightTile}, year: ${endYear}, start-end: ${rightStartDay}-${rightEndDay}.`);
+    // Check if we need shimmer animation
+    const needsShimmer = leftTileState === 'pendingData' || (startYear !== endYear && rightTileState === 'pendingData');
     
-    if (leftTileState === 'hasData' && leftTile) {
-      const sourceCanvas = leftTile.getCanvas();
-      ctx.drawImage(
-        sourceCanvas,
-        leftStartDay, 0, leftWidth, sourceCanvas.height,
-        currentX, 0, leftWidth, sourceCanvas.height
-      );
-    } else if (leftTileState === 'pendingData') {
-      drawPendingState(ctx, currentX, leftWidth, canvas.height);
-    } else if (leftTileState === 'error') {
-      drawErrorState(ctx, currentX, leftWidth, canvas.height);
-    }
-    
-    currentX += leftWidth;
-    
-    // Draw right tile if we're spanning two years
-    if (startYear !== endYear) {
-      const rightStartDay = 0;
-      const rightEndDay = getDayIndex(dateRange.end);
-      const rightWidth = rightEndDay - rightStartDay + 1;
+    const render = () => {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      if (rightTileState === 'hasData' && rightTile) {
-        const sourceCanvas = rightTile.getCanvas();
+      let currentX = 0;
+      
+      // Draw left tile
+      if (leftTileState === 'hasData' && leftTile) {
+        const sourceCanvas = leftTile.getCanvas();
         ctx.drawImage(
           sourceCanvas,
-          rightStartDay, 0, rightWidth, sourceCanvas.height,
-          currentX, 0, rightWidth, sourceCanvas.height
+          leftStartDay, 0, leftWidth, sourceCanvas.height,
+          currentX, 0, leftWidth, sourceCanvas.height
         );
-      } else if (rightTileState === 'pendingData') {
-        drawPendingState(ctx, currentX, rightWidth, canvas.height);
-      } else if (rightTileState === 'error') {
-        drawErrorState(ctx, currentX, rightWidth, canvas.height);
+      } else if (leftTileState === 'error') {
+        drawErrorState(ctx, currentX, leftWidth, canvas.height);
       }
-    }
+      
+      currentX += leftWidth;
+      
+      // Draw right tile if we're spanning two years
+      if (startYear !== endYear) {
+        if (rightTileState === 'hasData' && rightTile) {
+          const sourceCanvas = rightTile.getCanvas();
+          ctx.drawImage(
+            sourceCanvas,
+            0, 0, rightWidth, sourceCanvas.height,
+            currentX, 0, rightWidth, sourceCanvas.height
+          );
+        } else if (rightTileState === 'error') {
+          drawErrorState(ctx, currentX, rightWidth, canvas.height);
+        }
+      }
+      
+      // Draw shimmer overlay if needed
+      if (needsShimmer) {
+        // Calculate shimmer region
+        let shimmerX = 0;
+        let shimmerWidth = 0;
+        
+        if (leftTileState === 'pendingData' && (!startYear || startYear === endYear || rightTileState !== 'pendingData')) {
+          // Only left is pending
+          shimmerX = 0;
+          shimmerWidth = leftWidth;
+        } else if (startYear !== endYear && rightTileState === 'pendingData' && leftTileState !== 'pendingData') {
+          // Only right is pending
+          shimmerX = leftWidth;
+          shimmerWidth = rightWidth;
+        } else if (leftTileState === 'pendingData' && rightTileState === 'pendingData') {
+          // Both are pending - single shimmer across both
+          shimmerX = 0;
+          shimmerWidth = leftWidth + rightWidth;
+        }
+        
+        if (shimmerWidth > 0) {
+          // Update shimmer offset
+          const now = performance.now();
+          const delta = now - lastAnimationTimeRef.current;
+          lastAnimationTimeRef.current = now;
+          shimmerOffsetRef.current = (shimmerOffsetRef.current + delta * 0.2) % (shimmerWidth * 2);
+          
+          // Fill base color
+          ctx.fillStyle = '#eeeeee';
+          ctx.fillRect(shimmerX, 0, shimmerWidth, canvas.height);
+          
+          // Draw shimmer effect
+          const gradientWidth = shimmerWidth * 0.4;
+          const gradientX = shimmerX + shimmerOffsetRef.current - gradientWidth;
+          
+          const gradient = ctx.createLinearGradient(gradientX, 0, gradientX + gradientWidth, 0);
+          gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+          gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)');
+          gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          
+          ctx.save();
+          ctx.fillStyle = gradient;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillRect(shimmerX, 0, shimmerWidth, canvas.height);
+          ctx.restore();
+          
+          // Continue animation
+          animationFrameRef.current = requestAnimationFrame(render);
+        }
+      }
+    };
     
+    render();
     perfMonitor.end(perfName);
+    
+    // Cleanup
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
   }, [dateRange, leftTile, rightTile, leftTileState, rightTileState, facilityCode]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {

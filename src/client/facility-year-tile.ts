@@ -189,7 +189,7 @@ export class FacilityYearTile {
     }
 
     const renderTime = performance.now() - startTime;
-    console.log(`[FacilityYearTile] Rendered: ${this.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
+    // console.log(`[FacilityYearTile] Rendered: ${this.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
   }
 
   /**
