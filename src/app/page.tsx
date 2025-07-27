@@ -16,7 +16,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<{ start: CalendarDate; end: CalendarDate } | null>(null);
-  const [isFocused, setIsFocused] = useState(false);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [nswFacilities, setNswFacilities] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,8 +73,8 @@ export default function Home() {
         return;
       }
 
-      // Only handle arrow keys if stripe data is focused
-      if (!isFocused || !dateRange) return;
+      // Only handle if we have a date range
+      if (!dateRange) return;
 
       const isShift = e.shiftKey;
       const monthsToMove = isShift ? 6 : 1;
@@ -128,7 +127,7 @@ export default function Home() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dateRange, isFocused]);
+  }, [dateRange]);
 
 
   if (loading) {
@@ -193,8 +192,6 @@ export default function Home() {
                         facilityCode={facilityCode}
                         onHover={setTooltipData}
                         onHoverEnd={() => setTooltipData(null)}
-                        onFocus={() => setIsFocused(true)}
-                        onBlur={() => setIsFocused(false)}
                       />
                     ))}
                     
