@@ -22094,3 +22094,70 @@ NEM data request: 100%
 ✅ API response: 2018 | 3409ms
 🌐 API: Returning data for year 2018
  GET /api/capacity-factors?year=2018 200 in 3438ms
+🌐 API: Fetching capacity factors for year 2017
+📡 API fetch: 2017 (365 days)
+   Fetching data for 18 facilities across 2 networks...
+   Fetching NEM network: 15 facilities
+[OpenElectricity] Getting facility data {
+  networkCode: 'NEM',
+  facilityCodes: [
+    'BAYSW',     'CALL_B',
+    'CALLIDEC1', 'ERARING',
+    'GSTONE',    'KOGANCK',
+    'LOYYANGA',  'LOYYB',
+    'MILLMERN',  'MP',
+    'STANWELL',  'TARONG',
+    'TARONGN',   'VP',
+    'YALLOURN'
+  ],
+  metrics: [ 'energy' ],
+  params: { interval: '1d', dateStart: '2017-01-01', dateEnd: '2018-01-01' }
+}
+[OpenElectricity] Making request {
+  url: 'https://api.openelectricity.org.au/data/facilities/NEM?metrics=energy&interval=1d&date_start=2017-01-01&date_end=2018-01-01&facility_code=BAYSW&facility_code=CALL_B&facility_code=CALLIDEC1&facility_code=ERARING&facility_code=GSTONE&facility_code=KOGANCK&facility_code=LOYYANGA&facility_code=LOYYB&facility_code=MILLMERN&facility_code=MP&facility_code=STANWELL&facility_code=TARONG&facility_code=TARONGN&facility_code=VP&facility_code=YALLOURN',
+  method: 'GET',
+  headers: { Authorization: '***', 'Content-Type': 'application/json' }
+}
+   Fetching WEM network: 3 facilities
+[OpenElectricity] Getting facility data {
+  networkCode: 'WEM',
+  facilityCodes: [ 'BLUEWATERS', 'COLLIE', 'MUJA' ],
+  metrics: [ 'energy' ],
+  params: { interval: '1d', dateStart: '2017-01-01', dateEnd: '2018-01-01' }
+}
+[OpenElectricity] Making request {
+  url: 'https://api.openelectricity.org.au/data/facilities/WEM?metrics=energy&interval=1d&date_start=2017-01-01&date_end=2018-01-01&facility_code=BLUEWATERS&facility_code=COLLIE&facility_code=MUJA',
+  method: 'GET',
+  headers: { Authorization: '***', 'Content-Type': 'application/json' }
+}
+[OpenElectricity] Request completed in 2015ms { status: 403, statusText: 'Forbidden' }
+[OpenElectricity] Permission denied { status: 403, statusText: 'Forbidden' }
+[OpenElectricity] Request completed in 2845ms { status: 200, statusText: 'OK' }
+WEM data request: 100%
+[OpenElectricity] Getting facility data {
+  networkCode: 'NEM',
+  facilityCodes: [
+    'BAYSW',     'CALL_B',
+    'CALLIDEC1', 'ERARING',
+    'GSTONE',    'KOGANCK',
+    'LOYYANGA',  'LOYYB',
+    'MILLMERN',  'MP',
+    'STANWELL',  'TARONG',
+    'TARONGN',   'VP',
+    'YALLOURN'
+  ],
+  metrics: [ 'energy' ],
+  params: { interval: '1d', dateStart: '2017-01-01', dateEnd: '2018-01-01' }
+}
+[OpenElectricity] Making request {
+  url: 'https://api.openelectricity.org.au/data/facilities/NEM?metrics=energy&interval=1d&date_start=2017-01-01&date_end=2018-01-01&facility_code=BAYSW&facility_code=CALL_B&facility_code=CALLIDEC1&facility_code=ERARING&facility_code=GSTONE&facility_code=KOGANCK&facility_code=LOYYANGA&facility_code=LOYYB&facility_code=MILLMERN&facility_code=MP&facility_code=STANWELL&facility_code=TARONG&facility_code=TARONGN&facility_code=VP&facility_code=YALLOURN',
+  method: 'GET',
+  headers: { Authorization: '***', 'Content-Type': 'application/json' }
+}
+[OpenElectricity] Request completed in 2276ms { status: 200, statusText: 'OK' }
+NEM data request: 100%
+   Received 18615 data points
+   Processing completed in 51ms
+✅ API response: 2017 | 5452ms
+🌐 API: Returning data for year 2017
+ GET /api/capacity-factors?year=2017 200 in 5523ms
