@@ -4,15 +4,19 @@ import { yearDataVendor } from '@/client/year-data-vendor';
 import type { CacheStats } from '@/client/lru-cache';
 
 type DisplayMode = 'performance' | 'caches';
+type DisclosureState = 'collapsed' | 'expanded' | 'full';
+
+// State sequence: up -> right -> down -> right -> (repeat)
+const stateSequence: DisclosureState[] = ['collapsed', 'expanded', 'full', 'expanded'];
 
 export const PerformanceDisplay: React.FC = () => {
   const [fps, setFps] = useState(0);
   const [memory, setMemory] = useState<{ heapUsed: number; heapTotal: number } | null>(null);
   const [metrics, setMetrics] = useState<Record<string, { count: number; avgDuration: number; totalDuration: number }>>({});
-  const [showDetails, setShowDetails] = useState(false);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('performance');
+  const [sequenceIndex, setSequenceIndex] = useState(0);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('caches');
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
-  const [position, setPosition] = useState({ x: window.innerWidth - 520, y: 10 });
+  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 50, y: 10 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
@@ -86,113 +90,155 @@ export const PerformanceDisplay: React.FC = () => {
         borderRadius: '5px',
         fontFamily: 'monospace',
         fontSize: '12px',
-        width: '500px',
-        maxWidth: '500px',
+        width: stateSequence[sequenceIndex] === 'collapsed' ? 'auto' : '300px',
+        minWidth: stateSequence[sequenceIndex] === 'collapsed' ? 'auto' : '300px',
+        maxWidth: stateSequence[sequenceIndex] === 'collapsed' ? 'none' : '300px',
         zIndex: 10000,
         overflow: 'hidden',
         cursor: isDragging ? 'grabbing' : 'grab',
-        userSelect: 'none'
+        userSelect: 'none',
+        boxSizing: 'border-box',
+        opacity: stateSequence[sequenceIndex] === 'collapsed' ? 0.2 : 1,
+        transition: 'width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, opacity 0.3s ease'
       }}>
-      <div style={{ marginBottom: '5px' }}>
-        FPS: <span style={{ color: fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0' }}>
-          {fps.toFixed(1)}
-        </span>
-      </div>
-      
-      {memory && (
-        <div style={{ marginBottom: '5px' }}>
-          Memory: {memory.heapUsed.toFixed(1)}MB / {memory.heapTotal.toFixed(1)}MB
-        </div>
-      )}
-      
-      <div style={{ 
-        marginBottom: '5px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '5px'
-      }}>
-        <button 
-          onClick={() => setDisplayMode(displayMode === 'performance' ? 'caches' : 'performance')}
-          style={{ 
-            background: '#333', 
-            color: '#0f0', 
-            border: '1px solid #0f0',
-            borderRadius: '3px',
-            padding: '2px 5px',
-            cursor: 'pointer'
-          }}
-        >
-          {displayMode === 'performance' ? 'Caches' : 'Performance'}
-        </button>
-        {displayMode === 'performance' && (
-          <button 
-            onClick={() => setShowDetails(!showDetails)}
+      <div style={{ marginBottom: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span 
+            onClick={() => {
+              setSequenceIndex(prev => (prev + 1) % stateSequence.length);
+            }}
             style={{ 
-              background: '#333', 
-              color: '#0f0', 
-              border: '1px solid #0f0',
-              borderRadius: '3px',
-              padding: '2px 5px',
               cursor: 'pointer',
-              marginRight: '5px'
+              marginRight: '5px',
+              fontSize: '18px',
+              fontFamily: 'Arial',
+              display: 'inline-block',
+              transform: stateSequence[sequenceIndex] === 'collapsed' ? 'rotate(-90deg)' : 
+                         stateSequence[sequenceIndex] === 'expanded' ? 'rotate(0deg)' : 
+                         'rotate(90deg)',
+              transition: 'transform 0.3s ease',
+              userSelect: 'none'
             }}
           >
-            {showDetails ? 'Hide' : 'Show'} Details
-          </button>
+            ▸
+          </span>
+          <span style={{ color: fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0' }}>
+            {fps.toFixed(0)}fps
+          </span>
+        </div>
+        {memory && stateSequence[sequenceIndex] !== 'collapsed' && (
+          <span style={{ fontSize: '11px', color: '#888' }}>
+            Heap used <span style={{ fontWeight: 'bold' }}>{memory.heapUsed.toFixed(1)}/{memory.heapTotal.toFixed(1)} MB</span>
+          </span>
         )}
-        <button 
-          onClick={handleLogReport}
-          style={{ 
-            background: '#333', 
-            color: '#0f0', 
-            border: '1px solid #0f0',
-            borderRadius: '3px',
-            padding: '2px 5px',
-            cursor: 'pointer'
-          }}
-        >
-          Log Report
-        </button>
-        <button 
-          onClick={handleClear}
-          style={{ 
-            background: '#333', 
-            color: '#f00', 
-            border: '1px solid #f00',
-            borderRadius: '3px',
-            padding: '2px 5px',
-            cursor: 'pointer'
-          }}
-        >
-          Clear
-        </button>
       </div>
       
-      {displayMode === 'performance' && showDetails && (
+      {stateSequence[sequenceIndex] !== 'collapsed' && (
+        <div style={{ 
+          marginBottom: '5px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '5px'
+        }}>
+          <div style={{ 
+          display: 'inline-flex',
+          border: '1px solid #0f0',
+          borderRadius: '3px',
+          overflow: 'hidden'
+        }}>
+          <button 
+            onClick={() => setDisplayMode('caches')}
+            style={{ 
+              background: displayMode === 'caches' ? '#0f0' : '#333', 
+              color: displayMode === 'caches' ? '#000' : '#0f0', 
+              border: 'none',
+              borderRight: '1px solid #0f0',
+              padding: '2px 8px',
+              cursor: 'pointer',
+              fontSize: '11px'
+            }}
+          >
+            Cache
+          </button>
+          <button 
+            onClick={() => setDisplayMode('performance')}
+            style={{ 
+              background: displayMode === 'performance' ? '#0f0' : '#333', 
+              color: displayMode === 'performance' ? '#000' : '#0f0', 
+              border: 'none',
+              padding: '2px 8px',
+              cursor: 'pointer',
+              fontSize: '11px'
+            }}
+          >
+            Timing
+          </button>
+        </div>
+      </div>
+      )}
+      
+      {displayMode === 'performance' && stateSequence[sequenceIndex] === 'full' && (
         <div style={{ 
           marginTop: '10px', 
-          maxHeight: '400px', 
-          overflowY: 'auto',
           borderTop: '1px solid #0f0',
           paddingTop: '5px'
         }}>
+          <div style={{ 
+            marginBottom: '10px',
+            display: 'flex',
+            gap: '5px'
+          }}>
+            <button 
+              onClick={handleLogReport}
+              style={{ 
+                background: '#333', 
+                color: '#0f0', 
+                border: '1px solid #0f0',
+                borderRadius: '3px',
+                padding: '1px 5px',
+                cursor: 'pointer',
+                fontSize: '10px'
+              }}
+            >
+              Log Report
+            </button>
+            <button 
+              onClick={handleClear}
+              style={{ 
+                background: '#333', 
+                color: '#f00', 
+                border: '1px solid #f00',
+                borderRadius: '3px',
+                padding: '1px 5px',
+                cursor: 'pointer',
+                fontSize: '10px'
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          <div style={{
+            maxHeight: '300px', 
+            overflowY: 'auto'
+          }}>
           {Object.entries(metrics)
             .sort(([, a], [, b]) => b.totalDuration - a.totalDuration)
             .slice(0, 10)
             .map(([name, stats]) => (
               <div key={name} style={{ marginBottom: '5px', fontSize: '10px' }}>
-                <div style={{ color: '#0f0' }}>{name}:</div>
-                <div style={{ marginLeft: '10px', color: '#888' }}>
+                <div style={{ color: '#0f0', wordBreak: 'break-all', overflow: 'hidden' }}>{name}:</div>
+                <div style={{ marginLeft: '10px', color: '#888', wordBreak: 'break-all', overflow: 'hidden' }}>
                   Count: {stats.count} | 
                   Avg: {stats.avgDuration.toFixed(1)}ms | 
                   Total: {stats.totalDuration.toFixed(0)}ms
                 </div>
               </div>
             ))}
+          </div>
         </div>
       )}
       
-      {displayMode === 'caches' && (
+      {displayMode === 'caches' && stateSequence[sequenceIndex] === 'full' && (
         <div style={{ 
           marginTop: '10px', 
           borderTop: '1px solid #0f0',

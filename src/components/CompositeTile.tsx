@@ -6,6 +6,7 @@ import { FacilityYearTile } from '@/client/facility-year-tile';
 import { CapFacYear } from '@/client/cap-fac-year';
 import { getDayIndex } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
+import { perfMonitor } from '@/shared/performance-monitor';
 
 interface CompositeTileProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
@@ -132,11 +133,20 @@ export function CompositeTile({
   }, [dateRange, facilityCode]);
 
   useEffect(() => {
+    const perfName = 'CompositeTile.render';
+    perfMonitor.start(perfName);
+    
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      perfMonitor.end(perfName);
+      return;
+    }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      perfMonitor.end(perfName);
+      return;
+    }
 
     // Set canvas size to exactly 365 pixels wide
     canvas.width = 365;
@@ -209,7 +219,9 @@ export function CompositeTile({
         drawErrorState(ctx, currentX, rightWidth, canvas.height);
       }
     }
-  }, [dateRange, leftTile, rightTile, leftTileState, rightTileState]);
+    
+    perfMonitor.end(perfName);
+  }, [dateRange, leftTile, rightTile, leftTileState, rightTileState, facilityCode]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onHover) return;
