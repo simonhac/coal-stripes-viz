@@ -15,7 +15,7 @@ import './opennem.css';
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dateRange, setDateRange] = useState<{ start: CalendarDate; end: CalendarDate } | null>(null);
+  const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [nswFacilities, setNswFacilities] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,14 +24,14 @@ export default function Home() {
   useEffect(() => {
     async function initialLoad() {
       try {
-        // Calculate date range for last 12 months
+        // Calculate end date and determine which years we need
         const today = getTodayAEST();
-        const endDate = today.subtract({ days: 1 }); // Yesterday
-        const startDate = endDate.subtract({ months: 12 }).add({ days: 1 }); // 12 months ago
+        const calculatedEndDate = today.subtract({ days: 1 }); // Yesterday
+        const startDate = calculatedEndDate.subtract({ days: 364 }); // For determining which years to load
         
         // Determine which years we need
         const startYear = startDate.year;
-        const endYear = endDate.year;
+        const endYear = calculatedEndDate.year;
         const years = startYear === endYear ? [startYear] : [startYear, endYear];
         
         // Load all required years
@@ -52,8 +52,8 @@ export default function Home() {
         const sortedFacilities = Array.from(nswFacilityCodes).sort();
         setNswFacilities(sortedFacilities);
         
-        // Only set date range after data is loaded
-        setDateRange({ start: startDate, end: endDate });
+        // Only set end date after data is loaded
+        setEndDate(calculatedEndDate);
         setLoading(false);
       } catch (err) {
         console.error('Failed to load initial data:', err);
@@ -76,8 +76,8 @@ export default function Home() {
         return;
       }
 
-      // Only handle if we have a date range
-      if (!dateRange) return;
+      // Only handle if we have an end date
+      if (!endDate) return;
 
       const isShift = e.shiftKey;
       const monthsToMove = isShift ? 6 : 1;
@@ -85,13 +85,12 @@ export default function Home() {
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         // Left arrow - pan backward in time (older)
-        const newStart = dateRange.start.subtract({ months: monthsToMove });
-        const newEnd = dateRange.end.subtract({ months: monthsToMove });
+        const newEndDate = endDate.subtract({ months: monthsToMove });
+        setEndDate(newEndDate);
         
-        setDateRange({ start: newStart, end: newEnd });
-        
-        // Preload the new year if needed
-        const years = new Set([newStart.year, newEnd.year]);
+        // Preload the years we'll need
+        const startDate = newEndDate.subtract({ days: 364 });
+        const years = new Set([startDate.year, newEndDate.year]);
         years.forEach(year => {
           yearDataVendor.requestYear(year).catch(err => {
             console.error(`Failed to preload year ${year}:`, err);
@@ -100,25 +99,23 @@ export default function Home() {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         // Right arrow - pan forward in time (more recent)
-        const newStart = dateRange.start.add({ months: monthsToMove });
-        const newEnd = dateRange.end.add({ months: monthsToMove });
+        const newEndDate = endDate.add({ months: monthsToMove });
         
         // Get yesterday as the latest possible date
         const yesterday = getTodayAEST().subtract({ days: 1 });
         
         // Check boundaries - don't go past yesterday
-        if (newEnd.compare(yesterday) > 0) {
-          // Adjust to end at yesterday
-          const daysOver = getDaysBetween(yesterday, newEnd);
-          const constrainedEnd = yesterday;
-          const constrainedStart = newStart.subtract({ days: Math.abs(daysOver) });
-          
-          setDateRange({ start: constrainedStart, end: constrainedEnd });
+        if (newEndDate.compare(yesterday) > 0) {
+          // Don't move if we're already at yesterday
+          if (endDate.compare(yesterday) < 0) {
+            setEndDate(yesterday);
+          }
         } else {
-          setDateRange({ start: newStart, end: newEnd });
+          setEndDate(newEndDate);
           
-          // Preload the new year if needed
-          const years = new Set([newStart.year, newEnd.year]);
+          // Preload the years we'll need
+          const startDate = newEndDate.subtract({ days: 364 });
+          const years = new Set([startDate.year, newEndDate.year]);
           years.forEach(year => {
             yearDataVendor.requestYear(year).catch(err => {
               console.error(`Failed to preload year ${year}:`, err);
@@ -130,7 +127,7 @@ export default function Home() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dateRange]);
+  }, [endDate]);
 
 
   if (loading) {
@@ -167,7 +164,7 @@ export default function Home() {
       {/* Date Range Header */}
       <div className="opennem-stripes-container">
         <div className="opennem-stripes-header">
-          <DateRange dateRange={dateRange} />
+          <DateRange dateRange={endDate ? { start: endDate.subtract({ days: 364 }), end: endDate } : null} />
         </div>
 
         {/* Main Stripes Visualization */}
@@ -183,7 +180,9 @@ export default function Home() {
             <div className="opennem-region-content">
               {/* Display tiles */}
               {(() => {
-                if (!dateRange || nswFacilities.length === 0) return null;
+                if (!endDate || nswFacilities.length === 0) return null;
+                
+                const dateRange = { start: endDate.subtract({ days: 364 }), end: endDate };
                 
                 return (
                   <div className="opennem-facility-group">
@@ -191,7 +190,7 @@ export default function Home() {
                     {nswFacilities.map(facilityCode => (
                       <CompositeTile
                         key={facilityCode}
-                        dateRange={dateRange}
+                        endDate={endDate}
                         facilityCode={facilityCode}
                         onHover={setTooltipData}
                         onHoverEnd={() => setTooltipData(null)}

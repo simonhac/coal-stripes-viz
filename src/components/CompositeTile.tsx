@@ -4,12 +4,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
 import { CapFacYear } from '@/client/cap-fac-year';
-import { getDayIndex, getDaysBetween } from '@/shared/date-utils';
+import { getDayIndex, getDaysBetween, isLeapYear } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 
 interface CompositeTileProps {
-  dateRange: { start: CalendarDate; end: CalendarDate };
+  endDate: CalendarDate;
   facilityCode: string;
   onHover?: (tooltipData: any) => void;
   onHoverEnd?: () => void;
@@ -19,8 +19,13 @@ interface CompositeTileProps {
 
 type TileState = 'hasData' | 'pendingData' | 'error' | 'idle';
 
+// Helper function to get days in a year
+function getDaysInYear(year: number): number {
+  return isLeapYear(year) ? 366 : 365;
+}
+
 export function CompositeTile({ 
-  dateRange, 
+  endDate, 
   facilityCode,
   onHover,
   onHoverEnd,
@@ -40,6 +45,12 @@ export function CompositeTile({
   
   // Simple global mouse position tracking (moved to top)
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  
+  // Calculate date range - always exactly 365 days
+  const dateRange = {
+    start: endDate.subtract({ days: 364 }), // 364 days before end = 365 days total (inclusive)
+    end: endDate
+  };
   
   // Current animated position (internal state)
   const [currentPosition, setCurrentPosition] = useState<{
@@ -96,7 +107,7 @@ export function CompositeTile({
       anim.isAnimating = false;
     }
     // Don't depend on currentPosition to avoid loops
-  }, [dateRange, facilityCode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [endDate, facilityCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Use current position for loading tiles
@@ -235,10 +246,16 @@ export function CompositeTile({
     const leftStartDay = getDayIndex(currentPosition.start);
     const leftEndDay = startYear === endYear 
       ? getDayIndex(currentPosition.end) 
-      : (leftTile ? leftTile.getDaysCount() - 1 : getDayIndex(new CalendarDate(startYear, 12, 31)));
+      : getDaysInYear(startYear) - 1; // 0-based index for last day of year
     const leftWidth = leftEndDay - leftStartDay + 1;
     
     const rightWidth = startYear !== endYear ? getDayIndex(currentPosition.end) + 1 : 0;
+    
+    // Ensure total width is exactly 365 pixels (canvas width)
+    const totalWidth = leftWidth + rightWidth;
+    if (totalWidth !== 365 && facilityCode === 'BAYSW') {
+      console.warn(`[BAYSW] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalWidth}, currentPosition: ${currentPosition.start} to ${currentPosition.end}`);
+    }
     
     // Check if we need shimmer animation
     const needsShimmer = leftTileState === 'pendingData' || (startYear !== endYear && rightTileState === 'pendingData');
@@ -348,16 +365,15 @@ export function CompositeTile({
   const updateTooltip = (x: number, y: number) => {
     if (!onHover) return;
     
-    if (facilityCode === 'BAYSW') {
-      console.log('[BAYSW updateTooltip] Called with x:', x, 'y:', y);
-    }
     
     const startYear = currentPosition.start.year;
     const endYear = currentPosition.end.year;
     
     // Calculate left tile dimensions
     const leftStartDay = getDayIndex(currentPosition.start);
-    const leftEndDay = startYear === endYear ? getDayIndex(currentPosition.end) : (leftTile?.getDaysCount() || 365) - 1;
+    const leftEndDay = startYear === endYear 
+      ? getDayIndex(currentPosition.end) 
+      : getDaysInYear(startYear) - 1; // 0-based index for last day of year
     const leftWidth = leftEndDay - leftStartDay + 1;
     
     if (x < leftWidth) {
@@ -365,9 +381,6 @@ export function CompositeTile({
       if (leftTile) {
         const tileX = x + leftStartDay;
         const tooltipData = leftTile.getTooltipData(tileX, y);
-        if (facilityCode === 'BAYSW') {
-          console.log('[BAYSW updateTooltip] Got tooltip data:', tooltipData);
-        }
         if (tooltipData) {
           // Convert to new format
           const formattedData: any = {
@@ -376,9 +389,6 @@ export function CompositeTile({
             capacityFactor: tooltipData.capacityFactor,
             isRegion: false
           };
-          if (facilityCode === 'BAYSW') {
-            console.log('[BAYSW updateTooltip] Calling onHover with:', formattedData);
-          }
           onHover(formattedData);
         }
       }
@@ -429,8 +439,7 @@ export function CompositeTile({
         const totalDays = getDaysBetween(anim.fromStart, dateRange.start);
         const daysToMove = Math.round(totalDays * progress);
         const newStart = anim.fromStart.add({ days: daysToMove });
-        const rangeWidth = getDaysBetween(dateRange.start, dateRange.end);
-        const newEnd = newStart.add({ days: rangeWidth });
+        const newEnd = newStart.add({ days: 364 }); // Always exactly 365 days
         
         // Update current position
         setCurrentPosition({ start: newStart, end: newEnd });
@@ -456,7 +465,7 @@ export function CompositeTile({
         cancelAnimationFrame(frameId);
       }
     };
-  }, [animationRef.current.isAnimating, dateRange, facilityCode, updateTooltip, mousePos]);
+  }, [animationRef.current.isAnimating, endDate, facilityCode, updateTooltip, mousePos]);
   
   // Mouse position tracking effect
   useEffect(() => {
@@ -478,9 +487,6 @@ export function CompositeTile({
       // Get element at current mouse position
       const elementAtMouse = document.elementFromPoint(mousePos.x, mousePos.y);
       
-      if (facilityCode === 'BAYSW') {
-        console.log('[BAYSW Scroll] Mouse at:', mousePos, 'Element:', elementAtMouse);
-      }
       
       // Check if it's our canvas
       if (elementAtMouse === canvasRef.current) {
@@ -488,17 +494,11 @@ export function CompositeTile({
         const x = mousePos.x - rect.left;
         const y = mousePos.y - rect.top;
         
-        if (facilityCode === 'BAYSW') {
-          console.log('[BAYSW Scroll] Mouse over our canvas at:', { x, y });
-        }
         
         updateTooltip(x, y);
       } else {
         // Mouse not over our canvas - check if we need to call onHoverEnd
         // We can check if the tooltip is currently showing for this tile
-        if (facilityCode === 'BAYSW') {
-          console.log('[BAYSW Scroll] Mouse not over our canvas');
-        }
         // Note: We don't have a way to know if tooltip was showing for this specific tile
         // The parent component manages tooltip state across all tiles
       }
@@ -513,9 +513,6 @@ export function CompositeTile({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    if (facilityCode === 'BAYSW') {
-      console.log('[BAYSW Mouse] Move at:', { x, y });
-    }
     
     updateTooltip(x, y);
   };
