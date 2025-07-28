@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
 import { CapFacYear } from '@/client/cap-fac-year';
-import { getDayIndex } from '@/shared/date-utils';
+import { getDayIndex, getDaysBetween } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 
@@ -37,6 +37,25 @@ export function CompositeTile({
   const animationFrameRef = useRef<number | null>(null);
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
+  
+  // Current animated position (internal state)
+  const [currentPosition, setCurrentPosition] = useState<{
+    start: CalendarDate;
+    end: CalendarDate;
+  }>(dateRange);
+  
+  // Animation state
+  const animationRef = useRef<{
+    animationDuration: number; // animation duration in ms
+    animationStartTime: number; // when animation started
+    isAnimating: boolean;
+    fromStart: CalendarDate; // where we started animating from
+  }>({
+    animationDuration: 150, // 200ms
+    animationStartTime: 0,
+    isAnimating: false,
+    fromStart: dateRange.start
+  });
 
   const drawErrorState = (ctx: CanvasRenderingContext2D, x: number, width: number, height: number) => {
     ctx.fillStyle = '#ff0000';
@@ -44,20 +63,62 @@ export function CompositeTile({
       ctx.fillRect(x + i, 0, 2, height);
     }
   };
+  
+  // Track last processed goal to avoid loops
+  const lastGoalRef = useRef(dateRange.start.toString());
+  
+  // Handle date range changes - set up animation if appropriate
+  useEffect(() => {
+    const anim = animationRef.current;
+    const newGoal = dateRange.start.toString();
+    
+    // Check if goal has actually changed
+    if (lastGoalRef.current === newGoal) {
+      return;
+    }
+    
+    lastGoalRef.current = newGoal;
+    
+    // Check if we should animate
+    const daysDiff = getDaysBetween(currentPosition.start, dateRange.start);
+    
+    // Only animate if change is not "too much"
+    if (Math.abs(daysDiff) > 0 && Math.abs(daysDiff) <= 2000) {
+      anim.fromStart = currentPosition.start;
+      anim.animationStartTime = performance.now();
+      anim.isAnimating = true;
+    } else if (Math.abs(daysDiff) > 0) {
+      // Jump directly for large changes
+      setCurrentPosition(dateRange);
+      anim.isAnimating = false;
+    }
+    // Don't depend on currentPosition to avoid loops
+  }, [dateRange, facilityCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const startYear = dateRange.start.year;
-    const endYear = dateRange.end.year;
+    // Use current position for loading tiles
+    const startYear = currentPosition.start.year;
+    const endYear = currentPosition.end.year;
     
     // Track current request years to ignore stale responses
     let currentStartYear = startYear;
     let currentEndYear = endYear;
     
-    // Reset states when date range changes
-    setLeftTile(null);
-    setRightTile(null);
-    setLeftTileState('pendingData');
-    setRightTileState(startYear !== endYear ? 'pendingData' : 'idle');
+    // Only reset tiles if we're loading a different year
+    const needsNewLeftTile = !leftTile || leftTile.getYear() !== startYear;
+    const needsNewRightTile = startYear !== endYear && (!rightTile || rightTile.getYear() !== endYear);
+    
+    if (needsNewLeftTile) {
+      setLeftTile(null);
+      setLeftTileState('pendingData');
+    }
+    
+    if (needsNewRightTile) {
+      setRightTile(null);
+      setRightTileState('pendingData');
+    } else if (startYear === endYear) {
+      setRightTileState('idle');
+    }
     
     // Load left tile without waiting
     yearDataVendor.requestYear(startYear)
@@ -122,7 +183,8 @@ export function CompositeTile({
       currentStartYear = -1;
       currentEndYear = -1;
     };
-  }, [dateRange, facilityCode]);
+    // Only reload tiles when year changes or we don't have the tiles we need
+  }, [facilityCode, currentPosition.start.year, currentPosition.end.year]);
 
   useEffect(() => {
     const perfName = 'CompositeTile.render';
@@ -162,17 +224,18 @@ export function CompositeTile({
     canvas.height = canvasHeight;
     canvas.style.height = `${canvasHeight}px`;
 
-    const startYear = dateRange.start.year;
-    const endYear = dateRange.end.year;
+    // Use current position
+    const startYear = currentPosition.start.year;
+    const endYear = currentPosition.end.year;
     
     // Calculate dimensions
-    const leftStartDay = getDayIndex(dateRange.start);
+    const leftStartDay = getDayIndex(currentPosition.start);
     const leftEndDay = startYear === endYear 
-      ? getDayIndex(dateRange.end) 
+      ? getDayIndex(currentPosition.end) 
       : (leftTile ? leftTile.getDaysCount() - 1 : getDayIndex(new CalendarDate(startYear, 12, 31)));
     const leftWidth = leftEndDay - leftStartDay + 1;
     
-    const rightWidth = startYear !== endYear ? getDayIndex(dateRange.end) + 1 : 0;
+    const rightWidth = startYear !== endYear ? getDayIndex(currentPosition.end) + 1 : 0;
     
     // Check if we need shimmer animation
     const needsShimmer = leftTileState === 'pendingData' || (startYear !== endYear && rightTileState === 'pendingData');
@@ -257,9 +320,12 @@ export function CompositeTile({
           ctx.fillRect(shimmerX, 0, shimmerWidth, canvas.height);
           ctx.restore();
           
-          // Continue animation
-          animationFrameRef.current = requestAnimationFrame(render);
         }
+      }
+      
+      // Continue shimmer animation if needed
+      if (needsShimmer) {
+        animationFrameRef.current = requestAnimationFrame(render);
       }
     };
     
@@ -273,7 +339,56 @@ export function CompositeTile({
         animationFrameRef.current = null;
       }
     };
-  }, [dateRange, leftTile, rightTile, leftTileState, rightTileState, facilityCode]);
+  }, [dateRange, currentPosition, leftTile, rightTile, leftTileState, rightTileState, facilityCode]);
+  
+  // Animation loop effect - runs independently of render
+  useEffect(() => {
+    if (!animationRef.current.isAnimating) {
+      return;
+    }
+    
+    let frameId: number;
+    
+    const animate = () => {
+      const anim = animationRef.current;
+      
+      if (!anim.isAnimating) {
+        return;
+      }
+      
+      // Calculate progress based on elapsed time
+      const elapsed = performance.now() - anim.animationStartTime;
+      const progress = Math.min(elapsed / anim.animationDuration, 1);
+      
+      if (progress >= 1) {
+        // Animation complete - snap to goal
+        setCurrentPosition(dateRange);
+        anim.isAnimating = false;
+      } else {
+        // Calculate interpolated position
+        const totalDays = getDaysBetween(anim.fromStart, dateRange.start);
+        const daysToMove = Math.round(totalDays * progress);
+        const newStart = anim.fromStart.add({ days: daysToMove });
+        const rangeWidth = getDaysBetween(dateRange.start, dateRange.end);
+        const newEnd = newStart.add({ days: rangeWidth });
+        
+        // Update current position
+        setCurrentPosition({ start: newStart, end: newEnd });
+        
+        
+        // Continue animation
+        frameId = requestAnimationFrame(animate);
+      }
+    };
+    
+    frameId = requestAnimationFrame(animate);
+    
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [animationRef.current.isAnimating, dateRange, facilityCode]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onHover) return;
@@ -282,12 +397,12 @@ export function CompositeTile({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const startYear = dateRange.start.year;
-    const endYear = dateRange.end.year;
+    const startYear = currentPosition.start.year;
+    const endYear = currentPosition.end.year;
     
     // Calculate left tile dimensions
-    const leftStartDay = getDayIndex(dateRange.start);
-    const leftEndDay = startYear === endYear ? getDayIndex(dateRange.end) : (leftTile?.getDaysCount() || 365) - 1;
+    const leftStartDay = getDayIndex(currentPosition.start);
+    const leftEndDay = startYear === endYear ? getDayIndex(currentPosition.end) : (leftTile?.getDaysCount() || 365) - 1;
     const leftWidth = leftEndDay - leftStartDay + 1;
     
     if (x < leftWidth) {
@@ -332,10 +447,7 @@ export function CompositeTile({
       </div>
       <div 
         className="opennem-stripe-data"
-        tabIndex={0}
         style={{ cursor: 'grab' }}
-        onFocus={onFocus}
-        onBlur={onBlur}
       >
         <canvas
           ref={canvasRef}

@@ -97,6 +97,7 @@ export class YearDataVendor {
    */
   private async fetchYear(year: number, signal: AbortSignal): Promise<CapFacYear> {
     console.log(`📡 Fetching year ${year} from server...`);
+    const fetchStartTime = performance.now();
     
     try {
       const response = await fetch(`/api/capacity-factors?year=${year}`, { signal });
@@ -112,12 +113,13 @@ export class YearDataVendor {
       const startTime = performance.now();
       const capFacYear = createCapFacYear(year, data);
       const createTime = performance.now() - startTime;
-      console.log(`✅ Created ${capFacYear.facilityTiles.size} facility tiles in ${createTime.toFixed(0)}ms`);
+      console.log(`✅ Created ${capFacYear.facilityTiles.size} facility tiles for ${year} in ${createTime.toFixed(0)}ms`);
       
       // Cache the result with the total size (JSON + canvas memory)
       this.cache.set(year.toString(), capFacYear, capFacYear.totalSizeBytes, year.toString());
       
-      console.log(`✅ Successfully fetched year ${year} (${(capFacYear.totalSizeBytes / 1024 / 1024).toFixed(2)}MB)`);
+      const totalTime = (performance.now() - fetchStartTime) / 1000;
+      console.log(`✅ Successfully fetched year ${year} (${(capFacYear.totalSizeBytes / 1024 / 1024).toFixed(2)}MB) in ${totalTime.toFixed(1)}s`);
       
       return capFacYear;
     } catch (error: any) {

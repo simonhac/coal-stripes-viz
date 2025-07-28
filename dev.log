@@ -22755,3 +22755,4 @@ Import traces:
   path: '/Users/simon/dev/coal-stripes-viz/.next/server/pages/_app/build-manifest.json'
 }
  GET /favicon.ico 200 in 254ms
+ ✓ Compiled in 40ms

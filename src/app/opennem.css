@@ -360,10 +360,10 @@ header a {
   overflow: hidden;
 }
 
-.opennem-stripe-data:focus {
+/* .opennem-stripe-data:focus {
   outline: 2px solid var(--opennem-primary);
   outline-offset: -2px;
-}
+} */
 
 .opennem-stripe-data-inner {
   display: flex;

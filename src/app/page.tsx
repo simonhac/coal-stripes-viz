@@ -67,6 +67,9 @@ export default function Home() {
 
   // Keyboard navigation
   useEffect(() => {
+    // Ensure the page has focus on mount
+    window.focus();
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't handle if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
