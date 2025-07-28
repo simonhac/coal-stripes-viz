@@ -38,6 +38,9 @@ export function CompositeTile({
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
   
+  // Simple global mouse position tracking (moved to top)
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  
   // Current animated position (internal state)
   const [currentPosition, setCurrentPosition] = useState<{
     start: CalendarDate;
@@ -341,6 +344,63 @@ export function CompositeTile({
     };
   }, [dateRange, currentPosition, leftTile, rightTile, leftTileState, rightTileState, facilityCode]);
   
+  // Update tooltip based on current mouse position
+  const updateTooltip = (x: number, y: number) => {
+    if (!onHover) return;
+    
+    if (facilityCode === 'BAYSW') {
+      console.log('[BAYSW updateTooltip] Called with x:', x, 'y:', y);
+    }
+    
+    const startYear = currentPosition.start.year;
+    const endYear = currentPosition.end.year;
+    
+    // Calculate left tile dimensions
+    const leftStartDay = getDayIndex(currentPosition.start);
+    const leftEndDay = startYear === endYear ? getDayIndex(currentPosition.end) : (leftTile?.getDaysCount() || 365) - 1;
+    const leftWidth = leftEndDay - leftStartDay + 1;
+    
+    if (x < leftWidth) {
+      // Mouse is in left tile
+      if (leftTile) {
+        const tileX = x + leftStartDay;
+        const tooltipData = leftTile.getTooltipData(tileX, y);
+        if (facilityCode === 'BAYSW') {
+          console.log('[BAYSW updateTooltip] Got tooltip data:', tooltipData);
+        }
+        if (tooltipData) {
+          // Convert to new format
+          const formattedData: any = {
+            date: tooltipData.date,
+            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            capacityFactor: tooltipData.capacityFactor,
+            isRegion: false
+          };
+          if (facilityCode === 'BAYSW') {
+            console.log('[BAYSW updateTooltip] Calling onHover with:', formattedData);
+          }
+          onHover(formattedData);
+        }
+      }
+    } else if (startYear !== endYear) {
+      // Mouse is in right tile
+      if (rightTile) {
+        const tileX = x - leftWidth;
+        const tooltipData = rightTile.getTooltipData(tileX, y);
+        if (tooltipData) {
+          // Convert to new format
+          const formattedData: any = {
+            date: tooltipData.date,
+            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            capacityFactor: tooltipData.capacityFactor,
+            isRegion: false
+          };
+          onHover(formattedData);
+        }
+      }
+    }
+  };
+  
   // Animation loop effect - runs independently of render
   useEffect(() => {
     if (!animationRef.current.isAnimating) {
@@ -375,6 +435,14 @@ export function CompositeTile({
         // Update current position
         setCurrentPosition({ start: newStart, end: newEnd });
         
+        // Update tooltip if mouse is over the canvas
+        if (mousePos && canvasRef.current) {
+          const elementAtMouse = document.elementFromPoint(mousePos.x, mousePos.y);
+          if (elementAtMouse === canvasRef.current) {
+            const rect = canvasRef.current.getBoundingClientRect();
+            updateTooltip(mousePos.x - rect.left, mousePos.y - rect.top);
+          }
+        }
         
         // Continue animation
         frameId = requestAnimationFrame(animate);
@@ -388,56 +456,68 @@ export function CompositeTile({
         cancelAnimationFrame(frameId);
       }
     };
-  }, [animationRef.current.isAnimating, dateRange, facilityCode]);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onHover) return;
+  }, [animationRef.current.isAnimating, dateRange, facilityCode, updateTooltip, mousePos]);
+  
+  // Mouse position tracking effect
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
     
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+  
+  // Handle window scroll to update tooltip
+  useEffect(() => {
+    if (!mousePos) return;
+    
+    const handleScroll = () => {
+      if (!canvasRef.current) return;
+      
+      // Get element at current mouse position
+      const elementAtMouse = document.elementFromPoint(mousePos.x, mousePos.y);
+      
+      if (facilityCode === 'BAYSW') {
+        console.log('[BAYSW Scroll] Mouse at:', mousePos, 'Element:', elementAtMouse);
+      }
+      
+      // Check if it's our canvas
+      if (elementAtMouse === canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = mousePos.x - rect.left;
+        const y = mousePos.y - rect.top;
+        
+        if (facilityCode === 'BAYSW') {
+          console.log('[BAYSW Scroll] Mouse over our canvas at:', { x, y });
+        }
+        
+        updateTooltip(x, y);
+      } else {
+        // Mouse not over our canvas - check if we need to call onHoverEnd
+        // We can check if the tooltip is currently showing for this tile
+        if (facilityCode === 'BAYSW') {
+          console.log('[BAYSW Scroll] Mouse not over our canvas');
+        }
+        // Note: We don't have a way to know if tooltip was showing for this specific tile
+        // The parent component manages tooltip state across all tiles
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [mousePos, updateTooltip, onHoverEnd, facilityCode]);
+  
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const startYear = currentPosition.start.year;
-    const endYear = currentPosition.end.year;
-    
-    // Calculate left tile dimensions
-    const leftStartDay = getDayIndex(currentPosition.start);
-    const leftEndDay = startYear === endYear ? getDayIndex(currentPosition.end) : (leftTile?.getDaysCount() || 365) - 1;
-    const leftWidth = leftEndDay - leftStartDay + 1;
-    
-    if (x < leftWidth) {
-      // Mouse is in left tile
-      if (leftTile) {
-        const tileX = x + leftStartDay;
-        const tooltipData = leftTile.getTooltipData(tileX, y);
-        if (tooltipData) {
-          // Convert to new format
-          const formattedData: any = {
-            date: tooltipData.date,
-            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
-            capacityFactor: tooltipData.capacityFactor,
-            isRegion: false
-          };
-          onHover(formattedData);
-        }
-      }
-    } else if (startYear !== endYear) {
-      // Mouse is in right tile
-      if (rightTile) {
-        const tileX = x - leftWidth;
-        const tooltipData = rightTile.getTooltipData(tileX, y);
-        if (tooltipData) {
-          // Convert to new format
-          const formattedData: any = {
-            date: tooltipData.date,
-            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
-            capacityFactor: tooltipData.capacityFactor,
-            isRegion: false
-          };
-          onHover(formattedData);
-        }
-      }
+    if (facilityCode === 'BAYSW') {
+      console.log('[BAYSW Mouse] Move at:', { x, y });
     }
+    
+    updateTooltip(x, y);
   };
 
   return (
