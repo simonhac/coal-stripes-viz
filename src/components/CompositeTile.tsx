@@ -11,6 +11,8 @@ import { perfMonitor } from '@/shared/performance-monitor';
 interface CompositeTileProps {
   endDate: CalendarDate;
   facilityCode: string;
+  facilityName: string;
+  animatedDateRange?: { start: CalendarDate; end: CalendarDate };
   onHover?: (tooltipData: any) => void;
   onHoverEnd?: () => void;
   onFocus?: () => void;
@@ -27,13 +29,14 @@ function getDaysInYear(year: number): number {
 function CompositeTileComponent({ 
   endDate, 
   facilityCode,
+  facilityName,
+  animatedDateRange,
   onHover,
   onHoverEnd,
   onFocus,
   onBlur
 }: CompositeTileProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [facilityName, setFacilityName] = useState(facilityCode);
   
   // Store both tiles in a single state to ensure atomic updates
   const [tiles, setTiles] = useState<{
@@ -55,140 +58,153 @@ function CompositeTileComponent({
   // Simple global mouse position tracking (using ref to avoid re-renders)
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   
-  // Calculate date range - always exactly 365 days
-  const dateRange = {
+  // Use provided animated date range, or calculate from endDate
+  const dateRange = animatedDateRange || {
     start: endDate.subtract({ days: 364 }), // 364 days before end = 365 days total (inclusive)
     end: endDate
   };
   
-  // Current animated position (internal state)
-  const [currentPosition, setCurrentPosition] = useState<{
-    start: CalendarDate;
-    end: CalendarDate;
-  }>(dateRange);
+  // Calculate which tiles we need synchronously
+  const startYear = dateRange.start.year;
+  const endYear = dateRange.end.year;
   
-  // Animation state
-  const animationRef = useRef<{
-    animationDuration: number; // animation duration in ms
-    animationStartTime: number; // when animation started
-    isAnimating: boolean;
-    fromStart: CalendarDate; // where we started animating from
-  }>({
-    animationDuration: 150, // 200ms
-    animationStartTime: 0,
-    isAnimating: false,
-    fromStart: dateRange.start
-  });
-
-  const drawErrorState = (ctx: CanvasRenderingContext2D, x: number, width: number, height: number) => {
-    ctx.fillStyle = '#ff0000';
-    for (let i = 0; i < width; i += 4) {
-      ctx.fillRect(x + i, 0, 2, height);
-    }
+  // Determine what tiles we need based on current date range
+  const neededTiles = {
+    leftYear: startYear,
+    rightYear: startYear !== endYear ? endYear : null
   };
   
-  // Track last processed goal to avoid loops
-  const lastGoalRef = useRef(dateRange.start.toString());
+  // Get tiles from cache synchronously
+  const getTilesForDateRange = () => {
+    const newTiles = { ...tiles };
+    let needsUpdate = false;
+    
+    // Check left tile
+    if (!tiles.left || tiles.left.getYear() !== neededTiles.leftYear) {
+      const cachedLeftYear = yearDataVendor.getYearSync(neededTiles.leftYear);
+      if (cachedLeftYear) {
+        // If year is cached, tile MUST exist - use non-null assertion
+        const cachedLeftTile = cachedLeftYear.facilityTiles.get(facilityCode)!;
+        newTiles.left = cachedLeftTile;
+        newTiles.leftState = 'hasData';
+        needsUpdate = true;
+      } else {
+        // Year not in cache yet
+        newTiles.left = null;
+        newTiles.leftState = 'pendingData';
+        needsUpdate = true;
+      }
+    }
+    
+    // Check right tile
+    if (neededTiles.rightYear) {
+      if (!tiles.right || tiles.right.getYear() !== neededTiles.rightYear) {
+        const cachedRightYear = yearDataVendor.getYearSync(neededTiles.rightYear);
+        if (cachedRightYear) {
+          // If year is cached, tile MUST exist - use non-null assertion
+          const cachedRightTile = cachedRightYear.facilityTiles.get(facilityCode)!;
+          newTiles.right = cachedRightTile;
+          newTiles.rightState = 'hasData';
+          needsUpdate = true;
+        } else {
+          // Year not in cache yet
+          newTiles.right = null;
+          newTiles.rightState = 'pendingData';
+          needsUpdate = true;
+        }
+      } else if (tiles.right && tiles.rightState !== 'hasData') {
+        // We already have the correct right tile but state is wrong
+        newTiles.rightState = 'hasData';
+        needsUpdate = true;
+      }
+    } else {
+      // Single year - no right tile needed
+      if (tiles.rightState !== 'idle') {
+        newTiles.rightState = 'idle';
+        needsUpdate = true;
+      }
+    }
+    
+    return { newTiles, needsUpdate };
+  };
   
-  // Handle date range changes - set up animation if appropriate
-  useEffect(() => {
-    const anim = animationRef.current;
-    const newGoal = dateRange.start.toString();
-    
-    // Check if goal has actually changed
-    if (lastGoalRef.current === newGoal) {
-      return;
-    }
-    
-    lastGoalRef.current = newGoal;
-    
-    // Check if we should animate
-    const daysDiff = getDaysBetween(currentPosition.start, dateRange.start);
-    
-    // Only animate if change is not "too much"
-    if (Math.abs(daysDiff) > 0 && Math.abs(daysDiff) <= 2000) {
-      anim.fromStart = currentPosition.start;
-      anim.animationStartTime = performance.now();
-      anim.isAnimating = true;
-    } else if (Math.abs(daysDiff) > 0) {
-      // Jump directly for large changes
-      setCurrentPosition(dateRange);
-      anim.isAnimating = false;
-    }
-    // Don't depend on currentPosition to avoid loops
-  }, [endDate, facilityCode]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Update tiles if needed
+  const { newTiles, needsUpdate } = getTilesForDateRange();
+  if (needsUpdate && JSON.stringify(newTiles) !== JSON.stringify(tiles)) {
+    setTiles(newTiles);
+  }
 
-  useEffect(() => {
-    // Use current position for loading tiles
-    const startYear = currentPosition.start.year;
-    const endYear = currentPosition.end.year;
+  const drawErrorState = (ctx: CanvasRenderingContext2D, left: number, width: number, height: number) => {
+    ctx.fillStyle = '#ff0000';
+    for (let i = 0; i < width; i += 4) {
+      ctx.fillRect(left + i, 0, 2, height);
+    }
+  };
+
+  // Update tooltip based on current mouse position
+  const updateTooltip = (x: number, y: number) => {
+    if (!onHover) return;
     
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
+    
+    // Calculate left tile dimensions
+    const leftStartDay = getDayIndex(dateRange.start);
+    const leftEndDay = startYear === endYear 
+      ? getDayIndex(dateRange.end) 
+      : getDaysInYear(startYear) - 1; // 0-based index for last day of year
+    const leftWidth = leftEndDay - leftStartDay + 1;
+    
+    if (x < leftWidth) {
+      // Mouse is in left tile
+      if (tiles.left) {
+        const tileX = x + leftStartDay;
+        const tooltipData = tiles.left.getTooltipData(tileX, y);
+        if (tooltipData) {
+          // Convert to new format
+          const formattedData: any = {
+            date: tooltipData.date,
+            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            capacityFactor: tooltipData.capacityFactor,
+            isRegion: false
+          };
+          onHover(formattedData);
+        }
+      }
+    } else if (startYear !== endYear) {
+      // Mouse is in right tile
+      if (tiles.right) {
+        const tileX = x - leftWidth;
+        const tooltipData = tiles.right.getTooltipData(tileX, y);
+        if (tooltipData) {
+          // Convert to new format
+          const formattedData: any = {
+            date: tooltipData.date,
+            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            capacityFactor: tooltipData.capacityFactor,
+            isRegion: false
+          };
+          onHover(formattedData);
+        }
+      }
+    }
+  };
+
+  // Handle async loading of tiles that aren't in cache
+  useEffect(() => {
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
     
     // Track current request years to ignore stale responses
     let currentStartYear = startYear;
     let currentEndYear = endYear;
     
-    // Only reset tiles if we're loading a different year
-    let needsNewLeftTile = !tiles.left || tiles.left.getYear() !== startYear;
-    let needsNewRightTile = startYear !== endYear && (!tiles.right || tiles.right.getYear() !== endYear);
-    
-    // Prepare new tiles state - start with current state
-    let newTiles = { ...tiles };
-    let updateNeeded = false;
-    
-    // Try to get tiles synchronously from cache first
-    if (needsNewLeftTile) {
-      const cachedLeftYear = yearDataVendor.getYearSync(startYear);
-      if (cachedLeftYear) {
-        const cachedLeftTile = cachedLeftYear.facilityTiles.get(facilityCode);
-        if (cachedLeftTile) {
-          newTiles.left = cachedLeftTile;
-          newTiles.leftState = 'hasData';
-          setFacilityName(cachedLeftTile.getFacilityName());
-          needsNewLeftTile = false;
-          updateNeeded = true;
-        }
-      }
-      
-      if (needsNewLeftTile) {
-        newTiles.left = null;
-        newTiles.leftState = 'pendingData';
-        updateNeeded = true;
-      }
-    }
-    
-    if (needsNewRightTile) {
-      const cachedRightYear = yearDataVendor.getYearSync(endYear);
-      if (cachedRightYear) {
-        const cachedRightTile = cachedRightYear.facilityTiles.get(facilityCode);
-        if (cachedRightTile) {
-          newTiles.right = cachedRightTile;
-          newTiles.rightState = 'hasData';
-          if (!newTiles.left) {
-            setFacilityName(cachedRightTile.getFacilityName());
-          }
-          needsNewRightTile = false;
-          updateNeeded = true;
-        }
-      }
-      
-      if (needsNewRightTile) {
-        newTiles.right = null;
-        newTiles.rightState = 'pendingData';
-        updateNeeded = true;
-      }
-    } else if (startYear === endYear) {
-      newTiles.rightState = 'idle';
-      updateNeeded = true;
-    }
-    
-    // Apply all tile updates atomically
-    if (updateNeeded) {
-      setTiles(newTiles);
-    }
+    // Check if we need to load any data asynchronously
+    const needsAsyncLeftLoad = tiles.leftState === 'pendingData' && startYear === neededTiles.leftYear;
+    const needsAsyncRightLoad = tiles.rightState === 'pendingData' && neededTiles.rightYear && endYear === neededTiles.rightYear;
     
     // Load left tile only if not found in cache
-    if (needsNewLeftTile) {
+    if (needsAsyncLeftLoad) {
       yearDataVendor.requestYear(startYear)
         .then(leftYearData => {
           // Ignore if we've moved to a different year
@@ -203,7 +219,6 @@ function CompositeTileComponent({
               left: leftFacilityTile,
               leftState: 'hasData'
             }));
-            setFacilityName(leftFacilityTile.getFacilityName());
           } else {
             setTiles(prev => ({ ...prev, leftState: 'error' }));
           }
@@ -220,7 +235,7 @@ function CompositeTileComponent({
     }
 
     // Load right tile only if not found in cache and we're spanning two years
-    if (startYear !== endYear && needsNewRightTile) {
+    if (needsAsyncRightLoad) {
       yearDataVendor.requestYear(endYear)
         .then(rightYearData => {
           // Ignore if we've moved to different years
@@ -236,7 +251,6 @@ function CompositeTileComponent({
               rightState: 'hasData'
             }));
             if (!tiles.left) {
-              setFacilityName(rightFacilityTile.getFacilityName());
             }
           } else {
             setTiles(prev => ({ ...prev, rightState: 'error' }));
@@ -258,8 +272,8 @@ function CompositeTileComponent({
       currentStartYear = -1;
       currentEndYear = -1;
     };
-    // Only reload tiles when year changes or we don't have the tiles we need
-  }, [facilityCode, currentPosition.start.year, currentPosition.end.year]);
+    // Only reload tiles when pending states change
+  }, [facilityCode, dateRange.start.year, dateRange.end.year, tiles.leftState, tiles.rightState, neededTiles.leftYear, neededTiles.rightYear]);
 
   useEffect(() => {
     const perfName = 'CompositeTile.render';
@@ -299,60 +313,63 @@ function CompositeTileComponent({
     canvas.height = canvasHeight;
     canvas.style.height = `${canvasHeight}px`;
 
-    // Use current position
-    const startYear = currentPosition.start.year;
-    const endYear = currentPosition.end.year;
+    // Use date range
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
+    
+    // Update tooltip if mouse is hovering during date range changes
+    if (mousePosRef.current && canvasRef.current) {
+      const elementAtMouse = document.elementFromPoint(mousePosRef.current.x, mousePosRef.current.y);
+      if (elementAtMouse === canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        updateTooltip(mousePosRef.current.x - rect.left, mousePosRef.current.y - rect.top);
+      }
+    }
     
     
     // Calculate dimensions
-    const leftStartDay = getDayIndex(currentPosition.start);
+    const leftStartDay = getDayIndex(dateRange.start);
     const leftEndDay = startYear === endYear 
-      ? getDayIndex(currentPosition.end) 
+      ? getDayIndex(dateRange.end) 
       : getDaysInYear(startYear) - 1; // 0-based index for last day of year
     const leftWidth = leftEndDay - leftStartDay + 1;
     
-    const rightWidth = startYear !== endYear ? getDayIndex(currentPosition.end) + 1 : 0;
+    const rightWidth = startYear !== endYear ? getDayIndex(dateRange.end) + 1 : 0;
     
     // Ensure total width is exactly 365 pixels (canvas width)
     const totalWidth = leftWidth + rightWidth;
     if (totalWidth !== 365) {
-      console.warn(`[${facilityCode}] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalWidth}, currentPosition: ${currentPosition.start} to ${currentPosition.end}`);
+      console.warn(`[${facilityCode}] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalWidth}, dateRange: ${dateRange.start} to ${dateRange.end}`);
     }
     
     // Check if we need shimmer animation
     const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
     
     const render = () => {
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      let currentX = 0;
-      
-      // Draw left tile
+
+      // draw left tile
       if (tiles.leftState === 'hasData' && tiles.left) {
         const sourceCanvas = tiles.left.getCanvas();
         ctx.drawImage(
           sourceCanvas,
           leftStartDay, 0, leftWidth, sourceCanvas.height,
-          currentX, 0, leftWidth, sourceCanvas.height
+          0, 0, leftWidth, sourceCanvas.height
         );
       } else if (tiles.leftState === 'error') {
-        drawErrorState(ctx, currentX, leftWidth, canvas.height);
+        drawErrorState(ctx, 0, leftWidth, canvas.height);
       }
-      
-      currentX += leftWidth;
-      
-      // Draw right tile if we're spanning two years
+            
+      // draw right tile if we're spanning two years
       if (startYear !== endYear) {
         if (tiles.rightState === 'hasData' && tiles.right) {
           const sourceCanvas = tiles.right.getCanvas();
           ctx.drawImage(
             sourceCanvas,
             0, 0, rightWidth, sourceCanvas.height,
-            currentX, 0, rightWidth, sourceCanvas.height
+            leftWidth, 0, rightWidth, sourceCanvas.height
           );
         } else if (tiles.rightState === 'error') {
-          drawErrorState(ctx, currentX, rightWidth, canvas.height);
+          drawErrorState(ctx, leftWidth, rightWidth, canvas.height);
         }
       }
       
@@ -421,113 +438,8 @@ function CompositeTileComponent({
         animationFrameRef.current = null;
       }
     };
-  }, [dateRange, currentPosition, tiles, facilityCode]);
+  }, [dateRange, tiles, facilityCode, updateTooltip]);
   
-  // Update tooltip based on current mouse position
-  const updateTooltip = (x: number, y: number) => {
-    if (!onHover) return;
-    
-    
-    const startYear = currentPosition.start.year;
-    const endYear = currentPosition.end.year;
-    
-    // Calculate left tile dimensions
-    const leftStartDay = getDayIndex(currentPosition.start);
-    const leftEndDay = startYear === endYear 
-      ? getDayIndex(currentPosition.end) 
-      : getDaysInYear(startYear) - 1; // 0-based index for last day of year
-    const leftWidth = leftEndDay - leftStartDay + 1;
-    
-    if (x < leftWidth) {
-      // Mouse is in left tile
-      if (tiles.left) {
-        const tileX = x + leftStartDay;
-        const tooltipData = tiles.left.getTooltipData(tileX, y);
-        if (tooltipData) {
-          // Convert to new format
-          const formattedData: any = {
-            date: tooltipData.date,
-            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
-            capacityFactor: tooltipData.capacityFactor,
-            isRegion: false
-          };
-          onHover(formattedData);
-        }
-      }
-    } else if (startYear !== endYear) {
-      // Mouse is in right tile
-      if (tiles.right) {
-        const tileX = x - leftWidth;
-        const tooltipData = tiles.right.getTooltipData(tileX, y);
-        if (tooltipData) {
-          // Convert to new format
-          const formattedData: any = {
-            date: tooltipData.date,
-            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
-            capacityFactor: tooltipData.capacityFactor,
-            isRegion: false
-          };
-          onHover(formattedData);
-        }
-      }
-    }
-  };
-  
-  // Animation loop effect - runs independently of render
-  useEffect(() => {
-    if (!animationRef.current.isAnimating) {
-      return;
-    }
-    
-    let frameId: number;
-    
-    const animate = () => {
-      const anim = animationRef.current;
-      
-      if (!anim.isAnimating) {
-        return;
-      }
-      
-      // Calculate progress based on elapsed time
-      const elapsed = performance.now() - anim.animationStartTime;
-      const progress = Math.min(elapsed / anim.animationDuration, 1);
-      
-      if (progress >= 1) {
-        // Animation complete - snap to goal
-        setCurrentPosition(dateRange);
-        anim.isAnimating = false;
-      } else {
-        // Calculate interpolated position
-        const totalDays = getDaysBetween(anim.fromStart, dateRange.start);
-        const daysToMove = Math.round(totalDays * progress);
-        const newStart = anim.fromStart.add({ days: daysToMove });
-        const newEnd = newStart.add({ days: 364 }); // Always exactly 365 days
-        
-        // Update current position
-        setCurrentPosition({ start: newStart, end: newEnd });
-        
-        // Update tooltip if mouse is over the canvas
-        if (mousePosRef.current && canvasRef.current) {
-          const elementAtMouse = document.elementFromPoint(mousePosRef.current.x, mousePosRef.current.y);
-          if (elementAtMouse === canvasRef.current) {
-            const rect = canvasRef.current.getBoundingClientRect();
-            updateTooltip(mousePosRef.current.x - rect.left, mousePosRef.current.y - rect.top);
-          }
-        }
-        
-        // Continue animation
-        frameId = requestAnimationFrame(animate);
-      }
-    };
-    
-    frameId = requestAnimationFrame(animate);
-    
-    return () => {
-      if (frameId) {
-        cancelAnimationFrame(frameId);
-      }
-    };
-  }, [animationRef.current.isAnimating, endDate, facilityCode, updateTooltip]);
   
   // Mouse position tracking effect
   useEffect(() => {

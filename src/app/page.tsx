@@ -10,6 +10,7 @@ import { CapFacTooltip, TooltipData } from '../components/CapFacTooltip';
 import { CapFacXAxis } from '../components/CapFacXAxis';
 import { DateRange } from '../components/DateRange';
 import { yearDataVendor } from '@/client/year-data-vendor';
+import { useAnimatedDateRange } from '@/hooks/useAnimatedDateRange';
 import './opennem.css';
 
 export default function Home() {
@@ -19,6 +20,9 @@ export default function Home() {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [nswFacilities, setNswFacilities] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Get animated date range
+  const animatedDateRange = useAnimatedDateRange(endDate);
   
   // Memoize callbacks to prevent unnecessary re-renders
   const handleHover = useCallback((data: TooltipData) => {
@@ -118,6 +122,7 @@ export default function Home() {
           // Don't move if we're already at yesterday
           if (endDate.compare(yesterday) < 0) {
             setEndDate(yesterday);
+          } else {
           }
         } else {
           setEndDate(newEndDate);
@@ -173,7 +178,7 @@ export default function Home() {
       {/* Date Range Header */}
       <div className="opennem-stripes-container">
         <div className="opennem-stripes-header">
-          <DateRange dateRange={endDate ? { start: endDate.subtract({ days: 364 }), end: endDate } : null} />
+          <DateRange dateRange={animatedDateRange} />
         </div>
 
         {/* Main Stripes Visualization */}
@@ -189,9 +194,7 @@ export default function Home() {
             <div className="opennem-region-content">
               {/* Display tiles */}
               {(() => {
-                if (!endDate || nswFacilities.length === 0) return null;
-                
-                const dateRange = { start: endDate.subtract({ days: 364 }), end: endDate };
+                if (!animatedDateRange || nswFacilities.length === 0) return null;
                 
                 return (
                   <div className="opennem-facility-group">
@@ -199,15 +202,17 @@ export default function Home() {
                     {nswFacilities.map(facilityCode => (
                       <CompositeTile
                         key={facilityCode}
-                        endDate={endDate}
+                        endDate={endDate!}
                         facilityCode={facilityCode}
+                        facilityName={facilityCode} // TODO: Get actual facility name
+                        animatedDateRange={animatedDateRange}
                         onHover={handleHover}
                         onHoverEnd={handleHoverEnd}
                       />
                     ))}
                     
                     <CapFacXAxis 
-                      dateRange={dateRange}
+                      dateRange={animatedDateRange}
                       regionCode="NSW1"
                       onHover={handleHover}
                       onHoverEnd={handleHoverEnd}
