@@ -18,7 +18,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
-  const [nswFacilities, setNswFacilities] = useState<string[]>([]);
+  const [nswFacilities, setNswFacilities] = useState<{ code: string; name: string }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
@@ -52,17 +52,19 @@ export default function Home() {
         const yearResults = await Promise.all(yearPromises);
         
         // Extract NSW facilities from the loaded data
-        const nswFacilityCodes = new Set<string>();
+        const nswFacilityMap = new Map<string, string>();
         for (const yearData of yearResults) {
           for (const unit of yearData.data.data) {
             if (unit.region === 'NSW1') {
-              nswFacilityCodes.add(unit.facility_code);
+              nswFacilityMap.set(unit.facility_code, unit.facility_name);
             }
           }
         }
         
-        // Sort facilities alphabetically by code
-        const sortedFacilities = Array.from(nswFacilityCodes).sort();
+        // Sort facilities alphabetically by name
+        const sortedFacilities = Array.from(nswFacilityMap.entries())
+          .map(([code, name]) => ({ code, name }))
+          .sort((a, b) => a.name.localeCompare(b.name));
         setNswFacilities(sortedFacilities);
         
         // Only set end date after data is loaded
@@ -199,12 +201,12 @@ export default function Home() {
                 return (
                   <div className="opennem-facility-group">
                     {/* Display all NSW facilities */}
-                    {nswFacilities.map(facilityCode => (
+                    {nswFacilities.map(facility => (
                       <CompositeTile
-                        key={facilityCode}
+                        key={facility.code}
                         endDate={endDate!}
-                        facilityCode={facilityCode}
-                        facilityName={facilityCode} // TODO: Get actual facility name
+                        facilityCode={facility.code}
+                        facilityName={facility.name}
                         animatedDateRange={animatedDateRange}
                         onHover={handleHover}
                         onHoverEnd={handleHoverEnd}
