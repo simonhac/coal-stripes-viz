@@ -35,7 +35,26 @@ export const PerformanceDisplay: React.FC = () => {
   const [disclosureState, setDisclosureState] = useState<DisclosureState>('collapsed');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('caches');
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
-  const [position, setPosition] = useState({ x: window.innerWidth / 2 - 50, y: 10 });
+  const [position, setPosition] = useState(() => {
+    // Load saved position from localStorage
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = localStorage.getItem('performance-monitor-coordinates');
+      if (saved) {
+        try {
+          const coords = JSON.parse(saved);
+          // Validate coordinates are within viewport
+          if (coords.x >= 0 && coords.x <= window.innerWidth - 100 &&
+              coords.y >= 0 && coords.y <= window.innerHeight - 100) {
+            return coords;
+          }
+        } catch (e) {
+          console.error('Failed to parse saved performance monitor position:', e);
+        }
+      }
+    }
+    // Default position
+    return { x: window.innerWidth / 2 - 50, y: 10 };
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const allFeatureFlags = useAllFeatureFlags();
@@ -97,6 +116,18 @@ export const PerformanceDisplay: React.FC = () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, dragStart]);
+
+  // Save position to localStorage after drag ends
+  useEffect(() => {
+    if (!isDragging && typeof window !== 'undefined' && window.localStorage) {
+      // Debounce to avoid saving during drag
+      const timeoutId = setTimeout(() => {
+        localStorage.setItem('performance-monitor-coordinates', JSON.stringify(position));
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [position, isDragging]);
 
   return (
     <div 
