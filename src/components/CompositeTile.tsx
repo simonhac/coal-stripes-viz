@@ -24,7 +24,7 @@ function getDaysInYear(year: number): number {
   return isLeapYear(year) ? 366 : 365;
 }
 
-export function CompositeTile({ 
+function CompositeTileComponent({ 
   endDate, 
   facilityCode,
   onHover,
@@ -34,17 +34,26 @@ export function CompositeTile({
 }: CompositeTileProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [facilityName, setFacilityName] = useState(facilityCode);
-  const [leftTile, setLeftTile] = useState<FacilityYearTile | null>(null);
-  const [rightTile, setRightTile] = useState<FacilityYearTile | null>(null);
-  const [leftTileState, setLeftTileState] = useState<TileState>('idle');
-  const [rightTileState, setRightTileState] = useState<TileState>('idle');
+  
+  // Store both tiles in a single state to ensure atomic updates
+  const [tiles, setTiles] = useState<{
+    left: FacilityYearTile | null;
+    right: FacilityYearTile | null;
+    leftState: TileState;
+    rightState: TileState;
+  }>({
+    left: null,
+    right: null,
+    leftState: 'idle',
+    rightState: 'idle'
+  });
   const lastKnownHeightRef = useRef<number>(12); // Default height
   const animationFrameRef = useRef<number | null>(null);
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
   
-  // Simple global mouse position tracking (moved to top)
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  // Simple global mouse position tracking (using ref to avoid re-renders)
+  const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   
   // Calculate date range - always exactly 365 days
   const dateRange = {
@@ -114,55 +123,104 @@ export function CompositeTile({
     const startYear = currentPosition.start.year;
     const endYear = currentPosition.end.year;
     
+    
     // Track current request years to ignore stale responses
     let currentStartYear = startYear;
     let currentEndYear = endYear;
     
     // Only reset tiles if we're loading a different year
-    const needsNewLeftTile = !leftTile || leftTile.getYear() !== startYear;
-    const needsNewRightTile = startYear !== endYear && (!rightTile || rightTile.getYear() !== endYear);
+    let needsNewLeftTile = !tiles.left || tiles.left.getYear() !== startYear;
+    let needsNewRightTile = startYear !== endYear && (!tiles.right || tiles.right.getYear() !== endYear);
     
+    // Prepare new tiles state - start with current state
+    let newTiles = { ...tiles };
+    let updateNeeded = false;
+    
+    // Try to get tiles synchronously from cache first
     if (needsNewLeftTile) {
-      setLeftTile(null);
-      setLeftTileState('pendingData');
+      const cachedLeftYear = yearDataVendor.getYearSync(startYear);
+      if (cachedLeftYear) {
+        const cachedLeftTile = cachedLeftYear.facilityTiles.get(facilityCode);
+        if (cachedLeftTile) {
+          newTiles.left = cachedLeftTile;
+          newTiles.leftState = 'hasData';
+          setFacilityName(cachedLeftTile.getFacilityName());
+          needsNewLeftTile = false;
+          updateNeeded = true;
+        }
+      }
+      
+      if (needsNewLeftTile) {
+        newTiles.left = null;
+        newTiles.leftState = 'pendingData';
+        updateNeeded = true;
+      }
     }
     
     if (needsNewRightTile) {
-      setRightTile(null);
-      setRightTileState('pendingData');
+      const cachedRightYear = yearDataVendor.getYearSync(endYear);
+      if (cachedRightYear) {
+        const cachedRightTile = cachedRightYear.facilityTiles.get(facilityCode);
+        if (cachedRightTile) {
+          newTiles.right = cachedRightTile;
+          newTiles.rightState = 'hasData';
+          if (!newTiles.left) {
+            setFacilityName(cachedRightTile.getFacilityName());
+          }
+          needsNewRightTile = false;
+          updateNeeded = true;
+        }
+      }
+      
+      if (needsNewRightTile) {
+        newTiles.right = null;
+        newTiles.rightState = 'pendingData';
+        updateNeeded = true;
+      }
     } else if (startYear === endYear) {
-      setRightTileState('idle');
+      newTiles.rightState = 'idle';
+      updateNeeded = true;
     }
     
-    // Load left tile without waiting
-    yearDataVendor.requestYear(startYear)
-      .then(leftYearData => {
-        // Ignore if we've moved to a different year
-        if (currentStartYear !== startYear) {
-          return;
-        }
-        
-        const leftFacilityTile = leftYearData.facilityTiles.get(facilityCode);
-        if (leftFacilityTile) {
-          setLeftTile(leftFacilityTile);
-          setLeftTileState('hasData');
-          setFacilityName(leftFacilityTile.getFacilityName());
-        } else {
-          setLeftTileState('error');
-        }
-      })
-      .catch(error => {
-        // Ignore if we've moved to a different year
-        if (currentStartYear !== startYear) {
-          return;
-        }
-        
-        console.error(`Failed to load year ${startYear}:`, error);
-        setLeftTileState('error');
-      });
+    // Apply all tile updates atomically
+    if (updateNeeded) {
+      setTiles(newTiles);
+    }
+    
+    // Load left tile only if not found in cache
+    if (needsNewLeftTile) {
+      yearDataVendor.requestYear(startYear)
+        .then(leftYearData => {
+          // Ignore if we've moved to a different year
+          if (currentStartYear !== startYear) {
+            return;
+          }
+          
+          const leftFacilityTile = leftYearData.facilityTiles.get(facilityCode);
+          if (leftFacilityTile) {
+            setTiles(prev => ({
+              ...prev,
+              left: leftFacilityTile,
+              leftState: 'hasData'
+            }));
+            setFacilityName(leftFacilityTile.getFacilityName());
+          } else {
+            setTiles(prev => ({ ...prev, leftState: 'error' }));
+          }
+        })
+        .catch(error => {
+          // Ignore if we've moved to a different year
+          if (currentStartYear !== startYear) {
+            return;
+          }
+          
+          console.error(`Failed to load year ${startYear}:`, error);
+          setTiles(prev => ({ ...prev, leftState: 'error' }));
+        });
+    }
 
-    // Load right tile if spanning two years
-    if (startYear !== endYear) {
+    // Load right tile only if not found in cache and we're spanning two years
+    if (startYear !== endYear && needsNewRightTile) {
       yearDataVendor.requestYear(endYear)
         .then(rightYearData => {
           // Ignore if we've moved to different years
@@ -172,13 +230,16 @@ export function CompositeTile({
           
           const rightFacilityTile = rightYearData.facilityTiles.get(facilityCode);
           if (rightFacilityTile) {
-            setRightTile(rightFacilityTile);
-            setRightTileState('hasData');
-            if (!leftTile) {
+            setTiles(prev => ({
+              ...prev,
+              right: rightFacilityTile,
+              rightState: 'hasData'
+            }));
+            if (!tiles.left) {
               setFacilityName(rightFacilityTile.getFacilityName());
             }
           } else {
-            setRightTileState('error');
+            setTiles(prev => ({ ...prev, rightState: 'error' }));
           }
         })
         .catch(error => {
@@ -188,7 +249,7 @@ export function CompositeTile({
           }
           
           console.error(`Failed to load year ${endYear}:`, error);
-          setRightTileState('error');
+          setTiles(prev => ({ ...prev, rightState: 'error' }));
         });
     }
     
@@ -228,11 +289,11 @@ export function CompositeTile({
     
     // Set height from available tiles or use last known height
     let canvasHeight = lastKnownHeightRef.current;
-    if (leftTile) {
-      canvasHeight = leftTile.getCanvas().height;
+    if (tiles.left) {
+      canvasHeight = tiles.left.getCanvas().height;
       lastKnownHeightRef.current = canvasHeight; // Update last known height
-    } else if (rightTile) {
-      canvasHeight = rightTile.getCanvas().height;
+    } else if (tiles.right) {
+      canvasHeight = tiles.right.getCanvas().height;
       lastKnownHeightRef.current = canvasHeight; // Update last known height
     }
     canvas.height = canvasHeight;
@@ -241,6 +302,7 @@ export function CompositeTile({
     // Use current position
     const startYear = currentPosition.start.year;
     const endYear = currentPosition.end.year;
+    
     
     // Calculate dimensions
     const leftStartDay = getDayIndex(currentPosition.start);
@@ -253,12 +315,12 @@ export function CompositeTile({
     
     // Ensure total width is exactly 365 pixels (canvas width)
     const totalWidth = leftWidth + rightWidth;
-    if (totalWidth !== 365 && facilityCode === 'BAYSW') {
-      console.warn(`[BAYSW] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalWidth}, currentPosition: ${currentPosition.start} to ${currentPosition.end}`);
+    if (totalWidth !== 365) {
+      console.warn(`[${facilityCode}] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalWidth}, currentPosition: ${currentPosition.start} to ${currentPosition.end}`);
     }
     
     // Check if we need shimmer animation
-    const needsShimmer = leftTileState === 'pendingData' || (startYear !== endYear && rightTileState === 'pendingData');
+    const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
     
     const render = () => {
       // Clear canvas
@@ -267,14 +329,14 @@ export function CompositeTile({
       let currentX = 0;
       
       // Draw left tile
-      if (leftTileState === 'hasData' && leftTile) {
-        const sourceCanvas = leftTile.getCanvas();
+      if (tiles.leftState === 'hasData' && tiles.left) {
+        const sourceCanvas = tiles.left.getCanvas();
         ctx.drawImage(
           sourceCanvas,
           leftStartDay, 0, leftWidth, sourceCanvas.height,
           currentX, 0, leftWidth, sourceCanvas.height
         );
-      } else if (leftTileState === 'error') {
+      } else if (tiles.leftState === 'error') {
         drawErrorState(ctx, currentX, leftWidth, canvas.height);
       }
       
@@ -282,14 +344,14 @@ export function CompositeTile({
       
       // Draw right tile if we're spanning two years
       if (startYear !== endYear) {
-        if (rightTileState === 'hasData' && rightTile) {
-          const sourceCanvas = rightTile.getCanvas();
+        if (tiles.rightState === 'hasData' && tiles.right) {
+          const sourceCanvas = tiles.right.getCanvas();
           ctx.drawImage(
             sourceCanvas,
             0, 0, rightWidth, sourceCanvas.height,
             currentX, 0, rightWidth, sourceCanvas.height
           );
-        } else if (rightTileState === 'error') {
+        } else if (tiles.rightState === 'error') {
           drawErrorState(ctx, currentX, rightWidth, canvas.height);
         }
       }
@@ -300,15 +362,15 @@ export function CompositeTile({
         let shimmerX = 0;
         let shimmerWidth = 0;
         
-        if (leftTileState === 'pendingData' && (!startYear || startYear === endYear || rightTileState !== 'pendingData')) {
+        if (tiles.leftState === 'pendingData' && (!startYear || startYear === endYear || tiles.rightState !== 'pendingData')) {
           // Only left is pending
           shimmerX = 0;
           shimmerWidth = leftWidth;
-        } else if (startYear !== endYear && rightTileState === 'pendingData' && leftTileState !== 'pendingData') {
+        } else if (startYear !== endYear && tiles.rightState === 'pendingData' && tiles.leftState !== 'pendingData') {
           // Only right is pending
           shimmerX = leftWidth;
           shimmerWidth = rightWidth;
-        } else if (leftTileState === 'pendingData' && rightTileState === 'pendingData') {
+        } else if (tiles.leftState === 'pendingData' && tiles.rightState === 'pendingData') {
           // Both are pending - single shimmer across both
           shimmerX = 0;
           shimmerWidth = leftWidth + rightWidth;
@@ -359,7 +421,7 @@ export function CompositeTile({
         animationFrameRef.current = null;
       }
     };
-  }, [dateRange, currentPosition, leftTile, rightTile, leftTileState, rightTileState, facilityCode]);
+  }, [dateRange, currentPosition, tiles, facilityCode]);
   
   // Update tooltip based on current mouse position
   const updateTooltip = (x: number, y: number) => {
@@ -378,9 +440,9 @@ export function CompositeTile({
     
     if (x < leftWidth) {
       // Mouse is in left tile
-      if (leftTile) {
+      if (tiles.left) {
         const tileX = x + leftStartDay;
-        const tooltipData = leftTile.getTooltipData(tileX, y);
+        const tooltipData = tiles.left.getTooltipData(tileX, y);
         if (tooltipData) {
           // Convert to new format
           const formattedData: any = {
@@ -394,9 +456,9 @@ export function CompositeTile({
       }
     } else if (startYear !== endYear) {
       // Mouse is in right tile
-      if (rightTile) {
+      if (tiles.right) {
         const tileX = x - leftWidth;
-        const tooltipData = rightTile.getTooltipData(tileX, y);
+        const tooltipData = tiles.right.getTooltipData(tileX, y);
         if (tooltipData) {
           // Convert to new format
           const formattedData: any = {
@@ -445,11 +507,11 @@ export function CompositeTile({
         setCurrentPosition({ start: newStart, end: newEnd });
         
         // Update tooltip if mouse is over the canvas
-        if (mousePos && canvasRef.current) {
-          const elementAtMouse = document.elementFromPoint(mousePos.x, mousePos.y);
+        if (mousePosRef.current && canvasRef.current) {
+          const elementAtMouse = document.elementFromPoint(mousePosRef.current.x, mousePosRef.current.y);
           if (elementAtMouse === canvasRef.current) {
             const rect = canvasRef.current.getBoundingClientRect();
-            updateTooltip(mousePos.x - rect.left, mousePos.y - rect.top);
+            updateTooltip(mousePosRef.current.x - rect.left, mousePosRef.current.y - rect.top);
           }
         }
         
@@ -465,12 +527,12 @@ export function CompositeTile({
         cancelAnimationFrame(frameId);
       }
     };
-  }, [animationRef.current.isAnimating, endDate, facilityCode, updateTooltip, mousePos]);
+  }, [animationRef.current.isAnimating, endDate, facilityCode, updateTooltip]);
   
   // Mouse position tracking effect
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
+      mousePosRef.current = { x: e.clientX, y: e.clientY };
     };
     
     document.addEventListener('mousemove', handleMouseMove);
@@ -479,21 +541,17 @@ export function CompositeTile({
   
   // Handle window scroll to update tooltip
   useEffect(() => {
-    if (!mousePos) return;
-    
     const handleScroll = () => {
-      if (!canvasRef.current) return;
+      if (!canvasRef.current || !mousePosRef.current) return;
       
       // Get element at current mouse position
-      const elementAtMouse = document.elementFromPoint(mousePos.x, mousePos.y);
-      
+      const elementAtMouse = document.elementFromPoint(mousePosRef.current.x, mousePosRef.current.y);
       
       // Check if it's our canvas
       if (elementAtMouse === canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
-        const x = mousePos.x - rect.left;
-        const y = mousePos.y - rect.top;
-        
+        const x = mousePosRef.current.x - rect.left;
+        const y = mousePosRef.current.y - rect.top;
         
         updateTooltip(x, y);
       } else {
@@ -506,7 +564,7 @@ export function CompositeTile({
     
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [mousePos, updateTooltip, onHoverEnd, facilityCode]);
+  }, [updateTooltip, onHoverEnd, facilityCode]);
   
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -545,3 +603,5 @@ export function CompositeTile({
     </div>
   );
 }
+
+export const CompositeTile = React.memo(CompositeTileComponent);

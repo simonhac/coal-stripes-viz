@@ -21,6 +21,15 @@ export class YearDataVendor {
   }
 
   /**
+   * Get data for a year synchronously if it's in the cache
+   * @param year The year to get
+   * @returns The data if cached, null otherwise
+   */
+  getYearSync(year: number): CapFacYear | null {
+    return this.cache.get(year.toString()) || null;
+  }
+
+  /**
    * Request data for a specific year
    * @returns Promise that resolves with the data (immediately if cached)
    */

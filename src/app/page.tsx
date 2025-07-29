@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST, getDaysBetween } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
@@ -19,6 +19,15 @@ export default function Home() {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [nswFacilities, setNswFacilities] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleHover = useCallback((data: TooltipData) => {
+    setTooltipData(data);
+  }, []);
+  
+  const handleHoverEnd = useCallback(() => {
+    setTooltipData(null);
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -192,16 +201,16 @@ export default function Home() {
                         key={facilityCode}
                         endDate={endDate}
                         facilityCode={facilityCode}
-                        onHover={setTooltipData}
-                        onHoverEnd={() => setTooltipData(null)}
+                        onHover={handleHover}
+                        onHoverEnd={handleHoverEnd}
                       />
                     ))}
                     
                     <CapFacXAxis 
                       dateRange={dateRange}
                       regionCode="NSW1"
-                      onHover={setTooltipData}
-                      onHoverEnd={() => setTooltipData(null)}
+                      onHover={handleHover}
+                      onHoverEnd={handleHoverEnd}
                     />
                   </div>
                 );
