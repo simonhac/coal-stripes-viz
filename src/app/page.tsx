@@ -18,7 +18,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
-  const [nswFacilities, setNswFacilities] = useState<{ code: string; name: string }[]>([]);
+  const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
@@ -57,21 +57,49 @@ export default function Home() {
         const yearPromises = years.map(year => yearDataVendor.requestYear(year));
         const yearResults = await Promise.all(yearPromises);
         
-        // Extract NSW facilities from the loaded data
-        const nswFacilityMap = new Map<string, string>();
+        // Extract facilities by region from the loaded data
+        const regionFacilityMaps = new Map<string, Map<string, string>>();
+        
         for (const yearData of yearResults) {
           for (const unit of yearData.data.data) {
-            if (unit.region === 'NSW1') {
-              nswFacilityMap.set(unit.facility_code, unit.facility_name);
+            if (unit.region) {
+              if (!regionFacilityMaps.has(unit.region)) {
+                regionFacilityMaps.set(unit.region, new Map());
+              }
+              regionFacilityMaps.get(unit.region)!.set(unit.facility_code, unit.facility_name);
             }
           }
         }
         
-        // Sort facilities alphabetically by name
-        const sortedFacilities = Array.from(nswFacilityMap.entries())
-          .map(([code, name]) => ({ code, name }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setNswFacilities(sortedFacilities);
+        // Convert to sorted structure
+        const facilitiesMap = new Map<string, { code: string; name: string }[]>();
+        
+        // Define region display names
+        const regionNames = new Map([
+          ['NSW1', 'New South Wales'],
+          ['QLD1', 'Queensland'],
+          ['SA1', 'South Australia'],
+          ['TAS1', 'Tasmania'],
+          ['VIC1', 'Victoria']
+        ]);
+        
+        // Sort regions alphabetically by display name
+        const sortedRegions = Array.from(regionNames.entries())
+          .sort((a, b) => a[1].localeCompare(b[1]))
+          .map(([code]) => code);
+        
+        // Process each region
+        for (const regionCode of sortedRegions) {
+          const facilityMap = regionFacilityMaps.get(regionCode);
+          if (facilityMap && facilityMap.size > 0) {
+            const sortedFacilities = Array.from(facilityMap.entries())
+              .map(([code, name]) => ({ code, name }))
+              .sort((a, b) => a.name.localeCompare(b.name));
+            facilitiesMap.set(regionCode, sortedFacilities);
+          }
+        }
+        
+        setFacilitiesByRegion(facilitiesMap);
         
         // Only set end date after data is loaded
         setEndDate(calculatedEndDate);
@@ -194,42 +222,53 @@ export default function Home() {
           ref={containerRef} 
           className="opennem-stripes-viz"
         >
-          <div className="opennem-region">
-            <div className="opennem-region-header">
-              <span>New South Wales</span>
-              <CapFacTooltip data={tooltipData} />
-            </div>
-            <div className="opennem-region-content">
-              {/* Display tiles */}
-              {(() => {
-                if (!animatedDateRange || nswFacilities.length === 0) return null;
-                
-                return (
-                  <div className="opennem-facility-group">
-                    {/* Display all NSW facilities */}
-                    {nswFacilities.map(facility => (
-                      <CompositeTile
-                        key={facility.code}
-                        endDate={endDate!}
-                        facilityCode={facility.code}
-                        facilityName={facility.name}
-                        animatedDateRange={animatedDateRange}
+          {/* Create a section for each region */}
+          {Array.from(facilitiesByRegion.entries()).map(([regionCode, facilities]) => {
+            // Get region display name
+            const regionName = {
+              'NSW1': 'New South Wales',
+              'QLD1': 'Queensland',
+              'SA1': 'South Australia',
+              'TAS1': 'Tasmania',
+              'VIC1': 'Victoria'
+            }[regionCode] || regionCode;
+            
+            return (
+              <div key={regionCode} className="opennem-region">
+                <div className="opennem-region-header">
+                  <span>{regionName}</span>
+                  <CapFacTooltip data={tooltipData} />
+                </div>
+                <div className="opennem-region-content">
+                  {/* Display tiles */}
+                  {animatedDateRange && (
+                    <div className="opennem-facility-group">
+                      {/* Display all facilities for this region */}
+                      {facilities.map(facility => (
+                        <CompositeTile
+                          key={facility.code}
+                          endDate={endDate!}
+                          facilityCode={facility.code}
+                          facilityName={facility.name}
+                          animatedDateRange={animatedDateRange}
+                          onHover={handleHover}
+                          onHoverEnd={handleHoverEnd}
+                        />
+                      ))}
+                      
+                      <CapFacXAxis 
+                        dateRange={animatedDateRange}
+                        regionCode={regionCode}
+                        regionName={regionName}
                         onHover={handleHover}
                         onHoverEnd={handleHoverEnd}
                       />
-                    ))}
-                    
-                    <CapFacXAxis 
-                      dateRange={animatedDateRange}
-                      regionCode="NSW1"
-                      onHover={handleHover}
-                      onHoverEnd={handleHoverEnd}
-                    />
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>

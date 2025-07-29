@@ -7,14 +7,16 @@ import { yearDataVendor } from '@/client/year-data-vendor';
 
 interface CapFacXAxisProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
-  regionCode?: string;
+  regionCode: string;
+  regionName: string;
   onHover?: (tooltipData: any) => void;
   onHoverEnd?: () => void;
 }
 
 export function CapFacXAxis({ 
   dateRange, 
-  regionCode = 'NSW1',
+  regionCode,
+  regionName,
   onHover,
   onHoverEnd
 }: CapFacXAxisProps) {
@@ -169,7 +171,7 @@ export function CapFacXAxis({
     if (onHover) {
       onHover({
         date: month.date,
-        label: 'New South Wales',
+        label: regionName,
         capacityFactor: month.capacityFactor,
         isRegion: true
       });
