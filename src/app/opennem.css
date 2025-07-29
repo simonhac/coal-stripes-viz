@@ -354,7 +354,7 @@ header a {
 }
 
 .opennem-stripe-data {
-  width: 365px;
+  flex: 1;
   display: flex;
   position: relative;
   overflow: hidden;

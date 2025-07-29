@@ -291,15 +291,21 @@ function CompositeTileComponent({
       return;
     }
 
+    // Disable image smoothing for crisp pixel rendering
+    ctx.imageSmoothingEnabled = false;
+    ctx.mozImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    
     // Cancel any existing animation
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
 
-    // Set canvas size to exactly 365 pixels wide
-    canvas.width = 365;
-    canvas.style.width = '365px';
+    // Get the actual width from the parent container
+    const containerElement = canvas.parentElement;
+    const containerWidth = containerElement ? (containerElement.offsetWidth || containerElement.clientWidth || 365) : 365;
     
     // Set height from available tiles or use last known height
     let canvasHeight = lastKnownHeightRef.current;
@@ -310,7 +316,12 @@ function CompositeTileComponent({
       canvasHeight = tiles.right.getCanvas().height;
       lastKnownHeightRef.current = canvasHeight; // Update last known height
     }
+    
+    // Set canvas size - keep internal resolution at 365 pixels wide
+    // and let CSS stretch it
+    canvas.width = 365;
     canvas.height = canvasHeight;
+    canvas.style.width = '100%';
     canvas.style.height = `${canvasHeight}px`;
 
     // Use date range
@@ -322,12 +333,18 @@ function CompositeTileComponent({
       const elementAtMouse = document.elementFromPoint(mousePosRef.current.x, mousePosRef.current.y);
       if (elementAtMouse === canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
-        updateTooltip(mousePosRef.current.x - rect.left, mousePosRef.current.y - rect.top);
+        const x = mousePosRef.current.x - rect.left;
+        const y = mousePosRef.current.y - rect.top;
+        
+        // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
+        const canvasX = (x / rect.width) * 365;
+        
+        updateTooltip(canvasX, y);
       }
     }
     
     
-    // Calculate dimensions
+    // Calculate dimensions (in source pixels - always 365 total)
     const leftStartDay = getDayIndex(dateRange.start);
     const leftEndDay = startYear === endYear 
       ? getDayIndex(dateRange.end) 
@@ -336,11 +353,12 @@ function CompositeTileComponent({
     
     const rightWidth = startYear !== endYear ? getDayIndex(dateRange.end) + 1 : 0;
     
-    // Ensure total width is exactly 365 pixels (canvas width)
-    const totalWidth = leftWidth + rightWidth;
-    if (totalWidth !== 365) {
-      console.warn(`[${facilityCode}] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalWidth}, dateRange: ${dateRange.start} to ${dateRange.end}`);
+    // Ensure total width is exactly 365 days
+    const totalDays = leftWidth + rightWidth;
+    if (totalDays !== 365) {
+      console.warn(`[${facilityCode}] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalDays}, dateRange: ${dateRange.start} to ${dateRange.end}`);
     }
+    
     
     // Check if we need shimmer animation
     const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
@@ -465,7 +483,10 @@ function CompositeTileComponent({
         const x = mousePosRef.current.x - rect.left;
         const y = mousePosRef.current.y - rect.top;
         
-        updateTooltip(x, y);
+        // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
+        const canvasX = (x / rect.width) * 365;
+        
+        updateTooltip(canvasX, y);
       } else {
         // Mouse not over our canvas - check if we need to call onHoverEnd
         // We can check if the tooltip is currently showing for this tile
@@ -483,8 +504,10 @@ function CompositeTileComponent({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
+    const canvasX = (x / rect.width) * 365;
     
-    updateTooltip(x, y);
+    updateTooltip(canvasX, y);
   };
 
   return (
@@ -499,7 +522,7 @@ function CompositeTileComponent({
         <canvas
           ref={canvasRef}
           style={{ 
-            width: '365px',
+            width: '100%',
             height: '12px',
             imageRendering: 'pixelated',
             display: 'block'
