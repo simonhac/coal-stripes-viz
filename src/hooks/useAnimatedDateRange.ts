@@ -23,7 +23,7 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     fromStart: CalendarDate | null;
     targetStart: CalendarDate | null;
   }>({
-    animationDuration: 150, // 150ms animation
+    animationDuration: 250,  // milliseconds 
     animationStartTime: 0,
     fromStart: null,
     targetStart: null
@@ -77,6 +77,13 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     }
   }, [targetEndDate]); // eslint-disable-line react-hooks/exhaustive-deps
   
+  // Cubic easing function (ease-in-out)
+  const cubicEaseInOut = (t: number): number => {
+    return t < 0.5 
+      ? 4 * t * t * t 
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  };
+
   // Animation loop
   useEffect(() => {
     if (!isAnimating) {
@@ -84,7 +91,6 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     }
     
     let frameId: number;
-    let frameCount = 0;
     
     const animate = () => {
       const anim = animationRef.current;
@@ -93,34 +99,32 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
         return;
       }
       
-      // Increment frame counter
-      frameCount++;
+      // Calculate progress based on elapsed time
+      const elapsed = performance.now() - anim.animationStartTime;
+      const progress = Math.min(elapsed / anim.animationDuration, 1);
       
-      // Only move every 2 frames (2x slowdown)
-      if (frameCount % 2 === 0) {
-        // Move one day per 10 frames
-        const currentStart = currentRange?.start || anim.fromStart;
-        const daysRemaining = getDaysBetween(currentStart, anim.targetStart);
-        
-        if (daysRemaining === 0) {
-          // We've reached the target
-          const finalEnd = anim.targetStart.add({ days: 364 });
-          setCurrentRange({ start: anim.targetStart, end: finalEnd });
-          setIsAnimating(false);
-          return; // Stop the animation
-        } else {
-          // Move one day in the right direction
-          const delta = daysRemaining > 0 ? 1 : -1;
-          const newStart = currentStart.add({ days: delta });
-          const newEnd = newStart.add({ days: 364 }); // always exactly 365 days
-          
-          // Update current range
-          setCurrentRange({ start: newStart, end: newEnd });
-        }
+      // Apply cubic easing
+      const easedProgress = cubicEaseInOut(progress);
+      
+      // Calculate the total days to move
+      const totalDays = getDaysBetween(anim.fromStart, anim.targetStart);
+      const daysToMove = Math.round(totalDays * easedProgress);
+      
+      // Calculate new position
+      const newStart = anim.fromStart.add({ days: daysToMove });
+      const newEnd = newStart.add({ days: 364 }); // always exactly 365 days
+      
+      // Update current range
+      setCurrentRange({ start: newStart, end: newEnd });
+      
+      if (progress >= 1) {
+        // Animation complete - ensure we're exactly at the target
+        setCurrentRange({ start: anim.targetStart, end: anim.targetStart.add({ days: 364 }) });
+        setIsAnimating(false);
+      } else {
+        // Continue animation
+        frameId = requestAnimationFrame(animate);
       }
-      
-      // Continue animation
-      frameId = requestAnimationFrame(animate);
     };
     
     frameId = requestAnimationFrame(animate);
@@ -130,7 +134,7 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
         cancelAnimationFrame(frameId);
       }
     };
-  }, [isAnimating, currentRange]);
+  }, [isAnimating]);
   
   return currentRange;
 }
