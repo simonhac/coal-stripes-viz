@@ -293,8 +293,11 @@ function CompositeTileComponent({
 
     // Disable image smoothing for crisp pixel rendering
     ctx.imageSmoothingEnabled = false;
+    // @ts-ignore - vendor prefixes for older browsers
     ctx.mozImageSmoothingEnabled = false;
+    // @ts-ignore - vendor prefixes for older browsers
     ctx.webkitImageSmoothingEnabled = false;
+    // @ts-ignore - vendor prefixes for older browsers
     ctx.msImageSmoothingEnabled = false;
     
     // Cancel any existing animation

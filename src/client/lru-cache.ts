@@ -2,6 +2,7 @@ export interface CacheStats {
   numItems: number;
   totalKB: number;
   labels: string[];
+  pendingLabels?: string[];
 }
 
 export interface CacheItem<T> {

@@ -1,11 +1,14 @@
 
 OptimizedStripeCanvas
 
-why is there a facility name in the component?
+better caching
+most recent first on fetches
+height of collie
+tooltips
 
-when would the tile not know its width?
-
-why are we waiting
+hover over facility
+hover over region name
+click on month
 
 claude doctor or npm i -g @anthropic-ai/claude-cod
 
