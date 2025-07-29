@@ -17,18 +17,17 @@ export function CapFacTooltip({ data }: CapFacTooltipProps) {
     return <div className="hover-date-value" style={{ visibility: 'hidden' }}></div>;
   }
 
+  const jsDate = data.date.toDate('Australia/Brisbane');
+  const monthName = jsDate.toLocaleDateString('en-AU', {
+    month: 'short',
+    timeZone: 'Australia/Brisbane'
+  });
+  // Ensure exactly 3 letters for month (fixes "Sept" -> "Sep")
+  const shortMonth = monthName.substring(0, 3);
+  
   const formattedDate = data.isRegion 
-    ? data.date.toDate('Australia/Brisbane').toLocaleDateString('en-AU', {
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'Australia/Brisbane'
-      })
-    : data.date.toDate('Australia/Brisbane').toLocaleDateString('en-AU', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'Australia/Brisbane'
-      });
+    ? `${shortMonth} ${jsDate.getFullYear()}`
+    : `${jsDate.getDate()} ${shortMonth} ${jsDate.getFullYear()}`;
 
   const getCapacityValue = (capacityFactor: number | null) => {
     if (capacityFactor === null) return '—';

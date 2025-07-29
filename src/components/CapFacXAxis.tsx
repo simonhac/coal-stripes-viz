@@ -103,16 +103,19 @@ export function CapFacXAxis({
   let currentDate = dateRange.start;
   let currentDayOffset = 0;
   let totalDaysProcessed = 0;
+  let previousRightPercent = 0; // Track where the previous month ended
   
   while (currentDate.compare(dateRange.end) <= 0) {
     const monthStart = currentDate;
     const year = monthStart.year;
     const month = monthStart.month;
-    const monthLabelLong = monthStart.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
+    const monthName = monthStart.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
       month: 'short',
       timeZone: 'Australia/Brisbane'
     });
-    const monthLabelShort = monthLabelLong.charAt(0); // First letter only
+    // Ensure exactly 3 letters for long label (fixes "Sept" -> "Sep")
+    const monthLabelLong = monthName.substring(0, 3);
+    const monthLabelShort = monthName.charAt(0); // First letter only
     
     // Calculate month end
     let monthEnd = monthStart.set({ day: monthStart.calendar.getDaysInMonth(monthStart) });
@@ -134,7 +137,7 @@ export function CapFacXAxis({
     // Calculate width and position as percentages
     const daysInMonth = getDaysBetween(monthStart, monthEnd) + 1;
     const widthPercent = (daysInMonth / totalDays) * 100;
-    const leftPercent = (currentDayOffset / totalDays) * 100;
+    const leftPercent = previousRightPercent; // Start where previous month ended
     
     monthBars.push({
       labelShort: monthLabelShort,
@@ -146,6 +149,8 @@ export function CapFacXAxis({
       capacityFactor
     });
     
+    // Update for next iteration
+    previousRightPercent = leftPercent + widthPercent;
     currentDayOffset += daysInMonth;
     totalDaysProcessed += daysInMonth;
     

@@ -80,7 +80,8 @@ export default function Home() {
           ['QLD1', 'Queensland'],
           ['SA1', 'South Australia'],
           ['TAS1', 'Tasmania'],
-          ['VIC1', 'Victoria']
+          ['VIC1', 'Victoria'],
+          ['WEM', 'Western Australia']
         ]);
         
         // Sort regions alphabetically by display name
@@ -230,7 +231,8 @@ export default function Home() {
               'QLD1': 'Queensland',
               'SA1': 'South Australia',
               'TAS1': 'Tasmania',
-              'VIC1': 'Victoria'
+              'VIC1': 'Victoria',
+              'WEM': 'Western Australia'
             }[regionCode] || regionCode;
             
             return (
