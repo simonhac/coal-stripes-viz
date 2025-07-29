@@ -23,7 +23,7 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     fromStart: CalendarDate | null;
     targetStart: CalendarDate | null;
   }>({
-    animationDuration: 250,  // milliseconds 
+    animationDuration: 300,  // milliseconds 
     animationStartTime: 0,
     fromStart: null,
     targetStart: null

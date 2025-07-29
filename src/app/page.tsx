@@ -24,6 +24,12 @@ export default function Home() {
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate);
   
+  // Target date range (for display in header)
+  const targetDateRange = endDate ? {
+    start: endDate.subtract({ days: 364 }),
+    end: endDate
+  } : null;
+  
   // Memoize callbacks to prevent unnecessary re-renders
   const handleHover = useCallback((data: TooltipData) => {
     setTooltipData(data);
@@ -180,7 +186,7 @@ export default function Home() {
       {/* Date Range Header */}
       <div className="opennem-stripes-container">
         <div className="opennem-stripes-header">
-          <DateRange dateRange={animatedDateRange} />
+          <DateRange dateRange={targetDateRange} />
         </div>
 
         {/* Main Stripes Visualization */}
