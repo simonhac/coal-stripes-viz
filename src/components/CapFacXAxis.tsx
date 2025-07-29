@@ -95,15 +95,12 @@ export function CapFacXAxis({
     };
   }, []);
 
-  const monthBars: { labelShort: string; labelLong: string; color: string; widthPercent: number; leftPercent: number; date: CalendarDate; capacityFactor: number | null }[] = [];
+  const monthBars: { labelShort: string; labelLong: string; color: string; widthPercent: number; date: CalendarDate; capacityFactor: number | null }[] = [];
   
   // Total days in the date range (should be 365)
   const totalDays = getDaysBetween(dateRange.start, dateRange.end) + 1;
   
   let currentDate = dateRange.start;
-  let currentDayOffset = 0;
-  let totalDaysProcessed = 0;
-  let previousRightPercent = 0; // Track where the previous month ended
   
   while (currentDate.compare(dateRange.end) <= 0) {
     const monthStart = currentDate;
@@ -134,42 +131,21 @@ export function CapFacXAxis({
       }
     }
     
-    // Calculate width and position as percentages
+    // Calculate width as percentage
     const daysInMonth = getDaysBetween(monthStart, monthEnd) + 1;
     const widthPercent = (daysInMonth / totalDays) * 100;
-    const leftPercent = previousRightPercent; // Start where previous month ended
     
     monthBars.push({
       labelShort: monthLabelShort,
       labelLong: monthLabelLong,
       color: getProportionColorHex(capacityFactor),
       widthPercent,
-      leftPercent,
       date: monthStart,
       capacityFactor
     });
     
-    // Update for next iteration
-    previousRightPercent = leftPercent + widthPercent;
-    currentDayOffset += daysInMonth;
-    totalDaysProcessed += daysInMonth;
-    
     // Move to next month
     currentDate = monthStart.add({ months: 1 }).set({ day: 1 });
-  }
-  
-  // Debug: Check if we're covering all days
-  if (totalDaysProcessed !== totalDays) {
-    console.warn(`CapFacXAxis: Total days mismatch. Processed: ${totalDaysProcessed}, Expected: ${totalDays}`);
-  }
-  
-  // Adjust the last month to ensure we fill 100%
-  if (monthBars.length > 0) {
-    const lastMonth = monthBars[monthBars.length - 1];
-    const totalPercentUsed = monthBars.reduce((sum, month) => sum + month.widthPercent, 0);
-    if (totalPercentUsed < 100) {
-      lastMonth.widthPercent += (100 - totalPercentUsed);
-    }
   }
   
   const handleMouseEnter = (month: typeof monthBars[0]) => {
@@ -189,15 +165,16 @@ export function CapFacXAxis({
         {/* Empty label for alignment */}
       </div>
       <div className="opennem-stripe-data" ref={containerRef} style={{ cursor: 'default' }}>
-        <div style={{ display: 'block', width: '100%', height: '16px', position: 'relative' }}>
+        <div style={{ display: 'flex', width: '100%', height: '16px' }}>
             {monthBars.map((month, idx) => (
               <div
                 key={idx}
                 className="opennem-month-label"
                 style={{ 
                   backgroundColor: month.color,
-                  width: `${month.widthPercent}%`,
-                  left: `${month.leftPercent}%`
+                  width: idx === monthBars.length - 1 ? 'auto' : `${month.widthPercent}%`,
+                  flex: idx === monthBars.length - 1 ? '1' : 'none',
+                  position: 'relative'
                 }}
                 onMouseEnter={() => handleMouseEnter(month)}
                 onMouseLeave={onHoverEnd}
