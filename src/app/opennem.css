@@ -264,9 +264,7 @@ header a {
 .opennem-region-x-axis {
   position: relative;
   height: 16px;
-  margin-top: 5px;
-  margin-left: 140px; /* Align with facility data */
-  width: 365px; /* Match the stripe data width */
+  width: 100%; /* Fill parent width */
   overflow: hidden; /* Clip content */
 }
 
@@ -279,7 +277,6 @@ header a {
 /* Responsive adjustments for x-axis */
 @media (max-width: 768px) {
   .opennem-region-x-axis {
-    margin-left: 0; /* Start at left edge on mobile */
     margin-top: 3px; /* Reduce spacing on mobile */
   }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween } from '@/shared/date-utils';
 import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
@@ -19,6 +19,8 @@ export function CapFacXAxis({
   onHoverEnd
 }: CapFacXAxisProps) {
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
+  const [useShortLabels, setUseShortLabels] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const startYear = dateRange.start.year;
@@ -69,19 +71,46 @@ export function CapFacXAxis({
       currentYears.clear();
     };
   }, [dateRange]);
-  const monthBars: { label: string; color: string; width: number; left: number; date: CalendarDate; capacityFactor: number | null }[] = [];
+
+  // Monitor container width to determine label format
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        // Switch to short labels if average month width is less than 50px
+        // 365 days / 12 months ≈ 30.4 days per month on average
+        const avgMonthWidth = width / 12;
+        setUseShortLabels(avgMonthWidth < 50);
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  const monthBars: { labelShort: string; labelLong: string; color: string; widthPercent: number; leftPercent: number; date: CalendarDate; capacityFactor: number | null }[] = [];
+  
+  // Total days in the date range (should be 365)
+  const totalDays = getDaysBetween(dateRange.start, dateRange.end) + 1;
   
   let currentDate = dateRange.start;
-  let currentLeft = 0;
+  let currentDayOffset = 0;
+  let totalDaysProcessed = 0;
   
   while (currentDate.compare(dateRange.end) <= 0) {
     const monthStart = currentDate;
     const year = monthStart.year;
     const month = monthStart.month;
-    const monthLabel = monthStart.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
+    const monthLabelLong = monthStart.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
       month: 'short',
       timeZone: 'Australia/Brisbane'
     });
+    const monthLabelShort = monthLabelLong.charAt(0); // First letter only
     
     // Calculate month end
     let monthEnd = monthStart.set({ day: monthStart.calendar.getDaysInMonth(monthStart) });
@@ -100,23 +129,40 @@ export function CapFacXAxis({
       }
     }
     
-    // Calculate width and position in pixels (1 day = 1 pixel)
+    // Calculate width and position as percentages
     const daysInMonth = getDaysBetween(monthStart, monthEnd) + 1;
-    const width = daysInMonth;
+    const widthPercent = (daysInMonth / totalDays) * 100;
+    const leftPercent = (currentDayOffset / totalDays) * 100;
     
     monthBars.push({
-      label: monthLabel.charAt(0), // Single letter for month
+      labelShort: monthLabelShort,
+      labelLong: monthLabelLong,
       color: getProportionColorHex(capacityFactor),
-      width,
-      left: currentLeft,
+      widthPercent,
+      leftPercent,
       date: monthStart,
       capacityFactor
     });
     
-    currentLeft += width;
+    currentDayOffset += daysInMonth;
+    totalDaysProcessed += daysInMonth;
     
     // Move to next month
     currentDate = monthStart.add({ months: 1 }).set({ day: 1 });
+  }
+  
+  // Debug: Check if we're covering all days
+  if (totalDaysProcessed !== totalDays) {
+    console.warn(`CapFacXAxis: Total days mismatch. Processed: ${totalDaysProcessed}, Expected: ${totalDays}`);
+  }
+  
+  // Adjust the last month to ensure we fill 100%
+  if (monthBars.length > 0) {
+    const lastMonth = monthBars[monthBars.length - 1];
+    const totalPercentUsed = monthBars.reduce((sum, month) => sum + month.widthPercent, 0);
+    if (totalPercentUsed < 100) {
+      lastMonth.widthPercent += (100 - totalPercentUsed);
+    }
   }
   
   const handleMouseEnter = (month: typeof monthBars[0]) => {
@@ -131,23 +177,28 @@ export function CapFacXAxis({
   };
 
   return (
-    <div className="opennem-region-x-axis">
-      <div className="opennem-region-x-axis-inner">
-        {monthBars.map((month, idx) => (
-          <div
-            key={idx}
-            className="opennem-month-label"
-            style={{ 
-              backgroundColor: month.color,
-              width: `${month.width}px`,
-              left: `${month.left}px`
-            }}
-            onMouseEnter={() => handleMouseEnter(month)}
-            onMouseLeave={onHoverEnd}
-          >
-            {month.label}
-          </div>
-        ))}
+    <div className="opennem-stripe-row" style={{ display: 'flex' }}>
+      <div className="opennem-facility-label">
+        {/* Empty label for alignment */}
+      </div>
+      <div className="opennem-stripe-data" ref={containerRef} style={{ cursor: 'default' }}>
+        <div style={{ display: 'block', width: '100%', height: '16px', position: 'relative' }}>
+            {monthBars.map((month, idx) => (
+              <div
+                key={idx}
+                className="opennem-month-label"
+                style={{ 
+                  backgroundColor: month.color,
+                  width: `${month.widthPercent}%`,
+                  left: `${month.leftPercent}%`
+                }}
+                onMouseEnter={() => handleMouseEnter(month)}
+                onMouseLeave={onHoverEnd}
+              >
+                {useShortLabels ? month.labelShort : month.labelLong}
+              </div>
+            ))}
+        </div>
       </div>
     </div>
   );
