@@ -123,6 +123,7 @@ header a {
   max-width: 1200px;
   margin: 0 auto;
   padding: var(--app-padding);
+  position: relative; /* Ensure sticky children work */
 }
 
 .opennem-stripes-header {
@@ -209,7 +210,7 @@ header a {
   background: #faf9f6;
   user-select: none; /* Prevent text selection during drag */
   touch-action: pan-y; /* Allow vertical scroll but handle horizontal drag */
-  overflow: hidden; /* Prevent horizontal scroll */
+  /* Removed overflow constraints to allow sticky positioning */
 }
 
 .opennem-stripes-viz.dragging {
@@ -234,6 +235,7 @@ header a {
 
 .opennem-region {
   margin: 24px 0;
+  position: relative; /* Create containing block for sticky header */
 }
 
 .opennem-region:last-child {
@@ -251,13 +253,16 @@ header a {
   margin-left: 0;
   display: flex;
   align-items: flex-end; /* Align bottoms */
+  position: -webkit-sticky; /* For Safari */
+  position: sticky;
+  top: 0;
+  z-index: 100;
   justify-content: space-between;
 }
 
 .opennem-region-content {
   position: relative;
   min-height: 40px;
-  padding-top: 10px;
 }
 
 /* X-axis with month labels */
@@ -538,10 +543,11 @@ header a {
     margin: 20px 0 0 0;
   }
   
-  /* Reduce region header padding */
+  /* Reduce region header padding but maintain sticky */
   .opennem-region-header {
     padding: 4px 0 2px 0;
     font-size: 16px;
+    /* Sticky properties inherited from desktop */
   }
   
   /* Reduce facility group spacing */

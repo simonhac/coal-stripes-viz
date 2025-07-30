@@ -28,10 +28,10 @@ class CapacityFactorColorMap {
     let r: number, g: number, b: number;
     
     if (capacityFactor < 25) {
-      // Red for anything under 25%
-      r = 239;
-      g = 68;
-      b = 68;
+      // Medium red for anything under 25%
+      r = 210;
+      g = 70;
+      b = 70;
     } else {
       // Map capacity factor directly to grey scale
       // 25% -> 75% grey (light), 100% -> 0% grey (black)
