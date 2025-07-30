@@ -22,11 +22,13 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     animationStartTime: number;
     fromStart: CalendarDate | null;
     targetStart: CalendarDate | null;
+    isActive: boolean;
   }>({
     animationDuration: 300,  // milliseconds 
     animationStartTime: 0,
     fromStart: null,
-    targetStart: null
+    targetStart: null,
+    isActive: false
   });
   
   // Track last processed goal to avoid loops
@@ -69,9 +71,11 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
       anim.fromStart = currentRange.start;
       anim.targetStart = targetRange.start;
       anim.animationStartTime = performance.now();
+      anim.isActive = true;
       setIsAnimating(true);
     } else if (Math.abs(daysDiff) > 0) {
       // Jump directly for large changes
+      anim.isActive = false;
       setCurrentRange(targetRange);
       setIsAnimating(false);
     }
@@ -91,11 +95,12 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     }
     
     let frameId: number;
+    let animationActive = true;
     
     const animate = () => {
       const anim = animationRef.current;
       
-      if (!isAnimating || !anim.fromStart || !anim.targetStart) {
+      if (!animationActive || !anim.isActive || !anim.fromStart || !anim.targetStart) {
         return;
       }
       
@@ -114,14 +119,15 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
       const newStart = anim.fromStart.add({ days: daysToMove });
       const newEnd = newStart.add({ days: 364 }); // always exactly 365 days
       
-      // Update current range
-      setCurrentRange({ start: newStart, end: newEnd });
-      
       if (progress >= 1) {
         // Animation complete - ensure we're exactly at the target
+        anim.isActive = false;
         setCurrentRange({ start: anim.targetStart, end: anim.targetStart.add({ days: 364 }) });
         setIsAnimating(false);
       } else {
+        // Update current range
+        setCurrentRange({ start: newStart, end: newEnd });
+        
         // Continue animation
         frameId = requestAnimationFrame(animate);
       }
@@ -130,6 +136,7 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     frameId = requestAnimationFrame(animate);
     
     return () => {
+      animationActive = false;
       if (frameId) {
         cancelAnimationFrame(frameId);
       }
