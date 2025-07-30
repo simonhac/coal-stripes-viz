@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { getTodayAEST, getDaysBetween } from '@/shared/date-utils';
+import { getTodayAEST } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
@@ -24,7 +24,7 @@ export default function Home() {
   const animatedDateRange = useAnimatedDateRange(endDate);
   
   // Set up navigation
-  const { navigateByMonths, navigateToMonth, navigateToToday } = useNavigation({
+  const { navigateToMonth } = useNavigation({
     endDate,
     onDateChange: setEndDate,
     onBoundaryHit: () => {

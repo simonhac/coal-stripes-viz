@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { CapFacDataService } from '@/server/cap-fac-data-service';
-import { isLeapYear } from '@/shared/date-utils';
 import { initializeRequestLogger } from '@/server/request-logger';
 
 // Initialize logger for API routes

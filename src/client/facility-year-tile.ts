@@ -40,7 +40,7 @@ export class FacilityYearTile {
   }
 
   private renderCanvas(): void {
-    const startTime = performance.now();
+    // const startTime = performance.now();
     
     // Width is exactly the number of days
     const daysInYear = this.facility.units[0]?.history.data.length || 365;
@@ -73,7 +73,7 @@ export class FacilityYearTile {
     let useDirectBuffer = true;
     try {
       pixels = new Uint32Array(imageData.data.buffer);
-    } catch (e) {
+    } catch {
       // Fallback for test environment - use imageData directly
       useDirectBuffer = false;
       // Work directly with the Uint8ClampedArray
@@ -149,7 +149,7 @@ export class FacilityYearTile {
     // Put the image data back to canvas
     try {
       ctx.putImageData(imageData, 0, 0);
-    } catch (e) {
+    } catch {
       // Test environment fallback
       console.warn('Skipping putImageData in test environment');
     }
@@ -185,7 +185,7 @@ export class FacilityYearTile {
       });
     }
 
-    const renderTime = performance.now() - startTime;
+    // const renderTime = performance.now() - startTime;
     // console.log(`[FacilityYearTile] Rendered: ${this.facility.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
   }
 

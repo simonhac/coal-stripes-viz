@@ -1,5 +1,5 @@
 import { FacilityYearTile } from '../facility-year-tile';
-import { GeneratingUnitDTO, Facility, GeneratingUnit } from '@/shared/types';
+import { GeneratingUnitDTO } from '@/shared/types';
 import { createFacility } from '../facility-factory';
 import { MockCanvas } from './helpers/mock-canvas';
 

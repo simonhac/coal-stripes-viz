@@ -1,5 +1,4 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
-import { parseDate } from '@internationalized/date';
 import { isLeapYear, getDayIndex, getTodayAEST } from '@/shared/date-utils';
 import { setupTestLogger } from '../test-helpers';
 
@@ -103,7 +102,6 @@ describe('Real API Year-based Tests', () => {
     // Today in AEST
     const todayAEST = getTodayAEST();
     const yesterdayAEST = todayAEST.subtract({ days: 1 });
-    const yearStart = parseDate(`${currentYear}-01-01`);
     
     console.log(`\n📅 Today (AEST): ${todayAEST.toString()}`);
     console.log(`📅 Expected data through: ${yesterdayAEST.toString()}`);
@@ -173,7 +171,7 @@ describe('Real API Year-based Tests', () => {
     expect(firstUnit.history.data.length).toBe(365); // 2023 has 365 days
     
     // Verify data values are valid
-    firstUnit.history.data.forEach((value, index) => {
+    firstUnit.history.data.forEach((value) => {
       expect(typeof value === 'number' || value === null).toBe(true);
       if (value !== null) {
         expect(typeof value).toBe('number');

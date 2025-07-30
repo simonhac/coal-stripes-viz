@@ -1,5 +1,4 @@
 // Type definitions for capacity factor visualisation
-import { CalendarDate } from '@internationalized/date';
 
 export interface UnitHistoryDTO {
   start: string;

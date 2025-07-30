@@ -4,7 +4,7 @@ import {
   GeneratingUnitDTO
 } from '@/shared/types';
 import { CalendarDate, parseDate } from '@internationalized/date';
-import { getAESTDateTimeString, isLeapYear, getDaysBetween, parseAESTDateString, getTodayAEST } from '@/shared/date-utils';
+import { getAESTDateTimeString, isLeapYear, parseAESTDateString, getTodayAEST } from '@/shared/date-utils';
 import { LRUCache } from '@/shared/lru-cache';
 
 // Define types for the new API
@@ -32,7 +32,7 @@ export class CapFacDataService {
   private facilitiesFetchPromise: Promise<Facility[]> | null = null;
   private yearDataCache: LRUCache<string>;
 
-  constructor(apiKey: string, maxCachedYears: number = 5) {
+  constructor(apiKey: string, _maxCachedYears: number = 5) {
     this.client = new OEClientQueued(apiKey);
     this.yearDataCache = new LRUCache<string>(100);
   }
@@ -45,7 +45,7 @@ export class CapFacDataService {
     if (this.facilitiesFetchPromise) {
       try {
         await this.facilitiesFetchPromise;
-      } catch (err) {
+      } catch {
         // Ignore errors during cleanup
       }
     }
@@ -172,7 +172,7 @@ export class CapFacDataService {
     this.facilitiesFetchPromise = (async () => {
       try {
         console.log('🏭 Fetching coal facilities...');
-        const { response, table } = await this.client.getFacilities({
+        const { table } = await this.client.getFacilities({
           status_id: ['operating'],
           fueltech_id: ['coal_black', 'coal_brown']
         });

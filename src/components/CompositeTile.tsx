@@ -3,8 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
-import { CapFacYear } from '@/client/cap-fac-year';
-import { getDayIndex, getDaysBetween, isLeapYear } from '@/shared/date-utils';
+import { getDayIndex, isLeapYear } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 
@@ -385,8 +384,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
     }
 
     // Get the actual width from the parent container
-    const containerElement = canvas.parentElement;
-    const containerWidth = containerElement ? (containerElement.offsetWidth || containerElement.clientWidth || 365) : 365;
+    // const containerElement = canvas.parentElement;
     
     // Set height from available tiles or use last known height
     let canvasHeight = lastKnownHeightRef.current;
@@ -641,7 +639,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
             imageRendering: 'pixelated'
           }}
           onMouseMove={handleMouseMove}
-          onMouseLeave={(e) => {
+          onMouseLeave={() => {
             // Clear hover position on document root
             document.documentElement.style.removeProperty('--hover-x');
             if (onHoverEnd) {

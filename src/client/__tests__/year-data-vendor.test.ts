@@ -1,6 +1,5 @@
 import { YearDataVendor } from '../year-data-vendor';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
-import { CapFacYear } from '../cap-fac-year';
 import { MockCanvas } from './helpers/mock-canvas';
 
 global.OffscreenCanvas = MockCanvas as any;
@@ -236,7 +235,7 @@ describe('YearDataVendor', () => {
       );
 
       // Start two requests
-      const promise1 = testVendor.requestYear(2023);
+      testVendor.requestYear(2023);
       const promise2 = testVendor.requestYear(2024);
       
       // Give time for first to start processing

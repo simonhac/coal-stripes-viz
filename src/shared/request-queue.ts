@@ -1,8 +1,7 @@
 import { REQUEST_QUEUE_CONFIG } from '@/shared/config';
 import { 
   RequestQueueLogger, 
-  ConsoleRequestQueueLogger,
-  LogEntry 
+  ConsoleRequestQueueLogger
 } from './request-queue-logger';
 
 export interface QueuedRequest<T> {

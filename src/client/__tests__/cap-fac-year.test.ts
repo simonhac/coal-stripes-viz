@@ -1,5 +1,5 @@
 import { createCapFacYear } from '../cap-fac-year';
-import { GeneratingUnitCapFacHistoryDTO, GeneratingUnitDTO } from '@/shared/types';
+import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 import { MockCanvas } from './helpers/mock-canvas';
 
 // Mock OffscreenCanvas

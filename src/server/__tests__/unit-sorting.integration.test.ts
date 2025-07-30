@@ -1,5 +1,4 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
-import { parseDate } from '@internationalized/date';
 import { setupTestLogger } from '../test-helpers';
 
 describe('Unit Sorting Integration Test', () => {
