@@ -1,6 +1,7 @@
 import { OpenElectricityClient } from 'openelectricity';
-import { RequestQueue } from './request-queue';
+import { RequestQueue } from '@/shared/request-queue';
 import { REQUEST_QUEUE_CONFIG } from '@/shared/config';
+import { FileRequestQueueLogger } from './file-request-queue-logger';
 
 /**
  * Wrapper around OpenElectricityClient that adds request queuing,
@@ -21,7 +22,7 @@ export class OEClientQueued {
       timeout: REQUEST_QUEUE_CONFIG.REQUEST_TIMEOUT,
       circuitBreakerThreshold: REQUEST_QUEUE_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
       circuitBreakerResetTime: REQUEST_QUEUE_CONFIG.CIRCUIT_BREAKER_RESET_TIME
-    });
+    }, new FileRequestQueueLogger());
   }
 
   /**

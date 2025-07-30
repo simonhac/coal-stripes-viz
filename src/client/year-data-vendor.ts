@@ -1,11 +1,8 @@
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 import { LRUCache } from '@/client/lru-cache';
 import { CapFacYear, createCapFacYear } from './cap-fac-year';
-
-interface PendingFetch {
-  promise: Promise<CapFacYear>;
-  abort: AbortController;
-}
+import { RequestQueue, RequestQueueConfig } from '@/shared/request-queue';
+import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 
 /**
  * Vendor for year-based capacity factor data with pre-rendered tiles
@@ -13,11 +10,21 @@ interface PendingFetch {
  */
 export class YearDataVendor {
   private cache: LRUCache<CapFacYear>;
-  private pendingFetches: Map<number, PendingFetch>;
+  private requestQueue: RequestQueue<CapFacYear>;
 
-  constructor(maxYears: number = 10) {
+  constructor(maxYears: number = 10, queueConfig?: Partial<RequestQueueConfig>) {
     this.cache = new LRUCache<CapFacYear>(maxYears);
-    this.pendingFetches = new Map();
+    this.requestQueue = new RequestQueue<CapFacYear>({
+      maxConcurrent: 2, // Allow 2 concurrent year fetches
+      minInterval: 100, // 100ms between requests
+      maxRetries: 3,
+      retryDelayBase: 1000,
+      retryDelayMax: 30000,
+      timeout: 60000, // 60 second timeout for year data
+      circuitBreakerThreshold: 5,
+      circuitBreakerResetTime: 60000,
+      ...queueConfig // Allow overriding for tests
+    }, new NoOpRequestQueueLogger());
   }
 
   /**
@@ -40,26 +47,20 @@ export class YearDataVendor {
       return Promise.resolve(cached);
     }
 
-    // Check if already fetching
-    const pendingFetch = this.pendingFetches.get(year);
-    if (pendingFetch) {
-      return pendingFetch.promise;
-    }
-
-    // Start new fetch
-    const abort = new AbortController();
-    const fetchPromise = this.fetchYear(year, abort.signal);
-    
-    this.pendingFetches.set(year, { promise: fetchPromise, abort });
-    
-    // Clean up on completion
-    fetchPromise.finally(() => {
-      this.pendingFetches.delete(year);
-    }).catch(() => {
-      // Prevent unhandled rejection if no one is listening
-    });
-
-    return fetchPromise;
+    // Use RequestQueue to handle fetching with retry and rate limiting
+    return this.requestQueue.add({
+      execute: () => this.fetchYear(year),
+      priority: 1, // Normal priority
+      method: 'GET',
+      url: `/api/capacity-factors?year=${year}`,
+      label: year.toString(),
+      onProgress: (progress) => {
+        console.log(`Year ${year} fetch: ${progress}%`);
+      },
+      onError: (error) => {
+        console.error(`Failed to fetch year ${year}:`, error);
+      }
+    }, { addToFront: true }); // Client requests go to front of queue
   }
 
   /**
@@ -74,16 +75,17 @@ export class YearDataVendor {
    */
   getCacheStats() {
     const baseStats = this.cache.getStats();
-    
-    // Add pending labels
-    const pendingLabels: string[] = [];
-    for (const year of this.pendingFetches.keys()) {
-      pendingLabels.push(year.toString());
-    }
+    const queueStats = this.requestQueue.getStats();
+    const activeItems = this.requestQueue.getActiveItems();
+    const queuedItems = this.requestQueue.getQueuedItems();
     
     return {
       ...baseStats,
-      pendingLabels
+      pendingCount: queueStats.active,
+      queuedCount: queueStats.queued,
+      circuitOpen: queueStats.circuitOpen,
+      activeLabels: activeItems.map(item => item.label).filter(Boolean),
+      queuedLabels: queuedItems.map(item => item.label).filter(Boolean)
     };
   }
 
@@ -92,51 +94,38 @@ export class YearDataVendor {
    */
   clear(): void {
     this.cache.clear();
-    
-    // Abort all pending fetches
-    for (const [year, { abort }] of this.pendingFetches) {
-      console.log(`🚫 Cancelling fetch for year ${year}`);
-      abort.abort();
-    }
-    this.pendingFetches.clear();
+    this.requestQueue.clear();
   }
 
   /**
    * Fetch year data from server and create tiles
    */
-  private async fetchYear(year: number, signal: AbortSignal): Promise<CapFacYear> {
+  private async fetchYear(year: number): Promise<CapFacYear> {
     console.log(`📡 Fetching year ${year} from server...`);
     const fetchStartTime = performance.now();
     
-    try {
-      const response = await fetch(`/api/capacity-factors?year=${year}`, { signal });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data: GeneratingUnitCapFacHistoryDTO = await response.json();
-      
-      // Create CapFacYear with pre-rendered tiles
-      console.log(`🎨 Creating tiles for year ${year}...`);
-      const startTime = performance.now();
-      const capFacYear = createCapFacYear(year, data);
-      const createTime = performance.now() - startTime;
-      console.log(`✅ Created ${capFacYear.facilityTiles.size} facility tiles for ${year} in ${createTime.toFixed(0)}ms`);
-      
-      // Cache the result with the total size (JSON + canvas memory)
-      this.cache.set(year.toString(), capFacYear, capFacYear.totalSizeBytes, year.toString());
-      
-      const totalTime = (performance.now() - fetchStartTime) / 1000;
-      console.log(`✅ Successfully fetched year ${year} (${(capFacYear.totalSizeBytes / 1024 / 1024).toFixed(2)}MB) in ${totalTime.toFixed(1)}s`);
-      
-      return capFacYear;
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        throw new Error(`Request cancelled for year ${year}`);
-      }
-      throw error;
+    const response = await fetch(`/api/capacity-factors?year=${year}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+    
+    const data: GeneratingUnitCapFacHistoryDTO = await response.json();
+    
+    // Create CapFacYear with pre-rendered tiles
+    console.log(`🎨 Creating tiles for year ${year}...`);
+    const startTime = performance.now();
+    const capFacYear = createCapFacYear(year, data);
+    const createTime = performance.now() - startTime;
+    console.log(`✅ Created ${capFacYear.facilityTiles.size} facility tiles for ${year} in ${createTime.toFixed(0)}ms`);
+    
+    // Cache the result with the total size (JSON + canvas memory)
+    this.cache.set(year.toString(), capFacYear, capFacYear.totalSizeBytes, year.toString());
+    
+    const totalTime = (performance.now() - fetchStartTime) / 1000;
+    console.log(`✅ Successfully fetched year ${year} (${(capFacYear.totalSizeBytes / 1024 / 1024).toFixed(2)}MB) in ${totalTime.toFixed(1)}s`);
+    
+    return capFacYear;
   }
 
   /**

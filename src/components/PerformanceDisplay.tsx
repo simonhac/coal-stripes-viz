@@ -305,15 +305,42 @@ export const PerformanceDisplay: React.FC = () => {
                   ))}
                 </div>
               )}
-              {cacheStats.pendingLabels && cacheStats.pendingLabels.length > 0 && (
+              {cacheStats.activeLabels && cacheStats.activeLabels.length > 0 && (
                 <div style={{ marginLeft: '10px', marginTop: '5px' }}>
-                  <div style={{ fontSize: '10px', color: '#ff0', marginBottom: '3px' }}>Pending:</div>
+                  <div style={{ fontSize: '10px', color: '#0f0', marginBottom: '3px' }}>Active:</div>
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '4px'
                   }}>
-                    {cacheStats.pendingLabels.map(label => (
+                    {cacheStats.activeLabels.map(label => (
+                      <span
+                        key={label}
+                        style={{
+                          display: 'inline-block',
+                          padding: '2px 6px',
+                          backgroundColor: '#005500',
+                          color: '#0f0',
+                          borderRadius: '10px',
+                          fontSize: '9px',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cacheStats.queuedLabels && cacheStats.queuedLabels.length > 0 && (
+                <div style={{ marginLeft: '10px', marginTop: '5px' }}>
+                  <div style={{ fontSize: '10px', color: '#ff0', marginBottom: '3px' }}>Queued:</div>
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '4px'
+                  }}>
+                    {cacheStats.queuedLabels.map(label => (
                       <span
                         key={label}
                         style={{
@@ -330,6 +357,11 @@ export const PerformanceDisplay: React.FC = () => {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+              {cacheStats.circuitOpen && (
+                <div style={{ marginLeft: '10px', marginTop: '5px', color: '#f00', fontSize: '10px' }}>
+                  ⚠️ Circuit Breaker Open
                 </div>
               )}
             </div>

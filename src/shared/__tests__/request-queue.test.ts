@@ -1,23 +1,12 @@
 import { RequestQueue } from '../request-queue';
-import { initializeRequestLogger } from '../request-logger';
-import * as fs from 'fs';
-import * as path from 'path';
-
-// Mock the logger for tests
-jest.mock('../request-logger', () => ({
-  initializeRequestLogger: jest.fn(),
-  getRequestLogger: jest.fn(() => ({
-    getNextRequestId: jest.fn(() => 'ID1'),
-    log: jest.fn(),
-    cleanOldLogs: jest.fn()
-  }))
-}));
+import { NoOpRequestQueueLogger } from '../request-queue-logger';
 
 describe('RequestQueue', () => {
   let queue: RequestQueue<string>;
 
   beforeEach(() => {
-    queue = new RequestQueue();
+    // Use no-op logger for tests
+    queue = new RequestQueue(undefined, new NoOpRequestQueueLogger());
   });
 
   afterEach(() => {
@@ -36,7 +25,7 @@ describe('RequestQueue', () => {
         timeout: 5000,
         circuitBreakerThreshold: 5,
         circuitBreakerResetTime: 60000
-      });
+      }, new NoOpRequestQueueLogger());
       
       const results: string[] = [];
       
@@ -97,7 +86,7 @@ describe('RequestQueue', () => {
         timeout: 5000,
         circuitBreakerThreshold: 5,
         circuitBreakerResetTime: 60000
-      });
+      }, new NoOpRequestQueueLogger());
       
       // Make 3 requests
       const requests = Array.from({ length: 3 }, (_, i) => 
@@ -157,7 +146,7 @@ describe('RequestQueue', () => {
         timeout: 1000,
         circuitBreakerThreshold: 5,
         circuitBreakerResetTime: 1000
-      });
+      }, new NoOpRequestQueueLogger());
       
       await expect(
         testQueue.add({
@@ -185,7 +174,7 @@ describe('RequestQueue', () => {
         timeout: 1000,
         circuitBreakerThreshold: 2,
         circuitBreakerResetTime: 100
-      });
+      }, new NoOpRequestQueueLogger());
 
       // Cause 2 failures to open circuit
       for (let i = 0; i < 2; i++) {
@@ -217,6 +206,65 @@ describe('RequestQueue', () => {
       });
 
       expect(result).toBe('success after reset');
+    });
+  });
+
+  describe('Add to front', () => {
+    it('should add requests to front of queue when specified', async () => {
+      // Create a queue with single concurrent execution
+      const testQueue = new RequestQueue({
+        maxConcurrent: 1,
+        minInterval: 10,
+        maxRetries: 0,
+        retryDelayBase: 1000,
+        retryDelayMax: 30000,
+        timeout: 5000,
+        circuitBreakerThreshold: 5,
+        circuitBreakerResetTime: 60000
+      }, new NoOpRequestQueueLogger());
+      
+      const results: string[] = [];
+      
+      // First, add a blocking request
+      const blocker = testQueue.add({
+        execute: async () => {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          results.push('blocker');
+          return 'blocker';
+        },
+        priority: 1
+      });
+      
+      // Add requests normally (to back of queue)
+      const back1 = testQueue.add({
+        execute: async () => {
+          results.push('back1');
+          return 'back1';
+        },
+        priority: 1
+      });
+      
+      const back2 = testQueue.add({
+        execute: async () => {
+          results.push('back2');
+          return 'back2';
+        },
+        priority: 1
+      });
+      
+      // Add request to front
+      const front = testQueue.add({
+        execute: async () => {
+          results.push('front');
+          return 'front';
+        },
+        priority: 1
+      }, { addToFront: true });
+      
+      await Promise.all([blocker, back1, back2, front]);
+      
+      // Front request should execute before back requests
+      expect(results).toEqual(['blocker', 'front', 'back1', 'back2']);
     });
   });
 });

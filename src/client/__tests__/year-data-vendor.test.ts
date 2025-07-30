@@ -12,7 +12,7 @@ describe('YearDataVendor', () => {
   let vendor: YearDataVendor;
   
   beforeEach(() => {
-    vendor = new YearDataVendor(3); // Small cache for testing
+    vendor = new YearDataVendor(3, { maxRetries: 0 }); // Small cache for testing, no retries
     jest.clearAllMocks();
   });
   
@@ -59,7 +59,7 @@ describe('YearDataVendor', () => {
       expect(result.data).toEqual(mockData);
       expect(result.facilityTiles.size).toBe(1);
       expect(result.facilityTiles.has('TESTFAC')).toBe(true);
-      expect(global.fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023', expect.any(Object));
+      expect(global.fetch).toHaveBeenCalledWith('/api/capacity-factors?year=2023');
     });
 
     it('should return cached data immediately', async () => {
@@ -150,7 +150,8 @@ describe('YearDataVendor', () => {
       expect(stats.numItems).toBe(0);
       expect(stats.totalKB).toBe(0);
       expect(stats.labels).toEqual([]);
-      expect(stats.pendingLabels).toEqual([]);
+      expect(stats.activeLabels).toEqual([]);
+      expect(stats.queuedLabels).toEqual([]);
     });
 
     it('should track cached items', async () => {
@@ -180,8 +181,11 @@ describe('YearDataVendor', () => {
       // Start request but don't await
       vendor.requestYear(2023);
       
+      // Give it a moment to start processing
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
       const stats = vendor.getCacheStats();
-      expect(stats.pendingLabels).toContain('2023');
+      expect(stats.activeLabels).toContain('2023');
       
       // Clean up
       await new Promise(resolve => setTimeout(resolve, 150));
@@ -207,41 +211,43 @@ describe('YearDataVendor', () => {
 
     it('should cancel pending requests', async () => {
       const mockData = mockYearData(2023);
-      let aborted = false;
       
-      (global.fetch as jest.Mock).mockImplementation((url, options) => {
-        options?.signal?.addEventListener('abort', () => {
-          aborted = true;
-        });
-        
-        return new Promise((resolve, reject) => {
-          setTimeout(() => {
-            if (options?.signal?.aborted) {
-              const error = new Error('The operation was aborted');
-              error.name = 'AbortError';
-              reject(error);
-            } else {
-              resolve({
-                ok: true,
-                json: async () => mockData
-              });
-            }
-          }, 100);
-        });
+      // Create a vendor with single concurrent request to ensure requests queue up
+      const testVendor = new YearDataVendor(3, { 
+        maxRetries: 0,
+        maxConcurrent: 1,
+        minInterval: 10
       });
+      
+      // First request will start immediately and block the queue
+      (global.fetch as jest.Mock).mockImplementationOnce(() => 
+        new Promise(resolve => setTimeout(() => resolve({
+          ok: true,
+          json: async () => mockData
+        }), 200))
+      );
+      
+      // Second request should be queued
+      (global.fetch as jest.Mock).mockImplementationOnce(() => 
+        new Promise(resolve => setTimeout(() => resolve({
+          ok: true,
+          json: async () => mockYearData(2024)
+        }), 100))
+      );
 
-      // Start request but don't await
-      const promise = vendor.requestYear(2023);
+      // Start two requests
+      const promise1 = testVendor.requestYear(2023);
+      const promise2 = testVendor.requestYear(2024);
       
-      // Clear should abort the request
-      vendor.clear();
+      // Give time for first to start processing
+      await new Promise(resolve => setTimeout(resolve, 50));
       
-      // The promise should reject with cancellation error
-      await expect(promise).rejects.toThrow('Request cancelled');
+      // Clear should abort the queued request
+      testVendor.clear();
       
-      // Wait a bit to ensure abort was processed
-      await new Promise(resolve => setTimeout(resolve, 150));
-      expect(aborted).toBe(true);
+      // The first promise might complete (already processing)
+      // The second should reject with cancellation error
+      await expect(promise2).rejects.toThrow('Queue cleared');
     });
   });
 
