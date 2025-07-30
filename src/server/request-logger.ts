@@ -26,12 +26,21 @@ export class RequestLogger {
   private requestCounter: number = 0;
   private currentLogFile: string | null = null;
   private currentDate: string | null = null;
+  public readonly fileLoggingEnabled: boolean;
 
   constructor(port: number) {
     this.port = port;
     this.logDir = path.join(process.cwd(), 'logs');
-    this.ensureLogDirectory();
-    this.initializeLogFile();
+    
+    // Check if file logging is enabled via environment variable
+    // Default to true for development, false for production
+    this.fileLoggingEnabled = process.env.ENABLE_FILE_LOGGING === 'true' || 
+                             (process.env.ENABLE_FILE_LOGGING !== 'false' && process.env.NODE_ENV === 'development');
+    
+    if (this.fileLoggingEnabled) {
+      this.ensureLogDirectory();
+      this.initializeLogFile();
+    }
   }
 
   private ensureLogDirectory(): void {
@@ -97,6 +106,11 @@ export class RequestLogger {
   }
 
   public log(entry: LogEntry): void {
+    if (!this.fileLoggingEnabled) {
+      // If file logging is disabled, just return
+      return;
+    }
+    
     const logFile = path.join(this.logDir, this.getLogFileName());
     const timestamp = this.formatTimestamp(entry.timestamp);
     let logLine = `${timestamp} [${entry.eventType}]`;
@@ -181,6 +195,11 @@ export class RequestLogger {
   }
 
   public cleanOldLogs(retentionDays: number = 30): void {
+    if (!this.fileLoggingEnabled) {
+      // If file logging is disabled, don't try to clean logs
+      return;
+    }
+    
     const now = Date.now();
     const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
 
@@ -211,13 +230,16 @@ export function initializeRequestLogger(port: number): void {
   if (!loggerInstance) {
     loggerInstance = new RequestLogger(port);
     
-    // Set up daily cleanup
-    setInterval(() => {
-      loggerInstance!.cleanOldLogs();
-    }, 24 * 60 * 60 * 1000); // Run once per day
-    
-    // Run initial cleanup
-    loggerInstance.cleanOldLogs();
+    // Only set up cleanup if file logging is enabled
+    if (loggerInstance.fileLoggingEnabled) {
+      // Set up daily cleanup
+      setInterval(() => {
+        loggerInstance!.cleanOldLogs();
+      }, 24 * 60 * 60 * 1000); // Run once per day
+      
+      // Run initial cleanup
+      loggerInstance.cleanOldLogs();
+    }
   }
 }
 

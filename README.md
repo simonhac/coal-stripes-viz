@@ -57,6 +57,7 @@ This application visualises Australian coal power plant capacity factors over th
    OPENELECTRICITY_API_KEY=your_api_key_here
    OPENELECTRICITY_API_URL=https://api.openelectricity.org.au
    NODE_ENV=development
+   ENABLE_FILE_LOGGING=true  # Set to false for serverless deployments
    ```
 
 5. Run the development server:
@@ -111,6 +112,31 @@ The project includes several utility scripts:
 - `capture-screenshot.js` — Automated screenshot capture using Puppeteer
 - `test/` directory — Various API testing and data analysis scripts
 - Built-in error handling for API rate limits and data availability
+
+## Deployment
+
+### Environment Variables
+
+The application uses the following environment variables:
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `OPENELECTRICITY_API_KEY` | Your OpenElectricity API key | - | Yes |
+| `OPENELECTRICITY_API_URL` | OpenElectricity API endpoint | `https://api.openelectricity.org.au` | Yes |
+| `NODE_ENV` | Environment mode | `development` | No |
+| `ENABLE_FILE_LOGGING` | Enable request logging to files | `true` in development, `false` in production | No |
+
+### Vercel Deployment
+
+When deploying to Vercel or other serverless platforms:
+
+1. Set `ENABLE_FILE_LOGGING=false` in your environment variables
+2. Add your `OPENELECTRICITY_API_KEY` to the platform's environment variables
+3. The application will automatically disable file system operations in serverless environments
+
+### Local Development
+
+For local development, file logging is enabled by default to help with debugging API requests. Logs are stored in the `logs/` directory and automatically cleaned up after 30 days.
 
 ## Contributing
 
