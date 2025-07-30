@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { yearDataVendor } from '@/client/year-data-vendor';
-import type { CacheStats } from '@/client/lru-cache';
+import type { CacheStats } from '@/shared/lru-cache';
 import type { QueueStats } from '@/shared/request-queue';
 import { featureFlags } from '@/shared/feature-flags';
 import { useAllFeatureFlags } from '@/hooks/useFeatureFlag';
@@ -327,7 +327,7 @@ export const PerformanceDisplay: React.FC = () => {
                   flexWrap: 'wrap',
                   gap: '4px'
                 }}>
-                  {cacheStats.labels.map(label => (
+                  {cacheStats.labels.map((label: string) => (
                     <span
                       key={label}
                       style={{
@@ -355,7 +355,7 @@ export const PerformanceDisplay: React.FC = () => {
                   marginLeft: '10px'
                 }}>
                   {cacheStats.activeLabels && cacheStats.activeLabels.length > 0 ? (
-                    cacheStats.activeLabels.map(label => (
+                    cacheStats.activeLabels.map((label: string) => (
                       <span
                         key={label}
                         style={{
@@ -386,7 +386,7 @@ export const PerformanceDisplay: React.FC = () => {
                   marginLeft: '10px'
                 }}>
                   {cacheStats.queuedLabels && cacheStats.queuedLabels.length > 0 ? (
-                    cacheStats.queuedLabels.map(label => (
+                    cacheStats.queuedLabels.map((label: string) => (
                       <span
                         key={label}
                         style={{

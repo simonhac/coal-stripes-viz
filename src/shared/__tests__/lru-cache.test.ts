@@ -7,6 +7,10 @@ describe('LRUCache', () => {
     cache = new LRUCache<string>(3);
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   describe('basic operations', () => {
     it('should store and retrieve values', () => {
       cache.set('key1', 'value1', 100, 'label1');
@@ -139,6 +143,140 @@ describe('LRUCache', () => {
       
       stats = cache.getStats();
       expect(stats.totalKB).toBe(2);
+    });
+  });
+
+  describe('expiry', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    it('should accept items without expiry', () => {
+      cache.set('key1', 'value1', 100, 'label1');
+      expect(cache.get('key1')).toBe('value1');
+      
+      // Advance time by 1 year
+      jest.advanceTimersByTime(365 * 24 * 60 * 60 * 1000);
+      
+      // Should still be there
+      expect(cache.get('key1')).toBe('value1');
+    });
+
+    it('should expire items after their expiry date', () => {
+      const now = new Date();
+      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+      
+      cache.set('key1', 'value1', 100, 'label1', oneHourLater);
+      expect(cache.get('key1')).toBe('value1');
+      
+      // Advance time by 30 minutes
+      jest.advanceTimersByTime(30 * 60 * 1000);
+      expect(cache.get('key1')).toBe('value1');
+      
+      // Advance time by another 31 minutes (total 61 minutes)
+      jest.advanceTimersByTime(31 * 60 * 1000);
+      expect(cache.get('key1')).toBeUndefined();
+    });
+
+    it('should return false for has() on expired items', () => {
+      const now = new Date();
+      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+      
+      cache.set('key1', 'value1', 100, 'label1', oneHourLater);
+      expect(cache.has('key1')).toBe(true);
+      
+      // Advance time past expiry
+      jest.advanceTimersByTime(61 * 60 * 1000);
+      expect(cache.has('key1')).toBe(false);
+    });
+
+    it('should remove expired items from cache statistics', () => {
+      const now = new Date();
+      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+      
+      cache.set('key1', 'value1', 100, 'label1', oneHourLater);
+      cache.set('key2', 'value2', 200, 'label2'); // No expiry
+      
+      let stats = cache.getStats();
+      expect(stats.numItems).toBe(2);
+      expect(stats.totalKB).toBeCloseTo(0.293, 2);
+      
+      // Advance time past expiry
+      jest.advanceTimersByTime(61 * 60 * 1000);
+      
+      // Access key1 to trigger expiry check
+      expect(cache.get('key1')).toBeUndefined();
+      
+      stats = cache.getStats();
+      expect(stats.numItems).toBe(1);
+      expect(stats.totalKB).toBeCloseTo(0.195, 2);
+    });
+
+    it('should handle updating expiry dates', () => {
+      const now = new Date();
+      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+      const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      
+      // Set with 1 hour expiry
+      cache.set('key1', 'value1', 100, 'label1', oneHourLater);
+      
+      // Advance 50 minutes
+      jest.advanceTimersByTime(50 * 60 * 1000);
+      expect(cache.get('key1')).toBe('value1');
+      
+      // Update with new 2 hour expiry from original time
+      cache.set('key1', 'updatedValue1', 150, 'label1', twoHoursLater);
+      
+      // Advance another 20 minutes (total 70 minutes from start)
+      jest.advanceTimersByTime(20 * 60 * 1000);
+      expect(cache.get('key1')).toBe('updatedValue1'); // Should still be valid
+      
+      // Advance to 2 hours 1 minute from start
+      jest.advanceTimersByTime(51 * 60 * 1000);
+      expect(cache.get('key1')).toBeUndefined();
+    });
+  });
+
+  describe('hit counter', () => {
+    it('should initialize hit counter to 0', () => {
+      cache.set('key1', 'value1', 100, 'label1');
+      
+      // First access increments to 1
+      expect(cache.get('key1')).toBe('value1');
+      
+      // Access multiple times
+      cache.get('key1');
+      cache.get('key1');
+      cache.get('key1');
+      
+      // Update the value (should preserve hit counter)
+      cache.set('key1', 'updatedValue1', 100, 'label1');
+      
+      // Counter should still be 4
+      expect(cache.get('key1')).toBe('updatedValue1');
+      // Now it's 5
+    });
+
+    it('should reset hit counter when item is evicted and re-added', () => {
+      cache.set('key1', 'value1', 100, 'label1');
+      cache.set('key2', 'value2', 100, 'label2');
+      cache.set('key3', 'value3', 100, 'label3');
+      
+      // Access key1 multiple times
+      cache.get('key1');
+      cache.get('key1');
+      cache.get('key1');
+      
+      // Add key4, evicting key1
+      cache.set('key4', 'value4', 100, 'label4');
+      
+      // Re-add key1
+      cache.set('key1', 'value1', 100, 'label1');
+      
+      // Hit counter should be reset to 0, this access makes it 1
+      cache.get('key1');
+      expect(cache.get('key1')).toBe('value1');
+      // Now it's 2
     });
   });
 });

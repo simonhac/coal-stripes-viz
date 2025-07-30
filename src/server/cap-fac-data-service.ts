@@ -115,10 +115,26 @@ export class CapFacDataService {
     // Convert to JSON and cache
     const jsonString = JSON.stringify(coalStripesData);
     const sizeInBytes = jsonString.length;
-    this.yearDataCache.set(cacheKey, jsonString, sizeInBytes, `Year ${year}`);
+    
+    // Determine expiry time
+    const now = new Date();
+    const todayAEST = getTodayAEST();
+    const currentYear = todayAEST.year;
+    let expiresAt: Date | undefined;
+    
+    if (year === currentYear) {
+      // Current year expires in 1 hour
+      expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
+    } else {
+      // Other years expire in 24 hours
+      expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
+    
+    this.yearDataCache.set(cacheKey, jsonString, sizeInBytes, `Year ${year}`, expiresAt);
     
     const elapsed = Math.round(performance.now() - startTime);
-    console.log(`✅ API response: ${year} | ${elapsed}ms | Cached (${Math.round(sizeInBytes / 1024)}KB)`);
+    const expiryInfo = year === currentYear ? ' (expires in 1 hour)' : ' (expires in 24 hours)';
+    console.log(`✅ API response: ${year} | ${elapsed}ms | Cached (${Math.round(sizeInBytes / 1024)}KB)${expiryInfo}`);
     
     return coalStripesData;
   }

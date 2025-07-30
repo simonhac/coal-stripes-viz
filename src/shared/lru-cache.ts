@@ -10,6 +10,8 @@ export interface CacheItem<T> {
   value: T;
   sizeInBytes: number;
   label: string;
+  expiresAt?: Date;
+  hitCounter: number;
 }
 
 export class LRUCache<T> {
@@ -29,6 +31,16 @@ export class LRUCache<T> {
     const item = this.cache.get(key);
     
     if (item) {
+      // Check if item has expired
+      if (item.expiresAt && new Date() > item.expiresAt) {
+        // Remove expired item
+        this.removeItem(key);
+        return undefined;
+      }
+      
+      // Increment hit counter
+      item.hitCounter++;
+      
       // Move to end (most recently used)
       const index = this.accessOrder.indexOf(key);
       if (index > -1) {
@@ -44,11 +56,13 @@ export class LRUCache<T> {
   /**
    * Set an item in the cache
    */
-  set(key: string, value: T, sizeInBytes: number, label: string): void {
-    // If item exists, remove from access order and update total bytes
+  set(key: string, value: T, sizeInBytes: number, label: string, expiresAt?: Date): void {
+    // If item exists, preserve hit counter
+    let hitCounter = 0;
     if (this.cache.has(key)) {
       const existingItem = this.cache.get(key)!;
       this.totalBytes -= existingItem.sizeInBytes;
+      hitCounter = existingItem.hitCounter;
       
       const index = this.accessOrder.indexOf(key);
       if (index > -1) {
@@ -58,7 +72,7 @@ export class LRUCache<T> {
 
     // Add to end (most recently used)
     this.accessOrder.push(key);
-    this.cache.set(key, { key, value, sizeInBytes, label });
+    this.cache.set(key, { key, value, sizeInBytes, label, expiresAt, hitCounter });
     this.totalBytes += sizeInBytes;
 
     // Evict if over limit
@@ -71,7 +85,16 @@ export class LRUCache<T> {
    * Check if key exists in cache
    */
   has(key: string): boolean {
-    return this.cache.has(key);
+    const item = this.cache.get(key);
+    if (!item) return false;
+    
+    // Check if item has expired
+    if (item.expiresAt && new Date() > item.expiresAt) {
+      this.removeItem(key);
+      return false;
+    }
+    
+    return true;
   }
 
   /**
@@ -123,6 +146,22 @@ export class LRUCache<T> {
     if (item) {
       this.totalBytes -= item.sizeInBytes;
       this.cache.delete(oldestKey);
+    }
+  }
+  
+  /**
+   * Remove a specific item from the cache
+   */
+  private removeItem(key: string): void {
+    const item = this.cache.get(key);
+    if (item) {
+      this.totalBytes -= item.sizeInBytes;
+      this.cache.delete(key);
+      
+      const index = this.accessOrder.indexOf(key);
+      if (index > -1) {
+        this.accessOrder.splice(index, 1);
+      }
     }
   }
 }
