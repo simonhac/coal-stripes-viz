@@ -476,6 +476,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         }
       }
       
+      
       // Draw shimmer overlay if needed
       if (needsShimmer) {
         // Calculate shimmer region
@@ -596,6 +597,14 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
     const canvasY = (y / rect.height) * canvas.height;
     
     updateTooltip(canvasX, canvasY);
+    
+    // Update CSS variable for hover position on the document root to affect all regions
+    const dayColumn = Math.floor(canvasX);
+    if (dayColumn >= 0 && dayColumn < 365) {
+      const percentage = (dayColumn / 365) * 100;
+      // Set on document root so all regions share the same hover position
+      document.documentElement.style.setProperty('--hover-x', `${percentage}%`);
+    }
   };
 
   return (
@@ -626,13 +635,15 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
       >
         <canvas
           ref={canvasRef}
+          className="opennem-facility-canvas"
           style={{ 
             width: '100%',
-            imageRendering: 'pixelated',
-            display: 'block'
+            imageRendering: 'pixelated'
           }}
           onMouseMove={handleMouseMove}
-          onMouseLeave={() => {
+          onMouseLeave={(e) => {
+            // Clear hover position on document root
+            document.documentElement.style.removeProperty('--hover-x');
             if (onHoverEnd) {
               onHoverEnd();
             }

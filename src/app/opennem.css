@@ -355,6 +355,28 @@ header a {
   display: flex;
   position: relative;
   overflow: hidden;
+  isolation: isolate; /* Create a new stacking context */
+}
+
+/* Canvas styling */
+.opennem-facility-canvas {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* Hover indicator on stripe data container */
+.opennem-stripe-data::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(100% / 365 * 1.1); /* Width of one day, 10% wider to compensate for rounding */
+  background-color: rgba(255, 0, 0, 0.5); /* 50% opacity red */
+  pointer-events: none; /* Don't interfere with mouse events */
+  left: var(--hover-x, -100%); /* Inherits from document root */
+  transition: none; /* No transition for immediate response */
+  z-index: 10; /* Ensure it's above the canvas content */
 }
 
 /* .opennem-stripe-data:focus {
@@ -387,11 +409,7 @@ header a {
   height: 100%;
 }
 
-.opennem-facility-canvas {
-  display: block;
-  width: 100%;
-  cursor: pointer;
-}
+/* Removed duplicate .opennem-facility-canvas definition - merged with the one above */
 
 /* Hover indicator line */
 .opennem-hover-line {
