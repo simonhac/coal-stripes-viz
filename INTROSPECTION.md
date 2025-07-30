@@ -2,7 +2,7 @@
 
 ## Overview
 
-The performance monitoring widget is a custom-built, real-time performance analysis tool integrated into the Coal Stripes Visualization application. It provides immediate feedback on application performance metrics including frame rate, memory usage, and operation timings.
+The performance monitoring widget is a custom-built, real-time performance analysis tool integrated into the Coal Stripes Visualization application. It provides immediate feedback on application performance metrics including frame rate, memory usage, operation timings, cache statistics, and feature flag management.
 
 ## Architecture
 
@@ -15,8 +15,10 @@ The performance monitoring widget is a custom-built, real-time performance analy
 
 2. **PerformanceDisplay Component** (`/src/components/PerformanceDisplay.tsx`)
    - React component providing the UI overlay
-   - Fixed-position widget with collapsible details
+   - Draggable widget with collapsible details
    - Real-time updates every 500ms
+   - Three display modes: Performance, Cache, and Features
+   - Position persistence using localStorage
 
 3. **Configuration** (`/src/shared/config.ts`)
    - Centralized performance thresholds
@@ -63,11 +65,33 @@ Visual UI Overlay
   - Average time
   - Call count
   - Maximum time
+- Shows top 10 slowest operations by total time
 
 ### 4. Async Operation Support
 - `measureAsync()` wrapper for Promise-based operations
 - Maintains timing accuracy across async boundaries
 - Includes metadata support for contextual information
+
+### 5. Cache Monitoring
+- Real-time cache statistics from yearDataVendor
+- Displays:
+  - Number of cached items
+  - Total cache size in MB
+  - Visual list of cached year labels
+  - Pending requests
+- Clear cache button for debugging
+
+### 6. Feature Flag Management
+- Interactive toggle switches for all feature flags
+- Real-time enable/disable without code changes
+- Reload button to apply changes
+- Useful for A/B testing and gradual rollouts
+
+### 7. Widget Positioning
+- Fully draggable interface
+- Position persistence using localStorage key "performance-monitor-coordinates"
+- Viewport boundary validation
+- Smooth opacity transitions for collapsed/expanded states
 
 ## Implementation Patterns
 
@@ -110,25 +134,25 @@ const result = perfMonitor.measure(
 
 The performance monitor is actively used in:
 
-1. **Canvas Rendering** (`CoalStripesCanvas.tsx`)
-   - Pre-rendering operations
-   - Draw calls to visible canvas
-   - Frame-by-frame rendering performance
+1. **Canvas Rendering** (`CompositeTile.tsx`)
+   - Tile rendering operations
+   - Canvas draw operations
+   - Animation frame timing
 
-2. **Data Fetching** (`useCoalStripes.ts`)
-   - API call timing
-   - JSON parsing performance
-   - Overall fetch operation duration
+2. **Data Fetching** (`year-data-vendor.ts`)
+   - Year data loading
+   - Cache operations
+   - Network request timing
 
-3. **Cache Operations** (`smart-cache.ts`)
-   - Cache lookup performance
-   - Data retrieval timing
-   - Background fetch operations
+3. **Cache Operations** (`lru-cache.ts`)
+   - Cache hit/miss tracking
+   - Memory usage monitoring
+   - Eviction operations
 
-4. **User Interactions** (`useCoalStripes.ts`)
-   - Drag gesture performance
-   - Date range calculations
-   - UI responsiveness metrics
+4. **User Interface** (`PerformanceDisplay.tsx`)
+   - Widget rendering performance
+   - State update tracking
+   - Mode switching operations
 
 ## Extension Guidelines
 
@@ -158,23 +182,46 @@ The performance monitor is actively used in:
 
 To extend the UI display:
 
-1. **Modify PerformanceDisplay component**
+1. **Add a new display mode**
+   ```typescript
+   type DisplayMode = 'performance' | 'caches' | 'features' | 'custom';
+   ```
+
+2. **Modify PerformanceDisplay component**
    - Add new state for your metric
-   - Update the display logic
+   - Update the mode switching logic
+   - Add your custom visualization panel
    - Consider performance impact of rendering
 
-2. **Add data aggregation to PerformanceMonitor**
+3. **Add data aggregation to PerformanceMonitor**
    ```typescript
    getCustomMetric(): CustomMetricData {
      // Aggregate and return your custom data
    }
    ```
 
-3. **Export data for external analysis**
+4. **Export data for external analysis**
    ```typescript
    const report = perfMonitor.generateReport();
    // Send to analytics service or export as JSON
    ```
+
+### Widget Customization
+
+1. **Styling**
+   - Modify color schemes in inline styles
+   - Update button styles (greenButtonStyle, redButtonStyle)
+   - Adjust opacity and transition timings
+
+2. **Positioning**
+   - Default position set in component state
+   - localStorage key: "performance-monitor-coordinates"
+   - Viewport boundary checking on load
+
+3. **Interaction**
+   - Drag behavior uses mouse events
+   - Collapse/expand with disclosure triangle
+   - Mode switching with segmented button control
 
 ### Creating Custom Monitors
 
@@ -206,6 +253,8 @@ The monitoring system itself is designed to have minimal impact:
 - **Batched updates**: UI refreshes only twice per second
 - **Conditional compilation**: Can be disabled in production builds
 - **Memory efficient**: Fixed-size buffers for FPS tracking
+- **Smart rendering**: Only renders visible content based on disclosure state
+- **Debounced persistence**: localStorage updates are debounced to avoid excessive writes
 
 ## Future Enhancement Ideas
 
@@ -250,7 +299,26 @@ Common issues and solutions:
 2. **Memory not displayed**: Only works in Chrome/Chromium browsers
 3. **Missing operations**: Ensure start/end calls are properly paired
 4. **Performance overhead**: Disable in production or reduce update frequency
+5. **Widget position off-screen**: Delete localStorage key "performance-monitor-coordinates"
+6. **Cache data not updating**: Ensure yearDataVendor is properly initialized
+7. **Feature flags not working**: Check that feature flag definitions exist in shared/feature-flags.ts
+
+## Local Storage Usage
+
+The widget uses localStorage for persistence:
+
+- **Key**: `performance-monitor-coordinates`
+- **Format**: `{"x": number, "y": number}`
+- **Validation**: Coordinates are validated against viewport bounds on load
+- **Fallback**: Centers horizontally at y=10 if invalid or missing
 
 ## Conclusion
 
-The performance monitoring widget provides a powerful foundation for understanding and optimizing application performance. Its extensible architecture makes it easy to add new metrics and visualizations as needed. By following the patterns established in this system, developers can maintain high performance standards and quickly identify areas for improvement.
+The performance monitoring widget has evolved from a simple FPS counter to a comprehensive development tool featuring:
+- Real-time performance metrics
+- Cache monitoring and management
+- Feature flag runtime control
+- Persistent, draggable positioning
+- Multiple visualization modes
+
+Its extensible architecture makes it easy to add new metrics and visualizations as needed. By following the patterns established in this system, developers can maintain high performance standards and quickly identify areas for improvement.

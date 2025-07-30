@@ -3,7 +3,7 @@ import { perfMonitor } from '@/shared/performance-monitor';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import type { CacheStats } from '@/client/lru-cache';
 import { featureFlags } from '@/shared/feature-flags';
-import { useAllFeatureFlags } from '@/hooks/use-feature-flag';
+import { useAllFeatureFlags } from '@/hooks/useFeatureFlag';
 
 type DisplayMode = 'performance' | 'caches' | 'features';
 type DisclosureState = 'collapsed' | 'detailed';
