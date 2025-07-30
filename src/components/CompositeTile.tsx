@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
 import { CapFacYear } from '@/client/cap-fac-year';
@@ -25,7 +25,11 @@ function getDaysInYear(year: number): number {
   return isLeapYear(year) ? 366 : 365;
 }
 
-function CompositeTileComponent({ 
+export interface CompositeTileRef {
+  getStats: () => { avgCapacityFactor: number | null; totalCapacity: number } | null;
+}
+
+const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileProps>(({ 
   endDate, 
   facilityCode,
   facilityName,
@@ -33,7 +37,7 @@ function CompositeTileComponent({
   onHover,
   onHoverEnd,
   minCanvasHeight = 20
-}: CompositeTileProps) {
+}: CompositeTileProps, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Store both tiles in a single state to ensure atomic updates
@@ -139,7 +143,6 @@ function CompositeTileComponent({
     }
   };
 
-  // Update tooltip based on current mouse position
   // Calculate capacity-weighted average capacity factor for the facility across the date range
   const calculateFacilityAverage = useCallback(() => {
     if (!tiles.left && !tiles.right) return null;
@@ -187,6 +190,21 @@ function CompositeTileComponent({
     
     return totalCapacityDays > 0 ? totalWeightedCapacityFactor / totalCapacityDays : null;
   }, [tiles, dateRange]);
+  
+  // Expose getStats method via ref
+  useImperativeHandle(ref, () => ({
+    getStats: () => {
+      if (!tiles.left) return null;
+      
+      const avgCapacityFactor = calculateFacilityAverage();
+      const totalCapacity = tiles.left.getTotalCapacity();
+      
+      return {
+        avgCapacityFactor,
+        totalCapacity
+      };
+    }
+  }), [tiles, calculateFacilityAverage]);
   
   const updateTooltip = (x: number, y: number) => {
     if (!onHover) return;
@@ -568,7 +586,6 @@ function CompositeTileComponent({
     <div className="opennem-stripe-row" style={{ display: 'flex' }}>
       <div 
         className="opennem-facility-label"
-        style={{ cursor: onHover ? 'help' : 'default' }}
         onMouseEnter={() => {
           if (onHover) {
             const avgCapacityFactor = calculateFacilityAverage();
@@ -608,6 +625,8 @@ function CompositeTileComponent({
       </div>
     </div>
   );
-}
+});
+
+CompositeTileComponent.displayName = 'CompositeTile';
 
 export const CompositeTile = React.memo(CompositeTileComponent);

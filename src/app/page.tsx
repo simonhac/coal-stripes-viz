@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST, getDaysBetween } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
-import { CompositeTile } from '../components/CompositeTile';
+import { CompositeTile, CompositeTileRef } from '../components/CompositeTile';
 import { CapFacTooltip, TooltipData } from '../components/CapFacTooltip';
 import { CapFacXAxis } from '../components/CapFacXAxis';
 import { DateRange } from '../components/DateRange';
@@ -49,6 +49,31 @@ export default function Home() {
   
   const handleHoverEnd = useCallback(() => {
     setTooltipData(null);
+  }, []);
+
+  // Store refs to all CompositeTile components by region
+  const tileRefs = useRef<Map<string, Map<string, React.RefObject<CompositeTileRef>>>>(new Map());
+  
+  // Calculate capacity-weighted average for an entire region
+  const calculateRegionAverage = useCallback((regionCode: string) => {
+    const regionRefs = tileRefs.current.get(regionCode);
+    if (!regionRefs) return null;
+    
+    let totalWeightedCapacityFactor = 0;
+    let totalCapacity = 0;
+    
+    // Get stats from each facility tile in the region
+    for (const [facilityCode, ref] of regionRefs) {
+      if (!ref.current) return null;
+      
+      const stats = ref.current.getStats();
+      if (!stats || stats.avgCapacityFactor === null) return null;
+      
+      totalWeightedCapacityFactor += stats.avgCapacityFactor * stats.totalCapacity;
+      totalCapacity += stats.totalCapacity;
+    }
+    
+    return totalCapacity > 0 ? totalWeightedCapacityFactor / totalCapacity : null;
   }, []);
 
   // Initial load
@@ -187,10 +212,42 @@ export default function Home() {
               'WEM': 'Western Australia'
             }[regionCode] || regionCode;
             
+            // Initialize refs for this region if not already done
+            if (!tileRefs.current.has(regionCode)) {
+              tileRefs.current.set(regionCode, new Map());
+            }
+            const regionTileRefs = tileRefs.current.get(regionCode)!;
+            
+            // Create refs for any new facilities
+            facilities.forEach(facility => {
+              if (!regionTileRefs.has(facility.code)) {
+                regionTileRefs.set(facility.code, React.createRef<CompositeTileRef>());
+              }
+            });
+            
             return (
               <div key={regionCode} className="opennem-region">
                 <div className="opennem-region-header">
-                  <span>{regionName}</span>
+                  <span 
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={() => {
+                      if (animatedDateRange) {
+                        const avgCapacityFactor = calculateRegionAverage(regionCode);
+                        if (avgCapacityFactor !== null) {
+                          handleHover({
+                            startDate: animatedDateRange.start,
+                            endDate: animatedDateRange.end,
+                            label: regionName,
+                            capacityFactor: avgCapacityFactor,
+                            tooltipType: 'period'
+                          });
+                        }
+                      }
+                    }}
+                    onMouseLeave={handleHoverEnd}
+                  >
+                    {regionName}
+                  </span>
                   <CapFacTooltip data={tooltipData} />
                 </div>
                 <div className="opennem-region-content">
@@ -198,18 +255,22 @@ export default function Home() {
                   {animatedDateRange && (
                     <div className="opennem-facility-group">
                       {/* Display all facilities for this region */}
-                      {facilities.map(facility => (
-                        <CompositeTile
-                          key={facility.code}
-                          endDate={endDate!}
-                          facilityCode={facility.code}
-                          facilityName={facility.name}
-                          animatedDateRange={animatedDateRange}
-                          onHover={handleHover}
-                          onHoverEnd={handleHoverEnd}
-                          minCanvasHeight={25}
-                        />
-                      ))}
+                      {facilities.map(facility => {
+                        const ref = regionTileRefs.get(facility.code);
+                        return (
+                          <CompositeTile
+                            key={facility.code}
+                            ref={ref}
+                            endDate={endDate!}
+                            facilityCode={facility.code}
+                            facilityName={facility.name}
+                            animatedDateRange={animatedDateRange}
+                            onHover={handleHover}
+                            onHoverEnd={handleHoverEnd}
+                            minCanvasHeight={25}
+                          />
+                        );
+                      })}
                       
                       <CapFacXAxis 
                         dateRange={animatedDateRange}

@@ -297,4 +297,11 @@ export class FacilityYearTile {
   getUnits(): GeneratingUnitDTO[] {
     return this.units;
   }
+  
+  /**
+   * Get the total capacity for this facility
+   */
+  getTotalCapacity(): number {
+    return this.units.reduce((sum, unit) => sum + unit.capacity, 0);
+  }
 }
