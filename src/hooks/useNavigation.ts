@@ -28,6 +28,7 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
     const newEndDate = endDate.add({ months });
     const yesterday = getTodayAEST().subtract({ days: 1 });
     
+    
     // Don't go past yesterday
     if (newEndDate.compare(yesterday) > 0) {
       if (endDate.compare(yesterday) < 0) {

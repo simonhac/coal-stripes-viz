@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { getDaysBetween } from '@/shared/date-utils';
+import { getDaysBetween, getMonthName } from '@/shared/date-utils';
 import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 import { CapFacYear } from '@/client/cap-fac-year';
 import { yearDataVendor } from '@/client/year-data-vendor';
@@ -108,13 +108,8 @@ export function CapFacXAxis({
     const monthStart = currentDate;
     const year = monthStart.year;
     const month = monthStart.month;
-    const monthName = monthStart.toDate('Australia/Brisbane').toLocaleDateString('en-AU', { 
-      month: 'short',
-      timeZone: 'Australia/Brisbane'
-    });
-    // Ensure exactly 3 letters for long label (fixes "Sept" -> "Sep")
-    const monthLabelLong = monthName.substring(0, 3);
-    const monthLabelShort = monthName.charAt(0); // First letter only
+    const monthLabelLong = getMonthName(monthStart);
+    const monthLabelShort = monthLabelLong.charAt(0); // First letter only
     
     // Calculate month end
     let monthEnd = monthStart.set({ day: monthStart.calendar.getDaysInMonth(monthStart) });

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import type { CacheStats } from '@/client/lru-cache';
+import type { QueueStats } from '@/shared/request-queue';
 import { featureFlags } from '@/shared/feature-flags';
 import { useAllFeatureFlags } from '@/hooks/useFeatureFlag';
 
@@ -34,7 +35,7 @@ export const PerformanceDisplay: React.FC = () => {
   const [metrics, setMetrics] = useState<Record<string, { count: number; avgDuration: number; totalDuration: number }>>({});
   const [disclosureState, setDisclosureState] = useState<DisclosureState>('collapsed');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('caches');
-  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  const [cacheStats, setCacheStats] = useState<(CacheStats & QueueStats) | null>(null);
   const [position, setPosition] = useState(() => {
     // Load saved position from localStorage
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -275,9 +276,8 @@ export const PerformanceDisplay: React.FC = () => {
         }}>
           {cacheStats ? (
             <div style={{ marginBottom: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#888' }}>
-                Items: {cacheStats.numItems} | 
-                Size: {(cacheStats.totalKB / 1024).toFixed(2)}MB
+              <div style={{ fontSize: '10px', color: '#4af' }}>
+                Cached: ({cacheStats.numItems} items, {(cacheStats.totalKB / 1024).toFixed(1)}MB)
               </div>
               {cacheStats.labels.length > 0 && (
                 <div style={{ 
@@ -293,8 +293,8 @@ export const PerformanceDisplay: React.FC = () => {
                       style={{
                         display: 'inline-block',
                         padding: '2px 6px',
-                        backgroundColor: '#444',
-                        color: '#999',
+                        backgroundColor: '#224466',
+                        color: '#4af',
                         borderRadius: '10px',
                         fontSize: '9px',
                         whiteSpace: 'nowrap'
@@ -305,15 +305,17 @@ export const PerformanceDisplay: React.FC = () => {
                   ))}
                 </div>
               )}
-              {cacheStats.activeLabels && cacheStats.activeLabels.length > 0 && (
-                <div style={{ marginLeft: '10px', marginTop: '5px' }}>
-                  <div style={{ fontSize: '10px', color: '#0f0', marginBottom: '3px' }}>Active:</div>
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '4px'
-                  }}>
-                    {cacheStats.activeLabels.map(label => (
+              <div style={{ marginTop: '5px' }}>
+                <div style={{ fontSize: '10px', color: '#0f0', marginBottom: '3px' }}>Active:</div>
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px',
+                  minHeight: '20px',
+                  marginLeft: '10px'
+                }}>
+                  {cacheStats.activeLabels && cacheStats.activeLabels.length > 0 ? (
+                    cacheStats.activeLabels.map(label => (
                       <span
                         key={label}
                         style={{
@@ -328,19 +330,23 @@ export const PerformanceDisplay: React.FC = () => {
                       >
                         {label}
                       </span>
-                    ))}
-                  </div>
+                    ))
+                  ) : (
+                    <span style={{ fontSize: '9px', color: '#666' }}>None</span>
+                  )}
                 </div>
-              )}
-              {cacheStats.queuedLabels && cacheStats.queuedLabels.length > 0 && (
-                <div style={{ marginLeft: '10px', marginTop: '5px' }}>
-                  <div style={{ fontSize: '10px', color: '#ff0', marginBottom: '3px' }}>Queued:</div>
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '4px'
-                  }}>
-                    {cacheStats.queuedLabels.map(label => (
+              </div>
+              <div style={{ marginTop: '5px' }}>
+                <div style={{ fontSize: '10px', color: '#ff0', marginBottom: '3px' }}>Queued:</div>
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px',
+                  minHeight: '20px',
+                  marginLeft: '10px'
+                }}>
+                  {cacheStats.queuedLabels && cacheStats.queuedLabels.length > 0 ? (
+                    cacheStats.queuedLabels.map(label => (
                       <span
                         key={label}
                         style={{
@@ -355,10 +361,12 @@ export const PerformanceDisplay: React.FC = () => {
                       >
                         {label}
                       </span>
-                    ))}
-                  </div>
+                    ))
+                  ) : (
+                    <span style={{ fontSize: '9px', color: '#666' }}>None</span>
+                  )}
                 </div>
-              )}
+              </div>
               {cacheStats.circuitOpen && (
                 <div style={{ marginLeft: '10px', marginTop: '5px', color: '#f00', fontSize: '10px' }}>
                   ⚠️ Circuit Breaker Open

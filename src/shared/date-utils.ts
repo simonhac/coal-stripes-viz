@@ -177,3 +177,15 @@ export function getAESTDateTimeString(date: Date = new Date()): string {
 export function getTodayAEST(): CalendarDate {
   return today('Australia/Brisbane');
 }
+
+/**
+ * Get the short month name (3 letters) for a CalendarDate
+ * 
+ * @param date CalendarDate object
+ * @returns Three-letter month abbreviation
+ */
+export function getMonthName(date: CalendarDate): string {
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return monthNames[date.month - 1];
+}

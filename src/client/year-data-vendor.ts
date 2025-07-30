@@ -1,7 +1,7 @@
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
-import { LRUCache } from '@/client/lru-cache';
+import { LRUCache, CacheStats } from '@/client/lru-cache';
 import { CapFacYear, createCapFacYear } from './cap-fac-year';
-import { RequestQueue, RequestQueueConfig } from '@/shared/request-queue';
+import { RequestQueue, RequestQueueConfig, QueueStats } from '@/shared/request-queue';
 import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 
 /**
@@ -73,19 +73,13 @@ export class YearDataVendor {
   /**
    * Get cache statistics including pending fetches
    */
-  getCacheStats() {
-    const baseStats = this.cache.getStats();
+  getCacheStats(): CacheStats & QueueStats {
+    const cacheStats = this.cache.getStats();
     const queueStats = this.requestQueue.getStats();
-    const activeItems = this.requestQueue.getActiveItems();
-    const queuedItems = this.requestQueue.getQueuedItems();
     
     return {
-      ...baseStats,
-      pendingCount: queueStats.active,
-      queuedCount: queueStats.queued,
-      circuitOpen: queueStats.circuitOpen,
-      activeLabels: activeItems.map(item => item.label).filter(Boolean),
-      queuedLabels: queuedItems.map(item => item.label).filter(Boolean)
+      ...cacheStats,
+      ...queueStats
     };
   }
 

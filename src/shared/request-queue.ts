@@ -31,6 +31,15 @@ export interface RequestQueueConfig {
   circuitBreakerResetTime: number;
 }
 
+export interface QueueStats {
+  queued: number;
+  active: number;
+  circuitOpen: boolean;
+  failureCount: number;
+  activeLabels: string[];
+  queuedLabels: string[];
+}
+
 export class RequestQueue<T = any> {
   private queue: QueuedRequest<T>[] = [];
   private active: Map<string, Promise<T>> = new Map();
@@ -65,7 +74,6 @@ export class RequestQueue<T = any> {
   ): Promise<T> {
     // If request has a label, check if we already have a pending promise for it
     if (request.label && this.pendingPromises.has(request.label)) {
-      console.log(`Request for ${request.label} already pending, returning existing promise`);
       return this.pendingPromises.get(request.label)!;
     }
 
@@ -306,12 +314,22 @@ export class RequestQueue<T = any> {
   }
 
   // Get queue statistics
-  public getStats() {
+  public getStats(): QueueStats {
+    const activeLabels = Array.from(this.activeRequests.values())
+      .map(req => req.label)
+      .filter((label): label is string => label !== undefined);
+    
+    const queuedLabels = this.queue
+      .map(req => req.label)
+      .filter((label): label is string => label !== undefined);
+    
     return {
       queued: this.queue.length,
       active: this.active.size,
       circuitOpen: this.circuitOpen,
-      failureCount: this.failureCount
+      failureCount: this.failureCount,
+      activeLabels,
+      queuedLabels
     };
   }
 

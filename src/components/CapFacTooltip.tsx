@@ -1,5 +1,6 @@
 import React from 'react';
 import { CalendarDate } from '@internationalized/date';
+import { getMonthName } from '@/shared/date-utils';
 
 export interface TooltipData {
   startDate: CalendarDate;
@@ -19,37 +20,25 @@ export function CapFacTooltip({ data }: CapFacTooltipProps) {
   }
 
   const formatDate = () => {
-    const jsStartDate = data.startDate.toDate('Australia/Brisbane');
-    
-    const getMonthName = (date: Date) => {
-      const monthName = date.toLocaleDateString('en-AU', {
-        month: 'short',
-        timeZone: 'Australia/Brisbane'
-      });
-      // Ensure exactly 3 letters for month (fixes "Sept" -> "Sep")
-      return monthName.substring(0, 3);
-    };
-    
     switch (data.tooltipType) {
       case 'day':
-        return `${jsStartDate.getDate()} ${getMonthName(jsStartDate)} ${jsStartDate.getFullYear()}`;
+        return `${data.startDate.day} ${getMonthName(data.startDate)} ${data.startDate.year}`;
       
       case 'month':
-        return `${getMonthName(jsStartDate)} ${jsStartDate.getFullYear()}`;
+        return `${getMonthName(data.startDate)} ${data.startDate.year}`;
       
       case 'period':
         if (!data.endDate) {
           throw new Error('endDate is required for period tooltip type');
         }
-        const jsEndDate = data.endDate.toDate('Australia/Brisbane');
         
         // Show date range
-        const startDay = jsStartDate.getDate();
-        const startMonth = getMonthName(jsStartDate);
-        const startYear = jsStartDate.getFullYear();
-        const endDay = jsEndDate.getDate();
-        const endMonth = getMonthName(jsEndDate);
-        const endYear = jsEndDate.getFullYear();
+        const startDay = data.startDate.day;
+        const startMonth = getMonthName(data.startDate);
+        const startYear = data.startDate.year;
+        const endDay = data.endDate.day;
+        const endMonth = getMonthName(data.endDate);
+        const endYear = data.endDate.year;
         
         if (startYear === endYear && startMonth === endMonth) {
           return `${startDay}–${endDay} ${startMonth} ${startYear}`;

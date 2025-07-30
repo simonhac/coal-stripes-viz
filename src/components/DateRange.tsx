@@ -1,5 +1,6 @@
 import React from 'react';
 import { CalendarDate } from '@internationalized/date';
+import { getMonthName } from '@/shared/date-utils';
 
 interface DateRangeProps {
   dateRange: { start: CalendarDate; end: CalendarDate } | null;
@@ -9,16 +10,7 @@ export function DateRange({ dateRange }: DateRangeProps) {
   if (!dateRange) return <span>Loading...</span>;
   
   const format = (date: CalendarDate) => {
-    const jsDate = date.toDate('Australia/Brisbane');
-    const day = jsDate.getDate();
-    const year = jsDate.getFullYear();
-    const monthName = jsDate.toLocaleDateString('en-AU', { 
-      month: 'short',
-      timeZone: 'Australia/Brisbane'
-    });
-    // Ensure exactly 3 letters for month (fixes "Sept" -> "Sep")
-    const shortMonth = monthName.substring(0, 3);
-    return `${day} ${shortMonth} ${year}`;
+    return `${date.day} ${getMonthName(date)} ${date.year}`;
   };
   
   return (
