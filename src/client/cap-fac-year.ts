@@ -1,5 +1,6 @@
 import { GeneratingUnitCapFacHistoryDTO, GeneratingUnitDTO } from '@/shared/types';
 import { FacilityYearTile } from './facility-year-tile';
+import { createFacilitiesFromUnits } from './facility-factory';
 
 export interface CapFacYear {
   year: number;
@@ -73,20 +74,12 @@ export function createCapFacYear(
 ): CapFacYear {
   const facilityTiles = new Map<string, FacilityYearTile>();
   
-  // Group units by facility code
-  const unitsByFacility = new Map<string, GeneratingUnitDTO[]>();
-  
-  for (const unit of data.data) {
-    const facilityCode = unit.facility_code;
-    if (!unitsByFacility.has(facilityCode)) {
-      unitsByFacility.set(facilityCode, []);
-    }
-    unitsByFacility.get(facilityCode)!.push(unit);
-  }
+  // Create Facility objects from units
+  const facilities = createFacilitiesFromUnits(data.data);
   
   // Create a FacilityYearTile for each facility
-  for (const [facilityCode, units] of unitsByFacility) {
-    const tile = new FacilityYearTile(facilityCode, year, units);
+  for (const [facilityCode, facility] of facilities) {
+    const tile = new FacilityYearTile(facility, year);
     facilityTiles.set(facilityCode, tile);
   }
   

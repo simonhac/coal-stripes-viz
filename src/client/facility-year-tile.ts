@@ -1,4 +1,4 @@
-import { GeneratingUnitDTO } from '@/shared/types';
+import { Facility, GeneratingUnit } from '@/shared/types';
 import { TILE_CONFIG } from '@/shared/config';
 import { CalendarDate } from '@internationalized/date';
 import { getDateFromIndex } from '@/shared/date-utils';
@@ -6,49 +6,47 @@ import { capacityFactorColorMap } from '@/shared/capacity-factor-color-map';
 import { featureFlags } from '@/shared/feature-flags';
 
 export class FacilityYearTile {
-  private facilityCode: string;
-  private facilityName: string;
+  private facility: Facility;
   private year: number;
-  private units: GeneratingUnitDTO[];
   private canvas: OffscreenCanvas | HTMLCanvasElement | null = null;
   private unitHeights: number[] | null = null;
 
-  constructor(facilityCode: string, year: number, units: GeneratingUnitDTO[]) {
-    if (!facilityCode) {
+  constructor(facility: Facility, year: number) {
+    if (!facility) {
+      throw new Error('Facility must not be null');
+    }
+    if (!facility.facilityCode) {
       throw new Error('Facility code must not be null');
     }
-    if (!units || units.length === 0) {
+    if (!facility.units || facility.units.length === 0) {
       throw new Error('Units array must not be empty');
     }
-    const facilityName = units[0].facility_name;
-    if (!facilityName) {
+    if (!facility.facilityName) {
       throw new Error('Facility name must not be null');
     }
     
-    this.facilityCode = facilityCode;
-    this.facilityName = facilityName;
+    this.facility = facility;
     this.year = year;
-    this.units = units;
     
-    // Render the canvas immediately with shortLabels
-    this.renderCanvas(true);
+    // Render the canvas immediately
+    this.renderCanvas();
   }
 
-  private calculateUnitHeights(useShortLabels: boolean = false): number[] {
-    return this.units.map(unit => {
+  private calculateUnitHeights(): number[] {
+    return this.facility.units.map(unit => {
       // Ensure heights are always integers to avoid fractional pixel positions
       return Math.round(unit.capacity / 30);
     });
   }
 
-  private renderCanvas(useShortLabels: boolean = false): void {
+  private renderCanvas(): void {
     const startTime = performance.now();
     
     // Width is exactly the number of days
-    const daysInYear = this.units[0]?.history.data.length || 365;
+    const daysInYear = this.facility.units[0]?.history.data.length || 365;
     const width = daysInYear;
     
-    const unitHeights = this.calculateUnitHeights(useShortLabels);
+    const unitHeights = this.calculateUnitHeights();
     this.unitHeights = unitHeights; // Store for tooltip lookups
     const height = unitHeights.reduce((sum, h) => sum + h, 0);
 
@@ -88,7 +86,7 @@ export class FacilityYearTile {
       
       // Render units using direct pixel manipulation
       let yOffset = 0;
-      this.units.forEach((unit, unitIndex) => {
+      this.facility.units.forEach((unit, unitIndex) => {
         const unitHeight = unitHeights[unitIndex];
         
         
@@ -121,7 +119,7 @@ export class FacilityYearTile {
       
       // Render units
       let yOffset = 0;
-      this.units.forEach((unit, unitIndex) => {
+      this.facility.units.forEach((unit, unitIndex) => {
         const unitHeight = unitHeights[unitIndex];
         
         for (let dayIndex = 0; dayIndex < unit.history.data.length; dayIndex++) {
@@ -188,7 +186,7 @@ export class FacilityYearTile {
     }
 
     const renderTime = performance.now() - startTime;
-    // console.log(`[FacilityYearTile] Rendered: ${this.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
+    // console.log(`[FacilityYearTile] Rendered: ${this.facility.facilityCode}-${this.year} (${renderTime.toFixed(0)}ms)`);
   }
 
   /**
@@ -210,6 +208,7 @@ export class FacilityYearTile {
     facilityCode: string;
     facilityName: string;
     unitName: string;
+    network: string;
   } | null {
     // Check bounds
     if (!this.unitHeights || x < 0 || y < 0) {
@@ -229,11 +228,11 @@ export class FacilityYearTile {
       yOffset += unitHeight;
     }
 
-    if (unitIndex === -1 || unitIndex >= this.units.length) {
+    if (unitIndex === -1 || unitIndex >= this.facility.units.length) {
       return null;
     }
 
-    const unit = this.units[unitIndex];
+    const unit = this.facility.units[unitIndex];
     
     // x coordinate is the day index
     const dayIndex = Math.floor(x);
@@ -249,9 +248,10 @@ export class FacilityYearTile {
     return {
       date,
       capacityFactor,
-      facilityCode: this.facilityCode,
-      facilityName: this.facilityName,
-      unitName: unit.duid
+      facilityCode: this.facility.facilityCode,
+      facilityName: this.facility.facilityName,
+      unitName: unit.unitName,
+      network: this.facility.network
     };
   }
 
@@ -273,14 +273,14 @@ export class FacilityYearTile {
    * Get the facility code
    */
   getFacilityCode(): string {
-    return this.facilityCode;
+    return this.facility.facilityCode;
   }
 
   /**
    * Get the facility name
    */
   getFacilityName(): string {
-    return this.facilityName;
+    return this.facility.facilityName;
   }
 
   /**
@@ -294,14 +294,14 @@ export class FacilityYearTile {
   /**
    * Get the units for this facility
    */
-  getUnits(): GeneratingUnitDTO[] {
-    return this.units;
+  getUnits(): GeneratingUnit[] {
+    return this.facility.units;
   }
   
   /**
    * Get the total capacity for this facility
    */
   getTotalCapacity(): number {
-    return this.units.reduce((sum, unit) => sum + unit.capacity, 0);
+    return this.facility.units.reduce((sum, unit) => sum + unit.capacity, 0);
   }
 }

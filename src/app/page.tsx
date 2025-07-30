@@ -5,9 +5,7 @@ import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST, getDaysBetween } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
-import { CompositeTile, CompositeTileRef } from '../components/CompositeTile';
-import { CapFacTooltip, TooltipData } from '../components/CapFacTooltip';
-import { CapFacXAxis } from '../components/CapFacXAxis';
+import { RegionSection } from '../components/RegionSection';
 import { DateRange } from '../components/DateRange';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { useAnimatedDateRange } from '@/hooks/useAnimatedDateRange';
@@ -18,7 +16,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
-  const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
   const [boundaryFlash, setBoundaryFlash] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,45 +33,16 @@ export default function Home() {
     }
   });
   
+  // Use navigateToMonth directly as it already has the correct signature
+  const handleMonthClick = navigateToMonth;
+  
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
     start: endDate.subtract({ days: 364 }),
     end: endDate
   } : null;
   
-  // Memoize callbacks to prevent unnecessary re-renders
-  const handleHover = useCallback((data: TooltipData) => {
-    setTooltipData(data);
-  }, []);
-  
-  const handleHoverEnd = useCallback(() => {
-    setTooltipData(null);
-  }, []);
 
-  // Store refs to all CompositeTile components by region
-  const tileRefs = useRef<Map<string, Map<string, React.RefObject<CompositeTileRef>>>>(new Map());
-  
-  // Calculate capacity-weighted average for an entire region
-  const calculateRegionAverage = useCallback((regionCode: string) => {
-    const regionRefs = tileRefs.current.get(regionCode);
-    if (!regionRefs) return null;
-    
-    let totalWeightedCapacityFactor = 0;
-    let totalCapacity = 0;
-    
-    // Get stats from each facility tile in the region
-    for (const [facilityCode, ref] of regionRefs) {
-      if (!ref.current) return null;
-      
-      const stats = ref.current.getStats();
-      if (!stats || stats.avgCapacityFactor === null) return null;
-      
-      totalWeightedCapacityFactor += stats.avgCapacityFactor * stats.totalCapacity;
-      totalCapacity += stats.totalCapacity;
-    }
-    
-    return totalCapacity > 0 ? totalWeightedCapacityFactor / totalCapacity : null;
-  }, []);
 
   // Initial load
   useEffect(() => {
@@ -212,78 +180,16 @@ export default function Home() {
               'WEM': 'Western Australia'
             }[regionCode] || regionCode;
             
-            // Initialize refs for this region if not already done
-            if (!tileRefs.current.has(regionCode)) {
-              tileRefs.current.set(regionCode, new Map());
-            }
-            const regionTileRefs = tileRefs.current.get(regionCode)!;
-            
-            // Create refs for any new facilities
-            facilities.forEach(facility => {
-              if (!regionTileRefs.has(facility.code)) {
-                regionTileRefs.set(facility.code, React.createRef<CompositeTileRef>());
-              }
-            });
-            
             return (
-              <div key={regionCode} className="opennem-region">
-                <div className="opennem-region-header">
-                  <span 
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={() => {
-                      if (animatedDateRange) {
-                        const avgCapacityFactor = calculateRegionAverage(regionCode);
-                        if (avgCapacityFactor !== null) {
-                          handleHover({
-                            startDate: animatedDateRange.start,
-                            endDate: animatedDateRange.end,
-                            label: regionName,
-                            capacityFactor: avgCapacityFactor,
-                            tooltipType: 'period'
-                          });
-                        }
-                      }
-                    }}
-                    onMouseLeave={handleHoverEnd}
-                  >
-                    {regionName}
-                  </span>
-                  <CapFacTooltip data={tooltipData} />
-                </div>
-                <div className="opennem-region-content">
-                  {/* Display tiles */}
-                  {animatedDateRange && (
-                    <div className="opennem-facility-group">
-                      {/* Display all facilities for this region */}
-                      {facilities.map(facility => {
-                        const ref = regionTileRefs.get(facility.code);
-                        return (
-                          <CompositeTile
-                            key={facility.code}
-                            ref={ref}
-                            endDate={endDate!}
-                            facilityCode={facility.code}
-                            facilityName={facility.name}
-                            animatedDateRange={animatedDateRange}
-                            onHover={handleHover}
-                            onHoverEnd={handleHoverEnd}
-                            minCanvasHeight={25}
-                          />
-                        );
-                      })}
-                      
-                      <CapFacXAxis 
-                        dateRange={animatedDateRange}
-                        regionCode={regionCode}
-                        regionName={regionName}
-                        onHover={handleHover}
-                        onHoverEnd={handleHoverEnd}
-                        onMonthClick={navigateToMonth}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <RegionSection
+                key={regionCode}
+                regionCode={regionCode}
+                regionName={regionName}
+                facilities={facilities}
+                endDate={endDate!}
+                animatedDateRange={animatedDateRange}
+                onMonthClick={handleMonthClick}
+              />
             );
           })}
         </div>

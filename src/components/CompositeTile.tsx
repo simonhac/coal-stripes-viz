@@ -225,11 +225,17 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         const tileX = x + leftStartDay;
         const tooltipData = tiles.left.getTooltipData(tileX, y);
         if (tooltipData) {
+          // Format unit name - for WA units, show only the part after underscore
+          let unitName = tooltipData.unitName;
+          if (tooltipData.network.toUpperCase() === 'WEM' && unitName.includes('_')) {
+            unitName = unitName.split('_').pop() || unitName;
+          }
+          
           // Convert to new format
           const formattedData: any = {
             startDate: tooltipData.date,
             endDate: null,
-            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            label: `${tooltipData.facilityName} ${unitName}`,
             capacityFactor: tooltipData.capacityFactor,
             tooltipType: 'day'
           };
@@ -242,11 +248,17 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         const tileX = x - leftWidth;
         const tooltipData = tiles.right.getTooltipData(tileX, y);
         if (tooltipData) {
+          // Format unit name - for WA units, show only the part after underscore
+          let unitName = tooltipData.unitName;
+          if (tooltipData.network.toUpperCase() === 'WEM' && unitName.includes('_')) {
+            unitName = unitName.split('_').pop() || unitName;
+          }
+          
           // Convert to new format
           const formattedData: any = {
             startDate: tooltipData.date,
             endDate: null,
-            label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
+            label: `${tooltipData.facilityName} ${unitName}`,
             capacityFactor: tooltipData.capacityFactor,
             tooltipType: 'day'
           };
@@ -409,9 +421,10 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         const y = mousePosRef.current.y - rect.top;
         
         // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
-        const canvasX = (x / rect.width) * 365;
+        const canvasX = (x / rect.width) * canvasRef.current.width;
+        const canvasY = (y / rect.height) * canvasRef.current.height;
         
-        updateTooltip(canvasX, y);
+        updateTooltip(canvasX, canvasY);
       }
     }
     
@@ -556,9 +569,10 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         const y = mousePosRef.current.y - rect.top;
         
         // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
-        const canvasX = (x / rect.width) * 365;
+        const canvasX = (x / rect.width) * canvasRef.current.width;
+        const canvasY = (y / rect.height) * canvasRef.current.height;
         
-        updateTooltip(canvasX, y);
+        updateTooltip(canvasX, canvasY);
       } else {
         // Mouse not over our canvas - check if we need to call onHoverEnd
         // We can check if the tooltip is currently showing for this tile
@@ -572,14 +586,16 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
   }, [updateTooltip, onHoverEnd, facilityCode]);
   
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+    const canvas = e.currentTarget;
+    const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
     // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
-    const canvasX = (x / rect.width) * 365;
+    const canvasX = (x / rect.width) * canvas.width;
+    const canvasY = (y / rect.height) * canvas.height;
     
-    updateTooltip(canvasX, y);
+    updateTooltip(canvasX, canvasY);
   };
 
   return (

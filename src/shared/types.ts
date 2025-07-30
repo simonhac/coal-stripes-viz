@@ -27,3 +27,19 @@ export interface GeneratingUnitCapFacHistoryDTO {
   created_at: string;
   data: GeneratingUnitDTO[];
 }
+
+// Clean internal representations for the client
+export interface GeneratingUnit {
+  unitId: string;  // This is the DUID
+  unitName: string; // This could be formatted differently from unitId
+  capacity: number;
+  history: UnitHistoryDTO;
+}
+
+export interface Facility {
+  network: string;
+  region?: string; // Only present for NEM units
+  facilityCode: string;
+  facilityName: string;
+  units: GeneratingUnit[];
+}

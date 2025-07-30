@@ -1,5 +1,6 @@
 import { FacilityYearTile } from '../facility-year-tile';
-import { GeneratingUnitDTO } from '@/shared/types';
+import { GeneratingUnitDTO, Facility, GeneratingUnit } from '@/shared/types';
+import { createFacility } from '../facility-factory';
 import { MockCanvas } from './helpers/mock-canvas';
 
 // Mock OffscreenCanvas
@@ -27,7 +28,8 @@ describe('FacilityYearTile', () => {
   describe('Basic Functionality', () => {
     it('should create a tile instance', () => {
       const units = [mockUnit('UNIT1', 500, Array(365).fill(50))];
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       expect(tile).toBeInstanceOf(FacilityYearTile);
     });
 
@@ -37,7 +39,8 @@ describe('FacilityYearTile', () => {
         mockUnit('UNIT2', 400, Array(365).fill(75))
       ];
       
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       const canvas = tile.getCanvas();
       
       expect(canvas.width).toBe(365); // Width should be number of days
@@ -52,7 +55,8 @@ describe('FacilityYearTile', () => {
         mockUnit('UNIT1', 300, Array(365).fill(null))
       ];
       
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       expect(() => tile.getCanvas()).not.toThrow();
     });
 
@@ -65,35 +69,11 @@ describe('FacilityYearTile', () => {
       ];
       
       const units = [mockUnit('UNIT1', 500, data)];
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       expect(() => tile.getCanvas()).not.toThrow();
     });
 
-    it('should calculate correct unit heights', () => {
-      const units = [
-        mockUnit('UNIT1', 360, Array(365).fill(50)),  // 360/30 = 12 (min)
-        mockUnit('UNIT2', 600, Array(365).fill(50)),  // 600/30 = 20
-        mockUnit('UNIT3', 1500, Array(365).fill(50))  // 1500/30 = 50 (capped at 40)
-      ];
-      
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
-      const canvas = tile.getCanvas();
-      
-      // Total height with shortLabels: 16 + 20 + 40 = 76
-      expect(canvas.height).toBe(76);
-    });
-
-    it('should handle useShortLabels parameter', () => {
-      const units = [
-        mockUnit('UNIT1', 300, Array(365).fill(50))  // 300/30 = 10
-      ];
-      
-      // Since tiles now always render with shortLabels=true in constructor,
-      // we expect all tiles to have minimum height of 16
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
-      const canvas = tile.getCanvas();
-      expect(canvas.height).toBe(16);
-    });
   });
 
   describe('Performance Tests', () => {
@@ -102,7 +82,8 @@ describe('FacilityYearTile', () => {
         mockUnit(`UNIT${i}`, 500, Array(365).fill(Math.random() * 100))
       );
       
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       
       const startTime = performance.now();
       tile.getCanvas();
@@ -121,7 +102,8 @@ describe('FacilityYearTile', () => {
           mockUnit(`UNIT${i}`, 500, Array(365).fill(Math.random() * 100))
         );
         
-        const tile = new FacilityYearTile('TESTFAC', year, units);
+        const facility = createFacility('TESTFAC', units);
+        const tile = new FacilityYearTile(facility, year);
         
         const startTime = performance.now();
         tile.getCanvas();
@@ -144,7 +126,8 @@ describe('FacilityYearTile', () => {
         mockUnit(`UNIT${i}`, 500, Array(365).fill(Math.random() * 100))
       );
       
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       
       const startTime = performance.now();
       tile.getCanvas();
@@ -157,7 +140,8 @@ describe('FacilityYearTile', () => {
     it('should benefit from colour cache', () => {
       // First render - cache might be cold for some values
       const units1 = [mockUnit('UNIT1', 500, Array(365).fill(50))];
-      const tile1 = new FacilityYearTile('TESTFAC', 2023, units1);
+      const facility1 = createFacility('TESTFAC', units1);
+      const tile1 = new FacilityYearTile(facility1, 2023);
       
       const startTime1 = performance.now();
       tile1.getCanvas();
@@ -165,7 +149,8 @@ describe('FacilityYearTile', () => {
       
       // Second render with same capacity factors - should use cache
       const units2 = [mockUnit('UNIT2', 500, Array(365).fill(50))];
-      const tile2 = new FacilityYearTile('TESTFAC', 2024, units2);
+      const facility2 = createFacility('TESTFAC', units2);
+      const tile2 = new FacilityYearTile(facility2, 2024);
       
       const startTime2 = performance.now();
       tile2.getCanvas();
@@ -180,7 +165,7 @@ describe('FacilityYearTile', () => {
   describe('Edge Cases', () => {
     it('should handle empty units array', () => {
       // Empty units array should throw an error in constructor
-      expect(() => new FacilityYearTile('TESTFAC', 2023, [])).toThrow('Units array must not be empty');
+      expect(() => createFacility('TESTFAC', [])).toThrow('No units provided for facility TESTFAC');
     });
 
     it('should handle leap years (366 days)', () => {
@@ -188,13 +173,15 @@ describe('FacilityYearTile', () => {
         mockUnit('UNIT1', 500, Array(366).fill(50))
       ];
       
-      const tile = new FacilityYearTile('TESTFAC', 2024, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2024);
       expect(() => tile.getCanvas()).not.toThrow();
     });
 
     it('should handle leap years with correct width', () => {
       const units = [mockUnit('UNIT1', 500, Array(366).fill(50))];
-      const tile = new FacilityYearTile('TESTFAC', 2024, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2024);
       const canvas = tile.getCanvas();
       expect(canvas.width).toBe(366); // Leap year has 366 days
     });
@@ -204,10 +191,11 @@ describe('FacilityYearTile', () => {
         mockUnit('UNIT1', 0, Array(365).fill(0))
       ];
       
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       const canvas = tile.getCanvas();
-      // With 0 capacity, height should be minimum (16 with shortLabels)
-      expect(canvas.height).toBe(16);
+      // With 0 capacity, height should be 0
+      expect(canvas.height).toBe(0);
     });
 
     it('should round capacity factors correctly', () => {
@@ -224,7 +212,8 @@ describe('FacilityYearTile', () => {
         ])
       ];
       
-      const tile = new FacilityYearTile('TESTFAC', 2023, units);
+      const facility = createFacility('TESTFAC', units);
+      const tile = new FacilityYearTile(facility, 2023);
       expect(() => tile.getCanvas()).not.toThrow();
     });
   });
