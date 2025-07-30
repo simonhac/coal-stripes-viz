@@ -36,17 +36,36 @@ export const PerformanceDisplay: React.FC = () => {
   const [disclosureState, setDisclosureState] = useState<DisclosureState>('collapsed');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('caches');
   const [cacheStats, setCacheStats] = useState<(CacheStats & QueueStats) | null>(null);
+  const [isVisible, setIsVisible] = useState(() => {
+    // Load saved visibility state from localStorage
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = localStorage.getItem('performance-monitor-state');
+      if (saved) {
+        try {
+          const state = JSON.parse(saved);
+          return state.visible === true; // Default to false if not explicitly true
+        } catch (e) {
+          console.error('Failed to parse saved performance monitor state:', e);
+        }
+      }
+    }
+    // Default to hidden
+    return false;
+  });
   const [position, setPosition] = useState(() => {
     // Load saved position from localStorage
     if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = localStorage.getItem('performance-monitor-coordinates');
+      const saved = localStorage.getItem('performance-monitor-state');
       if (saved) {
         try {
-          const coords = JSON.parse(saved);
-          // Validate coordinates are within viewport
-          if (coords.x >= 0 && coords.x <= window.innerWidth - 100 &&
-              coords.y >= 0 && coords.y <= window.innerHeight - 100) {
-            return coords;
+          const state = JSON.parse(saved);
+          if (state.position) {
+            const coords = state.position;
+            // Validate coordinates are within viewport
+            if (coords.x >= 0 && coords.x <= window.innerWidth - 100 &&
+                coords.y >= 0 && coords.y <= window.innerHeight - 100) {
+              return coords;
+            }
           }
         } catch (e) {
           console.error('Failed to parse saved performance monitor position:', e);
@@ -118,17 +137,38 @@ export const PerformanceDisplay: React.FC = () => {
     };
   }, [isDragging, dragStart]);
 
-  // Save position to localStorage after drag ends
+  // Save position and visibility to localStorage
   useEffect(() => {
-    if (!isDragging && typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== 'undefined' && window.localStorage) {
       // Debounce to avoid saving during drag
       const timeoutId = setTimeout(() => {
-        localStorage.setItem('performance-monitor-coordinates', JSON.stringify(position));
+        const state = {
+          position,
+          visible: isVisible
+        };
+        localStorage.setItem('performance-monitor-state', JSON.stringify(state));
       }, 100);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [position, isDragging]);
+  }, [position, isVisible, isDragging]);
+
+  // Handle keyboard shortcut (Shift+P)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === 'P') {
+        setIsVisible(prev => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Don't render if not visible
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <div 

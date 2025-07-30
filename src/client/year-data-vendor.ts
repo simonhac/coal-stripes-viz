@@ -55,7 +55,7 @@ export class YearDataVendor {
       url: `/api/capacity-factors?year=${year}`,
       label: year.toString(),
       onProgress: (progress) => {
-        console.log(`Year ${year} fetch: ${progress}%`);
+        // Progress logging removed
       },
       onError: (error) => {
         console.error(`Failed to fetch year ${year}:`, error);
@@ -107,11 +107,9 @@ export class YearDataVendor {
     const data: GeneratingUnitCapFacHistoryDTO = await response.json();
     
     // Create CapFacYear with pre-rendered tiles
-    console.log(`🎨 Creating tiles for year ${year}...`);
     const startTime = performance.now();
     const capFacYear = createCapFacYear(year, data);
     const createTime = performance.now() - startTime;
-    console.log(`✅ Created ${capFacYear.facilityTiles.size} facility tiles for ${year} in ${createTime.toFixed(0)}ms`);
     
     // Cache the result with the total size (JSON + canvas memory)
     this.cache.set(year.toString(), capFacYear, capFacYear.totalSizeBytes, year.toString());
