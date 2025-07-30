@@ -73,6 +73,26 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
     preloadYearsForDate(yesterday);
   }, [onDateChange, preloadYearsForDate]);
 
+  // Navigate to January 1 of a given year
+  const navigateToYearStart = useCallback((targetYear: number) => {
+    const jan1 = new CalendarDate(targetYear, 1, 1);
+    const newEndDate = jan1.add({ days: 364 });
+    const yesterday = getTodayAEST().subtract({ days: 1 });
+    
+    // Don't go past yesterday
+    if (newEndDate.compare(yesterday) > 0) {
+      if (endDate && endDate.compare(yesterday) >= 0 && onBoundaryHit) {
+        onBoundaryHit();
+      } else {
+        onDateChange(yesterday);
+        preloadYearsForDate(yesterday);
+      }
+    } else {
+      onDateChange(newEndDate);
+      preloadYearsForDate(newEndDate);
+    }
+  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -85,15 +105,37 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
       if (!endDate) return;
 
       const isShift = e.shiftKey;
+      const isCmd = e.metaKey || e.ctrlKey; // Support both Mac (Cmd) and Windows/Linux (Ctrl)
       const monthsToMove = isShift ? 6 : 1;
 
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        navigateByMonths(-monthsToMove);
+        if (isCmd) {
+          // Command+Left: Go to Jan 1 of start year (or previous year if already Jan 1)
+          const startDate = endDate.subtract({ days: 364 });
+          const targetYear = (startDate.month === 1 && startDate.day === 1) 
+            ? startDate.year - 1 
+            : startDate.year;
+          navigateToYearStart(targetYear);
+        } else {
+          navigateByMonths(-monthsToMove);
+        }
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        navigateByMonths(monthsToMove);
+        if (isCmd) {
+          // Command+Right: Go to Jan 1 of end year (or next year if start date is already Jan 1)
+          const startDate = endDate.subtract({ days: 364 });
+          const targetYear = (startDate.month === 1 && startDate.day === 1) 
+            ? endDate.year + 1 
+            : endDate.year;
+          navigateToYearStart(targetYear);
+        } else {
+          navigateByMonths(monthsToMove);
+        }
       } else if (e.key === 'Home') {
+        e.preventDefault();
+        navigateToToday();
+      } else if (e.key === 't' || e.key === 'T') {
         e.preventDefault();
         navigateToToday();
       }
@@ -101,7 +143,7 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [endDate, navigateByMonths, navigateToToday]);
+  }, [endDate, navigateByMonths, navigateToToday, navigateToYearStart]);
 
   return {
     navigateByMonths,

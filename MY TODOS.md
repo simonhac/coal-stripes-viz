@@ -1,14 +1,12 @@
-
-OptimizedStripeCanvas
+hover focus
 
 better caching
 most recent first on fetches
-height of collie
-tooltips
-
-hover over facility
-hover over region name
-click on month
+tooltips to bind to just the correct one
 
 claude doctor or npm i -g @anthropic-ai/claude-cod
 
+drag gesture
+
+find out how far we can go back
+fix deployment error
