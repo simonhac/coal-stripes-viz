@@ -11,6 +11,7 @@ import { CapFacXAxis } from '../components/CapFacXAxis';
 import { DateRange } from '../components/DateRange';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { useAnimatedDateRange } from '@/hooks/useAnimatedDateRange';
+import { useNavigation } from '@/hooks/useNavigation';
 import './opennem.css';
 
 export default function Home() {
@@ -23,6 +24,12 @@ export default function Home() {
   
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate);
+  
+  // Set up navigation
+  const { navigateByMonths, navigateToMonth, navigateToToday } = useNavigation({
+    endDate,
+    onDateChange: setEndDate
+  });
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
@@ -115,70 +122,10 @@ export default function Home() {
     initialLoad();
   }, []);
 
-  // Keyboard navigation
+  // Ensure the page has focus on mount for keyboard navigation
   useEffect(() => {
-    // Ensure the page has focus on mount
     window.focus();
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      // Only handle if we have an end date
-      if (!endDate) return;
-
-      const isShift = e.shiftKey;
-      const monthsToMove = isShift ? 6 : 1;
-
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        // Left arrow - pan backward in time (older)
-        const newEndDate = endDate.subtract({ months: monthsToMove });
-        setEndDate(newEndDate);
-        
-        // Preload the years we'll need
-        const startDate = newEndDate.subtract({ days: 364 });
-        const years = new Set([startDate.year, newEndDate.year]);
-        years.forEach(year => {
-          yearDataVendor.requestYear(year).catch(err => {
-            console.error(`Failed to preload year ${year}:`, err);
-          });
-        });
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        // Right arrow - pan forward in time (more recent)
-        const newEndDate = endDate.add({ months: monthsToMove });
-        
-        // Get yesterday as the latest possible date
-        const yesterday = getTodayAEST().subtract({ days: 1 });
-        
-        // Check boundaries - don't go past yesterday
-        if (newEndDate.compare(yesterday) > 0) {
-          // Don't move if we're already at yesterday
-          if (endDate.compare(yesterday) < 0) {
-            setEndDate(yesterday);
-          } else {
-          }
-        } else {
-          setEndDate(newEndDate);
-          
-          // Preload the years we'll need
-          const startDate = newEndDate.subtract({ days: 364 });
-          const years = new Set([startDate.year, newEndDate.year]);
-          years.forEach(year => {
-            yearDataVendor.requestYear(year).catch(err => {
-              console.error(`Failed to preload year ${year}:`, err);
-            });
-          });
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [endDate]);
+  }, []);
 
 
   if (loading) {
@@ -265,6 +212,7 @@ export default function Home() {
                         regionName={regionName}
                         onHover={handleHover}
                         onHoverEnd={handleHoverEnd}
+                        onMonthClick={navigateToMonth}
                       />
                     </div>
                   )}

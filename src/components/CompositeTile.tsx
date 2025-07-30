@@ -15,8 +15,6 @@ interface CompositeTileProps {
   animatedDateRange?: { start: CalendarDate; end: CalendarDate };
   onHover?: (tooltipData: any) => void;
   onHoverEnd?: () => void;
-  onFocus?: () => void;
-  onBlur?: () => void;
   minCanvasHeight?: number;
 }
 
@@ -34,8 +32,6 @@ function CompositeTileComponent({
   animatedDateRange,
   onHover,
   onHoverEnd,
-  onFocus,
-  onBlur,
   minCanvasHeight = 20
 }: CompositeTileProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);

@@ -11,6 +11,7 @@ interface CapFacXAxisProps {
   regionName: string;
   onHover?: (tooltipData: any) => void;
   onHoverEnd?: () => void;
+  onMonthClick?: (year: number, month: number) => void;
 }
 
 export function CapFacXAxis({ 
@@ -18,7 +19,8 @@ export function CapFacXAxis({
   regionCode,
   regionName,
   onHover,
-  onHoverEnd
+  onHoverEnd,
+  onMonthClick
 }: CapFacXAxisProps) {
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
   const [useShortLabels, setUseShortLabels] = useState(false);
@@ -159,6 +161,12 @@ export function CapFacXAxis({
     }
   };
 
+  const handleMonthClick = (month: typeof monthBars[0]) => {
+    if (onMonthClick) {
+      onMonthClick(month.date.year, month.date.month);
+    }
+  };
+
   return (
     <div className="opennem-stripe-row" style={{ display: 'flex' }}>
       <div className="opennem-facility-label">
@@ -174,10 +182,12 @@ export function CapFacXAxis({
                   backgroundColor: month.color,
                   width: idx === monthBars.length - 1 ? 'auto' : `${month.widthPercent}%`,
                   flex: idx === monthBars.length - 1 ? '1' : 'none',
-                  position: 'relative'
+                  position: 'relative',
+                  cursor: onMonthClick ? 'pointer' : 'default'
                 }}
                 onMouseEnter={() => handleMouseEnter(month)}
                 onMouseLeave={onHoverEnd}
+                onClick={() => handleMonthClick(month)}
               >
                 {useShortLabels ? month.labelShort : month.labelLong}
               </div>
