@@ -5,6 +5,7 @@ import {
 } from '@/shared/types';
 import { CalendarDate, parseDate } from '@internationalized/date';
 import { getAESTDateTimeString, isLeapYear, getDaysBetween, parseAESTDateString, getTodayAEST } from '@/shared/date-utils';
+import { LRUCache } from '@/shared/lru-cache';
 
 // Define types for the new API
 interface UnitRecord {
@@ -29,9 +30,11 @@ export class CapFacDataService {
   private client: OEClientQueued;
   private facilitiesCache: Facility[] | null = null;
   private facilitiesFetchPromise: Promise<Facility[]> | null = null;
+  private yearDataCache: LRUCache<string>;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, maxCachedYears: number = 5) {
     this.client = new OEClientQueued(apiKey);
+    this.yearDataCache = new LRUCache<string>(100);
   }
 
   /**
@@ -47,9 +50,10 @@ export class CapFacDataService {
       }
     }
     
-    // Clear cache
+    // Clear caches
     this.facilitiesCache = null;
     this.facilitiesFetchPromise = null;
+    this.yearDataCache.clear();
     
     // Clear any pending requests in the queue
     if (this.client) {
@@ -65,6 +69,15 @@ export class CapFacDataService {
    * Always returns data for the full year with today and future dates nulled out
    */
   async getCapacityFactors(year: number): Promise<GeneratingUnitCapFacHistoryDTO> {
+    const cacheKey = year.toString();
+    
+    // Check cache first
+    const cachedJson = this.yearDataCache.get(cacheKey);
+    if (cachedJson) {
+      console.log(`📦 Cache hit: ${year}`);
+      return JSON.parse(cachedJson);
+    }
+    
     const startTime = performance.now();
     
     // Always work with full years - no partial years allowed
@@ -99,8 +112,13 @@ export class CapFacDataService {
     
     const coalStripesData = this.processGeneratingUnitCapFacHistoryDTO(allData, facilities, startDate, endDate);
     
+    // Convert to JSON and cache
+    const jsonString = JSON.stringify(coalStripesData);
+    const sizeInBytes = jsonString.length;
+    this.yearDataCache.set(cacheKey, jsonString, sizeInBytes, `Year ${year}`);
+    
     const elapsed = Math.round(performance.now() - startTime);
-    console.log(`✅ API response: ${year} | ${elapsed}ms`);
+    console.log(`✅ API response: ${year} | ${elapsed}ms | Cached (${Math.round(sizeInBytes / 1024)}KB)`);
     
     return coalStripesData;
   }
@@ -110,6 +128,13 @@ export class CapFacDataService {
    */
   public getQueueStats() {
     return this.client ? this.client.getQueueStats() : null;
+  }
+
+  /**
+   * Get cache statistics
+   */
+  public getCacheStats() {
+    return this.yearDataCache.getStats();
   }
 
 

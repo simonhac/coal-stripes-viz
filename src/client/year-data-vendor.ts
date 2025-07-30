@@ -1,5 +1,5 @@
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
-import { LRUCache, CacheStats } from '@/client/lru-cache';
+import { LRUCache, CacheStats } from '@/shared/lru-cache';
 import { CapFacYear, createCapFacYear } from './cap-fac-year';
 import { RequestQueue, RequestQueueConfig, QueueStats } from '@/shared/request-queue';
 import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
