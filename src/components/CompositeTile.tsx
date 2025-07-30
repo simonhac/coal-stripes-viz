@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, useImperativeHandle } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, useMemo } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
 import { getDayIndex, isLeapYear } from '@/shared/date-utils';
@@ -60,10 +60,12 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
   
   // Use provided animated date range, or calculate from endDate
-  const dateRange = animatedDateRange || {
-    start: endDate.subtract({ days: 364 }), // 364 days before end = 365 days total (inclusive)
-    end: endDate
-  };
+  const dateRange = useMemo(() => {
+    return animatedDateRange || {
+      start: endDate.subtract({ days: 364 }), // 364 days before end = 365 days total (inclusive)
+      end: endDate
+    };
+  }, [animatedDateRange, endDate]);
   
   // Calculate which tiles we need synchronously
   const startYear = dateRange.start.year;
@@ -205,7 +207,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
     }
   }), [tiles, calculateFacilityAverage]);
   
-  const updateTooltip = (x: number, y: number) => {
+  const updateTooltip = useCallback((x: number, y: number) => {
     if (!onHover) return;
     
     const startYear = dateRange.start.year;
@@ -265,7 +267,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         }
       }
     }
-  };
+  }, [dateRange, onHover, tiles]);
 
   // Handle async loading of tiles that aren't in cache
   useEffect(() => {
@@ -350,7 +352,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
       currentEndYear = -1;
     };
     // Only reload tiles when pending states change
-  }, [facilityCode, dateRange.start.year, dateRange.end.year, tiles.leftState, tiles.rightState, neededTiles.leftYear, neededTiles.rightYear]);
+  }, [facilityCode, dateRange.start.year, dateRange.end.year, tiles.leftState, tiles.rightState, tiles.left, neededTiles.leftYear, neededTiles.rightYear]);
 
   useEffect(() => {
     const perfName = 'CompositeTile.render';
@@ -540,7 +542,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         animationFrameRef.current = null;
       }
     };
-  }, [dateRange, tiles, facilityCode, updateTooltip]);
+  }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight]);
   
   
   // Mouse position tracking effect
