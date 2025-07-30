@@ -290,4 +290,11 @@ export class FacilityYearTile {
     // Canvas memory: width * height * 4 bytes per pixel (RGBA)
     return this.canvas!.width * this.canvas!.height * 4;
   }
+  
+  /**
+   * Get the units for this facility
+   */
+  getUnits(): GeneratingUnitDTO[] {
+    return this.units;
+  }
 }

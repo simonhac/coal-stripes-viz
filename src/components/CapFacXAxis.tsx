@@ -153,10 +153,11 @@ export function CapFacXAxis({
   const handleMouseEnter = (month: typeof monthBars[0]) => {
     if (onHover) {
       onHover({
-        date: month.date,
+        startDate: month.date,
+        endDate: null,
         label: regionName,
         capacityFactor: month.capacityFactor,
-        isRegion: true
+        tooltipType: 'month'
       });
     }
   };

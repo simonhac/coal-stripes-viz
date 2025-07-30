@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
 import { CapFacYear } from '@/client/cap-fac-year';
@@ -140,6 +140,54 @@ function CompositeTileComponent({
   };
 
   // Update tooltip based on current mouse position
+  // Calculate capacity-weighted average capacity factor for the facility across the date range
+  const calculateFacilityAverage = useCallback(() => {
+    if (!tiles.left && !tiles.right) return null;
+    
+    let totalWeightedCapacityFactor = 0;
+    let totalCapacityDays = 0;
+    
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
+    
+    // Calculate left tile contribution
+    if (tiles.left) {
+      const leftStartDay = getDayIndex(dateRange.start);
+      const leftEndDay = startYear === endYear 
+        ? getDayIndex(dateRange.end) 
+        : getDaysInYear(startYear) - 1;
+      
+      // Get all units from the left tile
+      for (const unit of tiles.left.getUnits()) {
+        for (let day = leftStartDay; day <= leftEndDay; day++) {
+          const cf = unit.history.data[day];
+          if (cf !== null) {
+            totalWeightedCapacityFactor += cf * unit.capacity;
+            totalCapacityDays += unit.capacity;
+          }
+        }
+      }
+    }
+    
+    // Calculate right tile contribution (if spanning two years)
+    if (startYear !== endYear && tiles.right) {
+      const rightEndDay = getDayIndex(dateRange.end);
+      
+      // Get all units from the right tile
+      for (const unit of tiles.right.getUnits()) {
+        for (let day = 0; day <= rightEndDay; day++) {
+          const cf = unit.history.data[day];
+          if (cf !== null) {
+            totalWeightedCapacityFactor += cf * unit.capacity;
+            totalCapacityDays += unit.capacity;
+          }
+        }
+      }
+    }
+    
+    return totalCapacityDays > 0 ? totalWeightedCapacityFactor / totalCapacityDays : null;
+  }, [tiles, dateRange]);
+  
   const updateTooltip = (x: number, y: number) => {
     if (!onHover) return;
     
@@ -161,10 +209,11 @@ function CompositeTileComponent({
         if (tooltipData) {
           // Convert to new format
           const formattedData: any = {
-            date: tooltipData.date,
+            startDate: tooltipData.date,
+            endDate: null,
             label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
             capacityFactor: tooltipData.capacityFactor,
-            isRegion: false
+            tooltipType: 'day'
           };
           onHover(formattedData);
         }
@@ -177,10 +226,11 @@ function CompositeTileComponent({
         if (tooltipData) {
           // Convert to new format
           const formattedData: any = {
-            date: tooltipData.date,
+            startDate: tooltipData.date,
+            endDate: null,
             label: `${tooltipData.facilityName} ${tooltipData.unitName}`,
             capacityFactor: tooltipData.capacityFactor,
-            isRegion: false
+            tooltipType: 'day'
           };
           onHover(formattedData);
         }
@@ -516,7 +566,25 @@ function CompositeTileComponent({
 
   return (
     <div className="opennem-stripe-row" style={{ display: 'flex' }}>
-      <div className="opennem-facility-label">
+      <div 
+        className="opennem-facility-label"
+        style={{ cursor: onHover ? 'help' : 'default' }}
+        onMouseEnter={() => {
+          if (onHover) {
+            const avgCapacityFactor = calculateFacilityAverage();
+            if (avgCapacityFactor !== null) {
+              onHover({
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                label: facilityName,
+                capacityFactor: avgCapacityFactor,
+                tooltipType: 'period'
+              });
+            }
+          }
+        }}
+        onMouseLeave={onHoverEnd}
+      >
         {facilityName}
       </div>
       <div 

@@ -20,6 +20,7 @@ export default function Home() {
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
+  const [boundaryFlash, setBoundaryFlash] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
@@ -28,7 +29,11 @@ export default function Home() {
   // Set up navigation
   const { navigateByMonths, navigateToMonth, navigateToToday } = useNavigation({
     endDate,
-    onDateChange: setEndDate
+    onDateChange: setEndDate,
+    onBoundaryHit: () => {
+      setBoundaryFlash(true);
+      setTimeout(() => setBoundaryFlash(false), 300);
+    }
   });
   
   // Target date range (for display in header)
@@ -168,7 +173,7 @@ export default function Home() {
         {/* Main Stripes Visualization */}
         <div 
           ref={containerRef} 
-          className="opennem-stripes-viz"
+          className={`opennem-stripes-viz ${boundaryFlash ? 'boundary-flash' : ''}`}
         >
           {/* Create a section for each region */}
           {Array.from(facilitiesByRegion.entries()).map(([regionCode, facilities]) => {

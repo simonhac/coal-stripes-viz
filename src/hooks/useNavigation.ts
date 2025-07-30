@@ -6,9 +6,10 @@ import { yearDataVendor } from '@/client/year-data-vendor';
 interface NavigationOptions {
   endDate: CalendarDate | null;
   onDateChange: (newEndDate: CalendarDate) => void;
+  onBoundaryHit?: () => void;
 }
 
-export function useNavigation({ endDate, onDateChange }: NavigationOptions) {
+export function useNavigation({ endDate, onDateChange, onBoundaryHit }: NavigationOptions) {
   // Preload years for a given date range
   const preloadYearsForDate = useCallback((newEndDate: CalendarDate) => {
     const startDate = newEndDate.subtract({ days: 364 });
@@ -32,12 +33,14 @@ export function useNavigation({ endDate, onDateChange }: NavigationOptions) {
       if (endDate.compare(yesterday) < 0) {
         onDateChange(yesterday);
         preloadYearsForDate(yesterday);
+      } else if (onBoundaryHit) {
+        onBoundaryHit();
       }
     } else {
       onDateChange(newEndDate);
       preloadYearsForDate(newEndDate);
     }
-  }, [endDate, onDateChange, preloadYearsForDate]);
+  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
 
   // Navigate to a specific month (used by clicking month boxes)
   const navigateToMonth = useCallback((year: number, month: number) => {
@@ -50,13 +53,18 @@ export function useNavigation({ endDate, onDateChange }: NavigationOptions) {
     
     // Don't go past yesterday
     if (newEndDate.compare(yesterday) > 0) {
-      onDateChange(yesterday);
-      preloadYearsForDate(yesterday);
+      // Check if we would actually move the date
+      if (endDate && endDate.compare(yesterday) >= 0 && onBoundaryHit) {
+        onBoundaryHit();
+      } else {
+        onDateChange(yesterday);
+        preloadYearsForDate(yesterday);
+      }
     } else {
       onDateChange(newEndDate);
       preloadYearsForDate(newEndDate);
     }
-  }, [onDateChange, preloadYearsForDate]);
+  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
 
   // Navigate to today (minus one day)
   const navigateToToday = useCallback(() => {
