@@ -17,6 +17,7 @@ interface CompositeTileProps {
   onHoverEnd?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  minCanvasHeight?: number;
 }
 
 type TileState = 'hasData' | 'pendingData' | 'error' | 'idle';
@@ -34,7 +35,8 @@ function CompositeTileComponent({
   onHover,
   onHoverEnd,
   onFocus,
-  onBlur
+  onBlur,
+  minCanvasHeight = 20
 }: CompositeTileProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -320,12 +322,15 @@ function CompositeTileComponent({
       lastKnownHeightRef.current = canvasHeight; // Update last known height
     }
     
+    // Apply minimum height if specified
+    const displayHeight = Math.max(canvasHeight, minCanvasHeight);
+    
     // Set canvas size - keep internal resolution at 365 pixels wide
     // and let CSS stretch it
     canvas.width = 365;
     canvas.height = canvasHeight;
     canvas.style.width = '100%';
-    canvas.style.height = `${canvasHeight}px`;
+    canvas.style.height = `${displayHeight}px`;
 
     // Use date range
     const startYear = dateRange.start.year;
@@ -526,7 +531,6 @@ function CompositeTileComponent({
           ref={canvasRef}
           style={{ 
             width: '100%',
-            height: '12px',
             imageRendering: 'pixelated',
             display: 'block'
           }}

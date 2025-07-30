@@ -255,6 +255,7 @@ export default function Home() {
                           animatedDateRange={animatedDateRange}
                           onHover={handleHover}
                           onHoverEnd={handleHoverEnd}
+                          minCanvasHeight={25}
                         />
                       ))}
                       

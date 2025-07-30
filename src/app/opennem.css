@@ -303,7 +303,7 @@ header a {
 /* Individual stripe rows */
 .opennem-stripe-row {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   border: none;
   min-height: 12px; /* Minimum height, but can be larger based on capacity */
   position: relative;

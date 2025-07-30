@@ -36,9 +36,8 @@ export class FacilityYearTile {
 
   private calculateUnitHeights(useShortLabels: boolean = false): number[] {
     return this.units.map(unit => {
-      const minHeight = useShortLabels ? 16 : 12;
       // Ensure heights are always integers to avoid fractional pixel positions
-      return Math.round(Math.max(minHeight, Math.min(40, unit.capacity / 30)));
+      return Math.round(unit.capacity / 30);
     });
   }
 
