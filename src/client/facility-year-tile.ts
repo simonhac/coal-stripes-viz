@@ -57,7 +57,7 @@ export class FacilityYearTile {
       }
     }
 
-    const ctx = this.canvas.getContext('2d', { alpha: false });
+    const ctx = this.canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     if (!ctx) {
       throw new Error('Failed to get 2D context');
     }
