@@ -187,7 +187,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
           const formattedData: any = {
             startDate: tooltipData.date,
             endDate: null,
-            label: `${tooltipData.facilityName} ${unitName}`,
+            label: `${facilityName} ${unitName}`,
             capacityFactor: tooltipData.capacityFactor,
             tooltipType: 'day'
           };
@@ -210,7 +210,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
           const formattedData: any = {
             startDate: tooltipData.date,
             endDate: null,
-            label: `${tooltipData.facilityName} ${unitName}`,
+            label: `${facilityName} ${unitName}`,
             capacityFactor: tooltipData.capacityFactor,
             tooltipType: 'day'
           };
@@ -218,7 +218,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
         }
       }
     }
-  }, [dateRange, onHover, tiles]);
+  }, [dateRange, onHover, tiles, facilityName]);
 
   // Handle async loading of tiles that aren't in cache
   useEffect(() => {

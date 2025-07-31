@@ -21,9 +21,6 @@ export class FacilityYearTile {
     if (!facility.units || facility.units.length === 0) {
       throw new Error('Units array must not be empty');
     }
-    if (!facility.facilityName) {
-      throw new Error('Facility name must not be null');
-    }
     
     this.facility = facility;
     this.year = year;
@@ -206,7 +203,6 @@ export class FacilityYearTile {
     date: CalendarDate;
     capacityFactor: number | null;
     facilityCode: string;
-    facilityName: string;
     unitName: string;
     network: string;
   } | null {
@@ -249,7 +245,6 @@ export class FacilityYearTile {
       date,
       capacityFactor,
       facilityCode: this.facility.facilityCode,
-      facilityName: this.facility.facilityName,
       unitName: unit.unitName,
       network: this.facility.network
     };
@@ -276,12 +271,6 @@ export class FacilityYearTile {
     return this.facility.facilityCode;
   }
 
-  /**
-   * Get the facility name
-   */
-  getFacilityName(): string {
-    return this.facility.facilityName;
-  }
 
   /**
    * Get the memory size of the rendered canvas in bytes
