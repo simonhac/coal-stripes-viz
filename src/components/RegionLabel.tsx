@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { yearDataVendor } from '@/client/year-data-vendor';
+import { yearDataVendor, calculateAverageCapacityFactor } from '@/client/year-data-vendor';
 
 interface RegionLabelProps {
   regionCode: string;
@@ -21,7 +21,8 @@ export function RegionLabel({
 }: RegionLabelProps) {
   const handleMouseEnter = () => {
     if (onHover && dateRange) {
-      const avgCapacityFactor = yearDataVendor.calculateRegionAverage(regionCode, dateRange);
+      const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
+      const avgCapacityFactor = calculateAverageCapacityFactor(stats);
       if (avgCapacityFactor !== null) {
         onHover({
           startDate: dateRange.start,

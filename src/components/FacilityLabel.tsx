@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { yearDataVendor } from '@/client/year-data-vendor';
+import { yearDataVendor, calculateAverageCapacityFactor } from '@/client/year-data-vendor';
 
 interface FacilityLabelProps {
   facilityCode: string;
@@ -23,7 +23,8 @@ export function FacilityLabel({
 }: FacilityLabelProps) {
   const handleMouseEnter = () => {
     if (onHover) {
-      const avgCapacityFactor = yearDataVendor.calculateFacilityAverage(regionCode, facilityCode, dateRange);
+      const stats = yearDataVendor.calculateFacilityStats(regionCode, facilityCode, dateRange);
+      const avgCapacityFactor = calculateAverageCapacityFactor(stats);
       if (avgCapacityFactor !== null) {
         onHover({
           startDate: dateRange.start,

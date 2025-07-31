@@ -6,6 +6,22 @@ import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 import { CalendarDate } from '@internationalized/date';
 import { getDayIndex } from '@/shared/date-utils';
 
+export interface GenerationStats {
+  totalWeightedCapacityFactor: number;
+  totalCapacityDays: number;
+}
+
+/**
+ * Calculate average capacity factor from generation statistics
+ * Returns null if stats are null or totalCapacityDays is 0
+ */
+export function calculateAverageCapacityFactor(stats: GenerationStats | null): number | null {
+  if (stats === null || stats.totalCapacityDays === 0) {
+    return null;
+  }
+  return stats.totalWeightedCapacityFactor / stats.totalCapacityDays;
+}
+
 /**
  * Vendor for year-based capacity factor data with pre-rendered tiles
  * Always returns a promise - resolved immediately for cached data
@@ -153,10 +169,10 @@ export class YearDataVendor {
   }
 
   /**
-   * Calculate average capacity factor for a facility across a date range
+   * Calculate generation statistics for a facility across a date range
    * Returns null if data is not available in cache
    */
-  calculateFacilityAverage(regionCode: string, facilityCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): number | null {
+  calculateFacilityStats(regionCode: string, facilityCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): GenerationStats | null {
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
     
@@ -206,20 +222,20 @@ export class YearDataVendor {
       }
     }
     
-    return totalCapacityDays > 0 ? totalWeightedCapacityFactor / totalCapacityDays : null;
+    return { totalWeightedCapacityFactor, totalCapacityDays };
   }
 
   /**
-   * Calculate average capacity factor for a region across a date range
+   * Calculate generation statistics for a region across a date range
    * Returns null if data is not available in cache
    */
-  calculateRegionAverage(regionCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): number | null {
+  calculateRegionStats(regionCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): GenerationStats | null {
     let totalWeightedCapacityFactor = 0;
-    let totalCapacity = 0;
+    let totalCapacityDays = 0;
     
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
-    console.log(`calculateRegionAverage for ${regionCode}, date range: ${dateRange.start.toString()} to ${dateRange.end.toString()}, years: ${startYear}-${endYear}`);
+    // console.log(`calculateRegionStats for ${regionCode}, date range: ${dateRange.start.toString()} to ${dateRange.end.toString()}, years: ${startYear}-${endYear}`);
     
     // Get facilities for this region
     const facilitiesInRegion = this.getFacilityCodesInRegion(regionCode, startYear);
@@ -229,24 +245,19 @@ export class YearDataVendor {
       return null;
     }
     
-    // Calculate weighted average across all facilities in the region
+    // Accumulate stats across all facilities in the region
     for (const facilityCode of facilitiesInRegion) {
-      const avgCapacityFactor = this.calculateFacilityAverage(regionCode, facilityCode, dateRange);
-      if (avgCapacityFactor === null) continue; // Skip if facility data is missing
+      const facilityStats = this.calculateFacilityStats(regionCode, facilityCode, dateRange);
+      if (facilityStats === null) {
+        console.warn(`Unable to get stats for facility ${facilityCode} in region ${regionCode} - cannot calculate region average`);
+        return null;
+      }
       
-      // Get facility's total capacity from the first year's data
-      const yearData = this.getYearSync(startYear);
-      if (!yearData) return null;
-      
-      const facilityTile = yearData.facilityTiles.get(facilityCode);
-      if (!facilityTile) continue;
-      
-      const facilityCapacity = facilityTile.getTotalCapacity();
-      totalWeightedCapacityFactor += avgCapacityFactor * facilityCapacity;
-      totalCapacity += facilityCapacity;
+      totalWeightedCapacityFactor += facilityStats.totalWeightedCapacityFactor;
+      totalCapacityDays += facilityStats.totalCapacityDays;
     }
     
-    return totalCapacity > 0 ? totalWeightedCapacityFactor / totalCapacity : null;
+    return { totalWeightedCapacityFactor, totalCapacityDays };
   }
 }
 
