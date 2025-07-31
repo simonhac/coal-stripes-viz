@@ -371,6 +371,11 @@ header a {
   cursor: pointer;
 }
 
+/* Override cursor when dragging */
+.opennem-facility-canvas.is-dragging {
+  cursor: grabbing !important;
+}
+
 /* Hover indicator on stripe data container */
 .opennem-stripe-data::before {
   content: '';

@@ -642,11 +642,10 @@ const CompositeTileComponent = ({
     >
       <canvas
         ref={canvasRef}
-        className="opennem-facility-canvas"
+        className={`opennem-facility-canvas ${isDragging ? 'is-dragging' : ''}`}
         style={{ 
           width: '100%',
-          imageRendering: 'pixelated',
-          cursor: isDragging ? 'grabbing' : undefined
+          imageRendering: 'pixelated'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
