@@ -50,14 +50,13 @@ const CompositeTileComponent = ({
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
   
-  // Drag state
+  // Drag state (using state for isDragging to trigger re-renders for cursor)
+  const [isDragging, setIsDragging] = useState(false);
   const dragStateRef = useRef<{
-    isDragging: boolean;
     startX: number;
     startEndDate: CalendarDate | null;
     lastBoundaryHitTime: number;
   }>({
-    isDragging: false,
     startX: 0,
     startEndDate: null,
     lastBoundaryHitTime: 0
@@ -478,8 +477,21 @@ const CompositeTileComponent = ({
     const handleGlobalMouseMove = (e: MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
       
+      // Update hover indicator if mouse is over any canvas (even during drag)
+      const elementAtMouse = document.elementFromPoint(e.clientX, e.clientY);
+      if (elementAtMouse && elementAtMouse.classList.contains('opennem-facility-canvas')) {
+        const rect = elementAtMouse.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const canvasX = (x / rect.width) * 365; // Assuming all canvases are 365px wide internally
+        const dayColumn = Math.floor(canvasX);
+        if (dayColumn >= 0 && dayColumn < 365) {
+          const percentage = (dayColumn / 365) * 100;
+          document.documentElement.style.setProperty('--hover-x', `${percentage}%`);
+        }
+      }
+      
       // Handle dragging globally (not just on canvas)
-      if (dragStateRef.current.isDragging && dragStateRef.current.startEndDate && canvasRef.current) {
+      if (isDragging && dragStateRef.current.startEndDate && canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
         const deltaX = e.clientX - dragStateRef.current.startX;
         // Convert screen pixels to days (negative because dragging right should move back in time)
@@ -522,7 +534,7 @@ const CompositeTileComponent = ({
     };
     
     const handleGlobalMouseUp = () => {
-      if (dragStateRef.current.isDragging) {
+      if (isDragging) {
         handleMouseUp();
       }
     };
@@ -534,7 +546,7 @@ const CompositeTileComponent = ({
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [endDate]);
+  }, [endDate, isDragging]);
   
   // Handle window scroll to update tooltip
   useEffect(() => {
@@ -571,8 +583,8 @@ const CompositeTileComponent = ({
     if (e.button !== 0) return; // Only handle left click
     
     e.preventDefault();
+    setIsDragging(true);
     dragStateRef.current = {
-      isDragging: true,
       startX: e.clientX,
       startEndDate: endDate,
       lastBoundaryHitTime: 0
@@ -583,8 +595,8 @@ const CompositeTileComponent = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Skip if dragging (handled globally)
-    if (dragStateRef.current.isDragging) {
+    // Skip if dragging (tooltip is handled in global mouse move)
+    if (isDragging) {
       return;
     }
     
@@ -597,29 +609,21 @@ const CompositeTileComponent = ({
     const canvasX = (x / rect.width) * canvas.width;
     const canvasY = (y / rect.height) * canvas.height;
     
-    // Normal hover behavior
+    // Normal hover behavior - tooltip
     updateTooltip(canvasX, canvasY);
-    
-    // Update CSS variable for hover position on the document root to affect all regions
-    const dayColumn = Math.floor(canvasX);
-    if (dayColumn >= 0 && dayColumn < 365) {
-      const percentage = (dayColumn / 365) * 100;
-      // Set on document root so all regions share the same hover position
-      document.documentElement.style.setProperty('--hover-x', `${percentage}%`);
-    }
   };
 
   const handleMouseUp = () => {
     // If we were dragging, emit a final event with isDragging: false
     // This allows the animation to smooth out to the final position
-    if (dragStateRef.current.isDragging && endDate) {
+    if (isDragging && endDate) {
       const event = new CustomEvent('date-navigate', { 
         detail: { newEndDate: endDate, isDragging: false } 
       });
       window.dispatchEvent(event);
     }
     
-    dragStateRef.current.isDragging = false;
+    setIsDragging(false);
     dragStateRef.current.startX = 0;
     dragStateRef.current.startEndDate = null;
     document.body.style.cursor = '';
@@ -628,21 +632,22 @@ const CompositeTileComponent = ({
   return (
     <div 
       className="opennem-stripe-data"
-      style={{ cursor: 'grab' }}
+      style={{ cursor: isDragging ? 'grabbing' : undefined }}
     >
       <canvas
         ref={canvasRef}
         className="opennem-facility-canvas"
         style={{ 
           width: '100%',
-          imageRendering: 'pixelated'
+          imageRendering: 'pixelated',
+          cursor: isDragging ? 'grabbing' : undefined
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => {
           // Only handle hover cleanup when not dragging
-          if (!dragStateRef.current.isDragging) {
+          if (!isDragging) {
             // Clear hover position on document root
             document.documentElement.style.removeProperty('--hover-x');
             
