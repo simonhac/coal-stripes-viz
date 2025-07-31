@@ -13,8 +13,6 @@ interface CompositeTileProps {
   facilityName: string;
   regionCode: string;
   animatedDateRange?: { start: CalendarDate; end: CalendarDate };
-  onHover?: (tooltipData: any) => void;
-  onHoverEnd?: () => void;
   minCanvasHeight?: number;
 }
 
@@ -31,8 +29,6 @@ const CompositeTileComponent = ({
   facilityName,
   regionCode,
   animatedDateRange,
-  onHover,
-  onHoverEnd,
   minCanvasHeight = 20
 }: CompositeTileProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -144,7 +140,6 @@ const CompositeTileComponent = ({
 
   
   const updateTooltip = useCallback((x: number, y: number) => {
-    if (!onHover) return;
     
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
@@ -181,16 +176,13 @@ const CompositeTileComponent = ({
         tooltipData.label = `${facilityName} ${unitName}`;
       }
       
-      // Call the hover callback
-      onHover(tooltipData);
-      
       // Broadcast the tooltip data via custom event
       const event = new CustomEvent('tooltip-data-hover', { 
         detail: tooltipData
       });
       window.dispatchEvent(event);
     }
-  }, [dateRange, onHover, tiles, facilityName]);
+  }, [dateRange, tiles, facilityName]);
 
   // Handle async loading of tiles that aren't in cache
   useEffect(() => {
@@ -507,7 +499,7 @@ const CompositeTileComponent = ({
     
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [updateTooltip, onHoverEnd, facilityCode]);
+  }, [updateTooltip, facilityCode]);
   
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -550,10 +542,6 @@ const CompositeTileComponent = ({
           // Broadcast hover end event
           const event = new CustomEvent('tooltip-data-hover-end');
           window.dispatchEvent(event);
-          
-          if (onHoverEnd) {
-            onHoverEnd();
-          }
         }}
       />
     </div>

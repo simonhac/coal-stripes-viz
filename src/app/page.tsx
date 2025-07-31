@@ -18,7 +18,6 @@ export default function Home() {
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
   const [boundaryFlash, setBoundaryFlash] = useState(false);
-  const [hoveredDate, setHoveredDate] = useState<CalendarDate | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
@@ -210,8 +209,6 @@ export default function Home() {
                 endDate={endDate!}
                 animatedDateRange={animatedDateRange}
                 onMonthClick={handleMonthClick}
-                hoveredDate={hoveredDate}
-                onHoveredDateChange={setHoveredDate}
               />
             );
           })}

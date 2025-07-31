@@ -16,8 +16,6 @@ interface RegionSectionProps {
   endDate: CalendarDate;
   animatedDateRange: { start: CalendarDate; end: CalendarDate } | null;
   onMonthClick: (year: number, month: number) => void;
-  hoveredDate: CalendarDate | null;
-  onHoveredDateChange: (date: CalendarDate | null) => void;
 }
 
 export function RegionSection({
@@ -26,9 +24,7 @@ export function RegionSection({
   facilities,
   endDate,
   animatedDateRange,
-  onMonthClick,
-  hoveredDate,
-  onHoveredDateChange
+  onMonthClick
 }: RegionSectionProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   
@@ -53,48 +49,37 @@ export function RegionSection({
     return `${dateStr} ${identifier} ${cf}`.trim();
   };
   
-  // Listen for facility hover events from CompositeTile
+  // Listen for ALL tooltip hover events
   useEffect(() => {
-    const handleFacilityHover = (e: Event) => {
+    const handleTooltipHover = (e: Event) => {
       const customEvent = e as CustomEvent;
-      const data = customEvent.detail;
+      const data = customEvent.detail as TooltipData;
       
-      // Listen to ALL hover events, not just from this region
       if (data) {
-        console.log(`${regionCode} got hover: ${formatTooltipDebug(data as TooltipData)}`);
-        
-        // For now, just update the hovered date for cross-region display
-        if (data.date || data.startDate) {
-          onHoveredDateChange(data.date || data.startDate);
+        // Check if hover is from our region or another region
+        if (data.regionCode === regionCode) {
+          console.log(`${regionCode} got hover: ${formatTooltipDebug(data)}`);
+          setTooltipData(data);
+        } else {
+          console.log(`${regionCode} got ${data.regionCode}'s update`);
         }
+        
       }
     };
     
-    const handleFacilityHoverEnd = () => {
-      // console.log(`Region ${regionCode} received hover end`);
-      onHoveredDateChange(null);
+    const handleTooltipHoverEnd = () => {
+      // Clear tooltip for this region
+      setTooltipData(null);
     };
     
-    window.addEventListener('tooltip-data-hover', handleFacilityHover);
-    window.addEventListener('tooltip-data-hover-end', handleFacilityHoverEnd);
+    window.addEventListener('tooltip-data-hover', handleTooltipHover);
+    window.addEventListener('tooltip-data-hover-end', handleTooltipHoverEnd);
     
     return () => {
-      window.removeEventListener('tooltip-data-hover', handleFacilityHover);
-      window.removeEventListener('tooltip-data-hover-end', handleFacilityHoverEnd);
+      window.removeEventListener('tooltip-data-hover', handleTooltipHover);
+      window.removeEventListener('tooltip-data-hover-end', handleTooltipHoverEnd);
     };
-  }, [regionCode, onHoveredDateChange]);
-  
-  // Handle hover events from different sources and mediate them
-  const handleHover = useCallback((data: TooltipData) => {
-    console.log(`${regionCode} useCallback hover event (${data.tooltipType}):`, data);
-    
-    // Always update the tooltip
-    setTooltipData(data);
-  }, []);
-  
-  const handleHoverEnd = useCallback(() => {
-    setTooltipData(null);
-  }, []);
+  }, [regionCode]);
   
   return (
     <div key={regionCode} className="opennem-region">
@@ -104,9 +89,6 @@ export function RegionSection({
             regionCode={regionCode}
             regionName={regionName}
             dateRange={animatedDateRange}
-            onHover={handleHover}
-            onHoverEnd={handleHoverEnd}
-            hoveredDate={hoveredDate}
           />
         ) : (
           <span>{regionName}</span>
@@ -126,8 +108,6 @@ export function RegionSection({
                     facilityName={facility.name}
                     regionCode={regionCode}
                     dateRange={animatedDateRange}
-                    onHover={handleHover}
-                    onHoverEnd={handleHoverEnd}
                   />
                   <CompositeTile
                     endDate={endDate}
@@ -135,8 +115,6 @@ export function RegionSection({
                     facilityName={facility.name}
                     regionCode={regionCode}
                     animatedDateRange={animatedDateRange}
-                    onHover={handleHover}
-                    onHoverEnd={handleHoverEnd}
                     minCanvasHeight={25}
                   />
                 </div>
@@ -147,8 +125,6 @@ export function RegionSection({
               dateRange={animatedDateRange}
               regionCode={regionCode}
               regionName={regionName}
-              onHover={handleHover}
-              onHoverEnd={handleHoverEnd}
               onMonthClick={onMonthClick}
             />
           </div>

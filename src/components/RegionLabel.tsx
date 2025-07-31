@@ -8,19 +8,15 @@ interface RegionLabelProps {
   regionCode: string;
   regionName: string;
   dateRange: { start: CalendarDate; end: CalendarDate };
-  onHover?: (tooltipData: any) => void;
-  onHoverEnd?: () => void;
 }
 
 export function RegionLabel({
   regionCode,
   regionName,
-  dateRange,
-  onHover,
-  onHoverEnd
+  dateRange
 }: RegionLabelProps) {
   const handleMouseEnter = () => {
-    if (onHover && dateRange) {
+    if (dateRange) {
       const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
       const avgCapacityFactor = calculateAverageCapacityFactor(stats);
       if (avgCapacityFactor !== null) {
@@ -32,7 +28,6 @@ export function RegionLabel({
           tooltipType: 'period',
           regionCode: regionCode
         };
-        onHover(tooltipData);
         
         // Broadcast the tooltip data
         const event = new CustomEvent('tooltip-data-hover', { 
@@ -48,8 +43,6 @@ export function RegionLabel({
       style={{ cursor: 'pointer' }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => {
-        if (onHoverEnd) onHoverEnd();
-        
         // Broadcast hover end
         const event = new CustomEvent('tooltip-data-hover-end');
         window.dispatchEvent(event);

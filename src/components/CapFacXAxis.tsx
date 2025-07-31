@@ -9,8 +9,6 @@ interface CapFacXAxisProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
   regionCode: string;
   regionName: string;
-  onHover?: (tooltipData: any) => void;
-  onHoverEnd?: () => void;
   onMonthClick?: (year: number, month: number) => void;
 }
 
@@ -18,8 +16,6 @@ export function CapFacXAxis({
   dateRange, 
   regionCode,
   regionName,
-  onHover,
-  onHoverEnd,
   onMonthClick
 }: CapFacXAxisProps) {
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
@@ -146,23 +142,20 @@ export function CapFacXAxis({
   }
   
   const handleMouseEnter = (month: typeof monthBars[0]) => {
-    if (onHover) {
-      const tooltipData = {
-        startDate: month.date,
-        endDate: null,
-        label: regionName,
-        capacityFactor: month.capacityFactor,
-        tooltipType: 'month',
-        regionCode: regionCode
-      };
-      onHover(tooltipData);
-      
-      // Broadcast the tooltip data
-      const event = new CustomEvent('tooltip-data-hover', { 
-        detail: tooltipData
-      });
-      window.dispatchEvent(event);
-    }
+    const tooltipData = {
+      startDate: month.date,
+      endDate: null,
+      label: regionName,
+      capacityFactor: month.capacityFactor,
+      tooltipType: 'month',
+      regionCode: regionCode
+    };
+    
+    // Broadcast the tooltip data
+    const event = new CustomEvent('tooltip-data-hover', { 
+      detail: tooltipData
+    });
+    window.dispatchEvent(event);
   };
 
   const handleMonthClick = (month: typeof monthBars[0]) => {
@@ -191,8 +184,6 @@ export function CapFacXAxis({
                 }}
                 onMouseEnter={() => handleMouseEnter(month)}
                 onMouseLeave={() => {
-                  if (onHoverEnd) onHoverEnd();
-                  
                   // Broadcast hover end
                   const event = new CustomEvent('tooltip-data-hover-end');
                   window.dispatchEvent(event);
