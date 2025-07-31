@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
 import { getDayIndex, isLeapYear } from '@/shared/date-utils';
@@ -24,11 +24,7 @@ function getDaysInYear(year: number): number {
   return isLeapYear(year) ? 366 : 365;
 }
 
-export interface CompositeTileRef {
-  getStats: () => { avgCapacityFactor: number | null; totalCapacity: number } | null;
-}
-
-const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileProps>(({ 
+const CompositeTileComponent = ({ 
   endDate, 
   facilityCode,
   facilityName,
@@ -36,7 +32,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
   onHover,
   onHoverEnd,
   minCanvasHeight = 20
-}: CompositeTileProps, ref) => {
+}: CompositeTileProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Store both tiles in a single state to ensure atomic updates
@@ -144,19 +140,6 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
     }
   };
 
-  
-  // Expose getStats method via ref
-  useImperativeHandle(ref, () => ({
-    getStats: () => {
-      if (!tiles.left) return null;
-      
-      const totalCapacity = tiles.left.getTotalCapacity();
-      
-      return {
-        totalCapacity
-      };
-    }
-  }), [tiles]);
   
   const updateTooltip = useCallback((x: number, y: number) => {
     if (!onHover) return;
@@ -581,7 +564,7 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
       />
     </div>
   );
-});
+};
 
 CompositeTileComponent.displayName = 'CompositeTile';
 

@@ -8,6 +8,7 @@ export interface CapFacYear {
   facilityTiles: Map<string, FacilityYearTile>;
   regionCapacityFactors: Map<string, (number | null)[]>; // Map of region name to array of 12 monthly capacity-weighted capacity factors
   totalSizeBytes: number;
+  daysInYear: number;
 }
 
 /**
@@ -97,11 +98,17 @@ export function createCapFacYear(
   
   const totalSizeBytes = jsonSizeBytes + canvasSizeBytes;
   
+  // Determine days in year from the data
+  const daysInYear = data.data.length > 0 && data.data[0].history.data 
+    ? data.data[0].history.data.length 
+    : 365;
+  
   return {
     year,
     data,
     facilityTiles,
     regionCapacityFactors,
-    totalSizeBytes
+    totalSizeBytes,
+    daysInYear
   };
 }

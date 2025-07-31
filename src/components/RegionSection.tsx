@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { CompositeTile, CompositeTileRef } from './CompositeTile';
+import { CompositeTile } from './CompositeTile';
 import { CapFacTooltip, TooltipData } from './CapFacTooltip';
 import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
@@ -26,15 +26,6 @@ export function RegionSection({
   onMonthClick
 }: RegionSectionProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
-  const tileRefs = useRef<Map<string, React.RefObject<CompositeTileRef | null>>>(new Map());
-  
-  // Initialize refs for facilities
-  facilities.forEach(facility => {
-    if (!tileRefs.current.has(facility.code)) {
-      const newRef = React.createRef<CompositeTileRef>();
-      tileRefs.current.set(facility.code, newRef);
-    }
-  });
   
   const handleHover = useCallback((data: TooltipData) => {
     setTooltipData(data);
@@ -66,8 +57,6 @@ export function RegionSection({
           <div className="opennem-facility-group">
             {/* Display all facilities for this region */}
             {facilities.map(facility => {
-              const ref = tileRefs.current.get(facility.code);
-              if (!ref) return null; // This should never happen due to initialization above
               return (
                 <div key={facility.code} className="opennem-stripe-row" style={{ display: 'flex' }}>
                   <FacilityLabel
@@ -79,7 +68,6 @@ export function RegionSection({
                     onHoverEnd={handleHoverEnd}
                   />
                   <CompositeTile
-                    ref={ref}
                     endDate={endDate}
                     facilityCode={facility.code}
                     facilityName={facility.name}
