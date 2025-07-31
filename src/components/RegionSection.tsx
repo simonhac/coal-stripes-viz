@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { CompositeTile } from './CompositeTile';
 import { CapFacTooltip, TooltipData, getTooltipFormattedDate } from './CapFacTooltip';
 import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
-import { getMonthName } from '@/shared/date-utils';
 
 interface RegionSectionProps {
   regionCode: string;

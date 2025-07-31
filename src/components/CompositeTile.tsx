@@ -27,7 +27,7 @@ const CompositeTileComponent = ({
   endDate, 
   facilityCode,
   facilityName,
-  regionCode,
+  regionCode: _regionCode,
   animatedDateRange,
   minCanvasHeight = 20
 }: CompositeTileProps) => {

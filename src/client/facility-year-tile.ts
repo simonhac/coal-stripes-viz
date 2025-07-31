@@ -1,6 +1,5 @@
 import { Facility, GeneratingUnit } from '@/shared/types';
 import { TILE_CONFIG } from '@/shared/config';
-import { CalendarDate } from '@internationalized/date';
 import { getDateFromIndex } from '@/shared/date-utils';
 import { capacityFactorColorMap } from '@/shared/capacity-factor-color-map';
 import { featureFlags } from '@/shared/feature-flags';
