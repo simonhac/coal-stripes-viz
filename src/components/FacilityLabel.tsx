@@ -23,7 +23,7 @@ export function FacilityLabel({
 }: FacilityLabelProps) {
   const handleMouseEnter = () => {
     if (onHover) {
-      const avgCapacityFactor = yearDataVendor.calculateFacilityAverage(facilityCode, dateRange);
+      const avgCapacityFactor = yearDataVendor.calculateFacilityAverage(regionCode, facilityCode, dateRange);
       if (avgCapacityFactor !== null) {
         onHover({
           startDate: dateRange.start,

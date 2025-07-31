@@ -156,7 +156,7 @@ export class YearDataVendor {
    * Calculate average capacity factor for a facility across a date range
    * Returns null if data is not available in cache
    */
-  calculateFacilityAverage(facilityCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): number | null {
+  calculateFacilityAverage(regionCode: string, facilityCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): number | null {
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
     
@@ -231,7 +231,7 @@ export class YearDataVendor {
     
     // Calculate weighted average across all facilities in the region
     for (const facilityCode of facilitiesInRegion) {
-      const avgCapacityFactor = this.calculateFacilityAverage(facilityCode, dateRange);
+      const avgCapacityFactor = this.calculateFacilityAverage(regionCode, facilityCode, dateRange);
       if (avgCapacityFactor === null) continue; // Skip if facility data is missing
       
       // Get facility's total capacity from the first year's data
