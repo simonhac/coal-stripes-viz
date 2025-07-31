@@ -18,10 +18,31 @@ export default function Home() {
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
   const [boundaryFlash, setBoundaryFlash] = useState(false);
+  const [hoveredDate, setHoveredDate] = useState<CalendarDate | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate);
+  
+  // // Debug: Listen for hover events
+  // useEffect(() => {
+  //   const handleHover = (e: Event) => {
+  //     const customEvent = e as CustomEvent;
+  //     console.log('Tooltip data hover event:', customEvent.detail);
+  //   };
+    
+  //   const handleHoverEnd = () => {
+  //     console.log('Tooltip data hover end');
+  //   };
+    
+  //   window.addEventListener('tooltip-data-hover', handleHover);
+  //   window.addEventListener('tooltip-data-hover-end', handleHoverEnd);
+    
+  //   return () => {
+  //     window.removeEventListener('tooltip-data-hover', handleHover);
+  //     window.removeEventListener('tooltip-data-hover-end', handleHoverEnd);
+  //   };
+  // }, []);
   
   // Set up navigation
   const { navigateToMonth } = useNavigation({
@@ -189,6 +210,8 @@ export default function Home() {
                 endDate={endDate!}
                 animatedDateRange={animatedDateRange}
                 onMonthClick={handleMonthClick}
+                hoveredDate={hoveredDate}
+                onHoveredDateChange={setHoveredDate}
               />
             );
           })}

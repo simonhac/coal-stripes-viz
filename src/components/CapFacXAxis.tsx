@@ -147,13 +147,21 @@ export function CapFacXAxis({
   
   const handleMouseEnter = (month: typeof monthBars[0]) => {
     if (onHover) {
-      onHover({
+      const tooltipData = {
         startDate: month.date,
         endDate: null,
         label: regionName,
         capacityFactor: month.capacityFactor,
-        tooltipType: 'month'
+        tooltipType: 'month',
+        regionCode: regionCode
+      };
+      onHover(tooltipData);
+      
+      // Broadcast the tooltip data
+      const event = new CustomEvent('tooltip-data-hover', { 
+        detail: tooltipData
       });
+      window.dispatchEvent(event);
     }
   };
 
@@ -182,7 +190,13 @@ export function CapFacXAxis({
                   cursor: onMonthClick ? 'pointer' : 'default'
                 }}
                 onMouseEnter={() => handleMouseEnter(month)}
-                onMouseLeave={onHoverEnd}
+                onMouseLeave={() => {
+                  if (onHoverEnd) onHoverEnd();
+                  
+                  // Broadcast hover end
+                  const event = new CustomEvent('tooltip-data-hover-end');
+                  window.dispatchEvent(event);
+                }}
                 onClick={() => handleMonthClick(month)}
               >
                 {useShortLabels ? month.labelShort : month.labelLong}

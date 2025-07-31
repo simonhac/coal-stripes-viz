@@ -11,6 +11,7 @@ interface CompositeTileProps {
   endDate: CalendarDate;
   facilityCode: string;
   facilityName: string;
+  regionCode: string;
   animatedDateRange?: { start: CalendarDate; end: CalendarDate };
   onHover?: (tooltipData: any) => void;
   onHoverEnd?: () => void;
@@ -28,6 +29,7 @@ const CompositeTileComponent = ({
   endDate, 
   facilityCode,
   facilityName,
+  regionCode,
   animatedDateRange,
   onHover,
   onHoverEnd,
@@ -154,12 +156,16 @@ const CompositeTileComponent = ({
       : getDaysInYear(startYear) - 1; // 0-based index for last day of year
     const leftWidth = leftEndDay - leftStartDay + 1;
     
+    let hoveredDate: CalendarDate | null = null;
+    
     if (x < leftWidth) {
       // Mouse is in left tile
       if (tiles.left) {
         const tileX = x + leftStartDay;
         const tooltipData = tiles.left.getTooltipData(tileX, y);
         if (tooltipData) {
+          hoveredDate = tooltipData.date;
+          
           // Format unit name - for WA units, show only the part after underscore
           let unitName = tooltipData.unitName;
           if (tooltipData.network.toUpperCase() === 'WEM' && unitName.includes('_')) {
@@ -172,7 +178,8 @@ const CompositeTileComponent = ({
             endDate: null,
             label: `${facilityName} ${unitName}`,
             capacityFactor: tooltipData.capacityFactor,
-            tooltipType: 'day'
+            tooltipType: 'day',
+            regionCode: regionCode
           };
           onHover(formattedData);
         }
@@ -183,6 +190,8 @@ const CompositeTileComponent = ({
         const tileX = x - leftWidth;
         const tooltipData = tiles.right.getTooltipData(tileX, y);
         if (tooltipData) {
+          hoveredDate = tooltipData.date;
+          
           // Format unit name - for WA units, show only the part after underscore
           let unitName = tooltipData.unitName;
           if (tooltipData.network.toUpperCase() === 'WEM' && unitName.includes('_')) {
@@ -195,10 +204,29 @@ const CompositeTileComponent = ({
             endDate: null,
             label: `${facilityName} ${unitName}`,
             capacityFactor: tooltipData.capacityFactor,
-            tooltipType: 'day'
+            tooltipType: 'day',
+            regionCode: regionCode
           };
           onHover(formattedData);
         }
+      }
+    }
+    
+    // Broadcast the tooltip data via custom event
+    if (hoveredDate && x >= 0) {
+      // Get the raw tooltip data that contains all the info
+      let tooltipData = null;
+      if (x < leftWidth && tiles.left) {
+        tooltipData = tiles.left.getTooltipData(x + leftStartDay, y);
+      } else if (x >= leftWidth && tiles.right) {
+        tooltipData = tiles.right.getTooltipData(x - leftWidth, y);
+      }
+      
+      if (tooltipData) {
+        const event = new CustomEvent('tooltip-data-hover', { 
+          detail: tooltipData
+        });
+        window.dispatchEvent(event);
       }
     }
   }, [dateRange, onHover, tiles, facilityName]);
@@ -557,6 +585,11 @@ const CompositeTileComponent = ({
         onMouseLeave={() => {
           // Clear hover position on document root
           document.documentElement.style.removeProperty('--hover-x');
+          
+          // Broadcast hover end event
+          const event = new CustomEvent('tooltip-data-hover-end');
+          window.dispatchEvent(event);
+          
           if (onHoverEnd) {
             onHoverEnd();
           }

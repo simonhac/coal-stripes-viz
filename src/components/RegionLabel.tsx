@@ -24,13 +24,21 @@ export function RegionLabel({
       const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
       const avgCapacityFactor = calculateAverageCapacityFactor(stats);
       if (avgCapacityFactor !== null) {
-        onHover({
+        const tooltipData = {
           startDate: dateRange.start,
           endDate: dateRange.end,
           label: regionName,
           capacityFactor: avgCapacityFactor,
-          tooltipType: 'period'
+          tooltipType: 'period',
+          regionCode: regionCode
+        };
+        onHover(tooltipData);
+        
+        // Broadcast the tooltip data
+        const event = new CustomEvent('tooltip-data-hover', { 
+          detail: tooltipData
         });
+        window.dispatchEvent(event);
       }
     }
   };
@@ -39,7 +47,13 @@ export function RegionLabel({
     <span 
       style={{ cursor: 'pointer' }}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={onHoverEnd}
+      onMouseLeave={() => {
+        if (onHoverEnd) onHoverEnd();
+        
+        // Broadcast hover end
+        const event = new CustomEvent('tooltip-data-hover-end');
+        window.dispatchEvent(event);
+      }}
     >
       {regionName}
     </span>
