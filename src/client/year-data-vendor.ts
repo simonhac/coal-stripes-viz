@@ -52,9 +52,6 @@ export class YearDataVendor {
    */
   getYearSync(year: number): CapFacYear | null {
     const result = this.cache.get(year.toString());
-    if (!result) {
-      console.log(`getYearSync(${year}) returned null, cache size: ${this.cache.size()}`);
-    }
     return result || null;
   }
 

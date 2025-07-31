@@ -29,7 +29,7 @@ export function RegionSection({
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   
   // Debug helper to format tooltip data
-  const formatTooltipDebug = (data: TooltipData): string => {
+  const _formatTooltipDebug = (data: TooltipData): string => {
     // Format date
     const dateStr = getTooltipFormattedDate(data);
     
@@ -58,7 +58,7 @@ export function RegionSection({
       if (data) {
         // Check if hover is from our region or another region
         if (data.regionCode === regionCode) {
-          console.log(`${regionCode} got hover: ${formatTooltipDebug(data)}`);
+          // console.log(`${regionCode} got hover: ${formatTooltipDebug(data)}`);
           setTooltipData(data);
         } else {
           // the hover is for a different region -- create an appropriate data object for this region
@@ -88,22 +88,17 @@ export function RegionSection({
           const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
           const avgCapacityFactor = calculateAverageCapacityFactor(stats);
           
-          if (avgCapacityFactor !== null) {
-            const myTooltipData: TooltipData = {
-              startDate: data.startDate,
-              endDate: data.tooltipType === 'day' ? null : data.endDate,
-              label: regionName,
-              capacityFactor: avgCapacityFactor,
-              tooltipType: data.tooltipType,
-              regionCode: regionCode
-            };
-            
-            // console.log(`${regionCode} got ${data.regionCode}'s update: ${formatTooltipDebug(myTooltipData)}`);
-            setTooltipData(myTooltipData);
-          } else {
-            console.log(`${regionCode} got ${data.regionCode}'s update but couldn't calculate stats`);
-            setTooltipData(null);
+          const myTooltipData: TooltipData = {
+            startDate: data.startDate,
+            endDate: data.tooltipType === 'day' ? null : data.endDate,
+            label: regionName,
+            capacityFactor:  avgCapacityFactor,
+            tooltipType: data.tooltipType,
+            regionCode: regionCode 
           }
+        
+          // console.log(`${regionCode} got ${data.regionCode}'s update: ${formatTooltipDebug(myTooltipData)}`);
+          setTooltipData(myTooltipData);
         }
       }
     };
@@ -120,7 +115,7 @@ export function RegionSection({
       window.removeEventListener('tooltip-data-hover', handleTooltipHover);
       window.removeEventListener('tooltip-data-hover-end', handleTooltipHoverEnd);
     };
-  }, [regionCode]);
+  }, [regionCode, regionName]);
   
   if (!animatedDateRange) {
     return null;
