@@ -7,6 +7,7 @@ import { CapFacTooltip, TooltipData, getTooltipFormattedDate } from './CapFacToo
 import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
+import { yearDataVendor, calculateAverageCapacityFactor } from '@/client/year-data-vendor';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -60,9 +61,50 @@ export function RegionSection({
           console.log(`${regionCode} got hover: ${formatTooltipDebug(data)}`);
           setTooltipData(data);
         } else {
-          console.log(`${regionCode} got ${data.regionCode}'s update`);
+          // the hover is for a different region -- create an appropriate data object for this region
+          
+          // Determine date range based on tooltip type
+          let dateRange: { start: CalendarDate; end: CalendarDate };
+
+          switch (data.tooltipType) {
+            case 'day':
+              // For a single day, create a range of just that day
+              dateRange = { start: data.startDate, end: data.startDate };
+              break;
+
+            case 'month':
+            case 'period':
+              // For month or period, use the provided range
+              dateRange = { start: data.startDate, end: data.endDate || data.startDate };
+              break;
+
+            default:
+              console.log(`${regionCode} got ${data.regionCode}'s update with unknown tooltip type`);
+              setTooltipData(null);
+              return;
+          }
+          
+          // Calculate capacity factor for our region
+          const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
+          const avgCapacityFactor = calculateAverageCapacityFactor(stats);
+          
+          if (avgCapacityFactor !== null) {
+            const myTooltipData: TooltipData = {
+              startDate: data.startDate,
+              endDate: data.tooltipType === 'day' ? null : data.endDate,
+              label: regionName,
+              capacityFactor: avgCapacityFactor,
+              tooltipType: data.tooltipType,
+              regionCode: regionCode
+            };
+            
+            // console.log(`${regionCode} got ${data.regionCode}'s update: ${formatTooltipDebug(myTooltipData)}`);
+            setTooltipData(myTooltipData);
+          } else {
+            console.log(`${regionCode} got ${data.regionCode}'s update but couldn't calculate stats`);
+            setTooltipData(null);
+          }
         }
-        
       }
     };
     
@@ -80,54 +122,51 @@ export function RegionSection({
     };
   }, [regionCode]);
   
+  if (!animatedDateRange) {
+    return null;
+  }
+
   return (
     <div key={regionCode} className="opennem-region">
       <div className="opennem-region-header">
-        {animatedDateRange ? (
-          <RegionLabel
-            regionCode={regionCode}
-            regionName={regionName}
-            dateRange={animatedDateRange}
-          />
-        ) : (
-          <span>{regionName}</span>
-        )}
+        <RegionLabel
+          regionCode={regionCode}
+          regionName={regionName}
+          dateRange={animatedDateRange}
+        />
         <CapFacTooltip data={tooltipData} />
       </div>
       <div className="opennem-region-content">
-        {/* Display tiles */}
-        {animatedDateRange && (
-          <div className="opennem-facility-group">
-            {/* Display all facilities for this region */}
-            {facilities.map(facility => {
-              return (
-                <div key={facility.code} className="opennem-stripe-row" style={{ display: 'flex' }}>
-                  <FacilityLabel
-                    facilityCode={facility.code}
-                    facilityName={facility.name}
-                    regionCode={regionCode}
-                    dateRange={animatedDateRange}
-                  />
-                  <CompositeTile
-                    endDate={endDate}
-                    facilityCode={facility.code}
-                    facilityName={facility.name}
-                    regionCode={regionCode}
-                    animatedDateRange={animatedDateRange}
-                    minCanvasHeight={25}
-                  />
-                </div>
-              );
-            })}
-            
-            <CapFacXAxis 
-              dateRange={animatedDateRange}
-              regionCode={regionCode}
-              regionName={regionName}
-              onMonthClick={onMonthClick}
-            />
-          </div>
-        )}
+        <div className="opennem-facility-group">
+          {/* Display all facilities for this region */}
+          {facilities.map(facility => {
+            return (
+              <div key={facility.code} className="opennem-stripe-row" style={{ display: 'flex' }}>
+                <FacilityLabel
+                  facilityCode={facility.code}
+                  facilityName={facility.name}
+                  regionCode={regionCode}
+                  dateRange={animatedDateRange}
+                />
+                <CompositeTile
+                  endDate={endDate}
+                  facilityCode={facility.code}
+                  facilityName={facility.name}
+                  regionCode={regionCode}
+                  animatedDateRange={animatedDateRange}
+                  minCanvasHeight={25}
+                />
+              </div>
+            );
+          })}
+          
+          <CapFacXAxis 
+            dateRange={animatedDateRange}
+            regionCode={regionCode}
+            regionName={regionName}
+            onMonthClick={onMonthClick}
+          />
+        </div>
       </div>
     </div>
   );

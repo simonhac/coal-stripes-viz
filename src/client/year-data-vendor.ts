@@ -234,8 +234,6 @@ export class YearDataVendor {
     let totalCapacityDays = 0;
     
     const startYear = dateRange.start.year;
-    // const endYear = dateRange.end.year;
-    // console.log(`calculateRegionStats for ${regionCode}, date range: ${dateRange.start.toString()} to ${dateRange.end.toString()}, years: ${startYear}-${endYear}`);
     
     // Get facilities for this region
     const facilitiesInRegion = this.getFacilityCodesInRegion(regionCode, startYear);
