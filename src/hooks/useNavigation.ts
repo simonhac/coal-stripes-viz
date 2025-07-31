@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
+import { DATE_BOUNDARIES } from '@/shared/config';
 
 interface NavigationOptions {
   endDate: CalendarDate | null;
@@ -25,16 +26,27 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
   // Navigate to a specific date (used by drag navigation)
   const navigateToDate = useCallback((newEndDate: CalendarDate) => {
     const yesterday = getTodayAEST().subtract({ days: 1 });
+    const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
     
-    // Don't go past yesterday
+    // Check both boundaries
     if (newEndDate.compare(yesterday) > 0) {
+      // Trying to go past yesterday
       if (!endDate || endDate.compare(yesterday) < 0) {
         onDateChange(yesterday);
         preloadYearsForDate(yesterday);
       } else if (onBoundaryHit) {
         onBoundaryHit();
       }
+    } else if (newEndDate.compare(earliestDate) < 0) {
+      // Trying to go before earliest date
+      if (!endDate || endDate.compare(earliestDate) > 0) {
+        onDateChange(earliestDate);
+        preloadYearsForDate(earliestDate);
+      } else if (onBoundaryHit) {
+        onBoundaryHit();
+      }
     } else {
+      // Date is within valid range
       onDateChange(newEndDate);
       preloadYearsForDate(newEndDate);
     }
@@ -46,17 +58,27 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
     
     const newEndDate = endDate.add({ months });
     const yesterday = getTodayAEST().subtract({ days: 1 });
+    const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
     
-    
-    // Don't go past yesterday
+    // Check both boundaries
     if (newEndDate.compare(yesterday) > 0) {
+      // Trying to go past yesterday
       if (endDate.compare(yesterday) < 0) {
         onDateChange(yesterday);
         preloadYearsForDate(yesterday);
       } else if (onBoundaryHit) {
         onBoundaryHit();
       }
+    } else if (newEndDate.compare(earliestDate) < 0) {
+      // Trying to go before earliest date
+      if (endDate.compare(earliestDate) > 0) {
+        onDateChange(earliestDate);
+        preloadYearsForDate(earliestDate);
+      } else if (onBoundaryHit) {
+        onBoundaryHit();
+      }
     } else {
+      // Date is within valid range
       onDateChange(newEndDate);
       preloadYearsForDate(newEndDate);
     }
@@ -69,22 +91,8 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
     const firstOfMonth = new CalendarDate(year, month, 1);
     const newEndDate = firstOfMonth.add({ days: 364 });
     
-    const yesterday = getTodayAEST().subtract({ days: 1 });
-    
-    // Don't go past yesterday
-    if (newEndDate.compare(yesterday) > 0) {
-      // Check if we would actually move the date
-      if (endDate && endDate.compare(yesterday) >= 0 && onBoundaryHit) {
-        onBoundaryHit();
-      } else {
-        onDateChange(yesterday);
-        preloadYearsForDate(yesterday);
-      }
-    } else {
-      onDateChange(newEndDate);
-      preloadYearsForDate(newEndDate);
-    }
-  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
+    navigateToDate(newEndDate);
+  }, [navigateToDate]);
 
   // Navigate to today (minus one day)
   const navigateToToday = useCallback(() => {
@@ -96,21 +104,9 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
   const navigateToYearStart = useCallback((targetYear: number) => {
     const jan1 = new CalendarDate(targetYear, 1, 1);
     const newEndDate = jan1.add({ days: 364 });
-    const yesterday = getTodayAEST().subtract({ days: 1 });
     
-    // Don't go past yesterday
-    if (newEndDate.compare(yesterday) > 0) {
-      if (endDate && endDate.compare(yesterday) >= 0 && onBoundaryHit) {
-        onBoundaryHit();
-      } else {
-        onDateChange(yesterday);
-        preloadYearsForDate(yesterday);
-      }
-    } else {
-      onDateChange(newEndDate);
-      preloadYearsForDate(newEndDate);
-    }
-  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
+    navigateToDate(newEndDate);
+  }, [navigateToDate]);
 
   // Keyboard navigation
   useEffect(() => {

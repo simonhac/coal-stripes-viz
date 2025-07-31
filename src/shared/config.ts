@@ -2,6 +2,8 @@
  * Central configuration for the coal stripes visualization
  */
 
+import { CalendarDate } from '@internationalized/date';
+
 // Drag interaction configuration  
 export const DRAG_CONFIG = {
   DEBOUNCE_DELAY: 150,              // Milliseconds to debounce drag updates
@@ -28,6 +30,12 @@ export const UI_CONFIG = {
 export const API_CONFIG = {
   BASE_URL: '/api/coal-stripes',    // Base URL for API calls
   DEFAULT_TIMEZONE: 'Australia/Brisbane',
+} as const;
+
+// Date boundaries
+export const DATE_BOUNDARIES = {
+  // The earliest date we can show data from (365 days will show from Jan 1, 2006)
+  EARLIEST_END_DATE: new CalendarDate(2006, 12, 31),
 } as const;
 
 // Tile rendering configuration
