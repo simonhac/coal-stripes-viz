@@ -14,7 +14,6 @@ interface CompositeTileProps {
   regionCode: string;
   animatedDateRange?: { start: CalendarDate; end: CalendarDate };
   minCanvasHeight?: number;
-  onDateNavigate?: (newEndDate: CalendarDate) => void;
 }
 
 type TileState = 'hasData' | 'pendingData' | 'error' | 'idle';
