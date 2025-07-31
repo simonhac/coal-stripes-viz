@@ -18,10 +18,11 @@ export default function Home() {
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
   const [boundaryFlash, setBoundaryFlash] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
-  const animatedDateRange = useAnimatedDateRange(endDate);
+  const animatedDateRange = useAnimatedDateRange(endDate, { skipAnimation: isDragging });
   
   // // Debug: Listen for hover events
   // useEffect(() => {
@@ -44,17 +45,55 @@ export default function Home() {
   // }, []);
   
   // Set up navigation
-  const { navigateToMonth } = useNavigation({
+  const { navigateToMonth, navigateToDate } = useNavigation({
     endDate,
     onDateChange: setEndDate,
     onBoundaryHit: () => {
       setBoundaryFlash(true);
       setTimeout(() => setBoundaryFlash(false), 300);
-    }
+    },
+    isDragging
   });
   
   // Use navigateToMonth directly as it already has the correct signature
   const handleMonthClick = navigateToMonth;
+  
+  // Handle drag navigation from tiles
+  useEffect(() => {
+    const handleDateNavigate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { newEndDate, isDragging } = customEvent.detail;
+      // console.log('📅 date-navigate event received:', {
+      //   newEndDate: newEndDate?.toString(),
+      //   currentEndDate: endDate?.toString(),
+      //   isDragging,
+      //   timestamp: Date.now()
+      // });
+      if (newEndDate) {
+        setIsDragging(isDragging);
+        if (isDragging) {
+          // During drag, update date directly without animation
+          setEndDate(newEndDate);
+        } else {
+          // On drag end or other navigation, use animation
+          navigateToDate(newEndDate);
+        }
+      }
+    };
+    
+    const handleBoundaryHit = () => {
+      setBoundaryFlash(true);
+      setTimeout(() => setBoundaryFlash(false), 300);
+    };
+    
+    window.addEventListener('date-navigate', handleDateNavigate);
+    window.addEventListener('navigation-boundary-hit', handleBoundaryHit);
+    
+    return () => {
+      window.removeEventListener('date-navigate', handleDateNavigate);
+      window.removeEventListener('navigation-boundary-hit', handleBoundaryHit);
+    };
+  }, [navigateToDate, endDate, setEndDate]);
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {

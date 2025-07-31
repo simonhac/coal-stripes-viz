@@ -7,7 +7,7 @@ interface AnimatedDateRange {
   end: CalendarDate;
 }
 
-export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
+export function useAnimatedDateRange(targetEndDate: CalendarDate | null, options?: { skipAnimation?: boolean }) {
   // Current animated range
   const [currentRange, setCurrentRange] = useState<AnimatedDateRange | null>(
     targetEndDate ? { start: targetEndDate.subtract({ days: 364 }), end: targetEndDate } : null
@@ -66,8 +66,14 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
     // Check if we should animate
     const daysDiff = getDaysBetween(currentRange.start, targetRange.start);
     
+    // Skip animation if requested
+    if (options?.skipAnimation) {
+      anim.isActive = false;
+      setCurrentRange(targetRange);
+      setIsAnimating(false);
+    }
     // Only animate if change is not "too much"
-    if (Math.abs(daysDiff) > 0 && Math.abs(daysDiff) <= 2000) {
+    else if (Math.abs(daysDiff) > 0 && Math.abs(daysDiff) <= 2000) {
       anim.fromStart = currentRange.start;
       anim.targetStart = targetRange.start;
       anim.animationStartTime = performance.now();
@@ -79,7 +85,7 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null) {
       setCurrentRange(targetRange);
       setIsAnimating(false);
     }
-  }, [targetEndDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [targetEndDate, options?.skipAnimation]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Cubic easing function (ease-in-out)
   const cubicEaseInOut = (t: number): number => {

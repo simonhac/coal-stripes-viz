@@ -7,9 +7,10 @@ interface NavigationOptions {
   endDate: CalendarDate | null;
   onDateChange: (newEndDate: CalendarDate) => void;
   onBoundaryHit?: () => void;
+  isDragging?: boolean;
 }
 
-export function useNavigation({ endDate, onDateChange, onBoundaryHit }: NavigationOptions) {
+export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging }: NavigationOptions) {
   // Preload years for a given date range
   const preloadYearsForDate = useCallback((newEndDate: CalendarDate) => {
     const startDate = newEndDate.subtract({ days: 364 });
@@ -20,6 +21,24 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
       });
     });
   }, []);
+
+  // Navigate to a specific date (used by drag navigation)
+  const navigateToDate = useCallback((newEndDate: CalendarDate) => {
+    const yesterday = getTodayAEST().subtract({ days: 1 });
+    
+    // Don't go past yesterday
+    if (newEndDate.compare(yesterday) > 0) {
+      if (!endDate || endDate.compare(yesterday) < 0) {
+        onDateChange(yesterday);
+        preloadYearsForDate(yesterday);
+      } else if (onBoundaryHit) {
+        onBoundaryHit();
+      }
+    } else {
+      onDateChange(newEndDate);
+      preloadYearsForDate(newEndDate);
+    }
+  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
 
   // Navigate by months (used by keyboard navigation)
   const navigateByMonths = useCallback((months: number) => {
@@ -70,9 +89,8 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
   // Navigate to today (minus one day)
   const navigateToToday = useCallback(() => {
     const yesterday = getTodayAEST().subtract({ days: 1 });
-    onDateChange(yesterday);
-    preloadYearsForDate(yesterday);
-  }, [onDateChange, preloadYearsForDate]);
+    navigateToDate(yesterday);
+  }, [navigateToDate]);
 
   // Navigate to January 1 of a given year
   const navigateToYearStart = useCallback((targetYear: number) => {
@@ -101,6 +119,9 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
+
+      // Don't handle keyboard navigation while dragging
+      if (isDragging) return;
 
       // Only handle if we have an end date
       if (!endDate) return;
@@ -144,11 +165,12 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit }: Navigati
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [endDate, navigateByMonths, navigateToToday, navigateToYearStart]);
+  }, [endDate, navigateByMonths, navigateToToday, navigateToYearStart, isDragging]);
 
   return {
     navigateByMonths,
     navigateToMonth,
     navigateToToday,
+    navigateToDate,
   };
 }
