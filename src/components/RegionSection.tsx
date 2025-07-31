@@ -3,10 +3,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { CompositeTile } from './CompositeTile';
-import { CapFacTooltip, TooltipData } from './CapFacTooltip';
+import { CapFacTooltip, TooltipData, getTooltipFormattedDate } from './CapFacTooltip';
 import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
+import { getMonthName } from '@/shared/date-utils';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -31,6 +32,27 @@ export function RegionSection({
 }: RegionSectionProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
   
+  // Debug helper to format tooltip data
+  const formatTooltipDebug = (data: TooltipData): string => {
+    // Format date
+    const dateStr = getTooltipFormattedDate(data);
+    
+    // Build identifier
+    const network = data.network || '';
+    const region = data.regionCode;
+    const facility = data.facilityCode || '';
+    const unit = data.unitName || '';
+    const parts = [network, region, facility, unit].filter(p => p);
+    const identifier = parts.length > 0 ? parts.join('.') : data.label;
+    
+    // Format capacity factor
+    const cf = data.capacityFactor !== null 
+      ? `${data.capacityFactor.toFixed(1)}%` 
+      : '—';
+    
+    return `${dateStr} ${identifier} ${cf}`.trim();
+  };
+  
   // Listen for facility hover events from CompositeTile
   useEffect(() => {
     const handleFacilityHover = (e: Event) => {
@@ -39,7 +61,7 @@ export function RegionSection({
       
       // Listen to ALL hover events, not just from this region
       if (data) {
-        console.log(`Region ${regionCode} received hover event from ${data.regionCode}:`, data);
+        console.log(`${regionCode} got hover: ${formatTooltipDebug(data as TooltipData)}`);
         
         // For now, just update the hovered date for cross-region display
         if (data.date || data.startDate) {

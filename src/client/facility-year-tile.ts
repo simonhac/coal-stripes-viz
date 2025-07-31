@@ -4,6 +4,7 @@ import { CalendarDate } from '@internationalized/date';
 import { getDateFromIndex } from '@/shared/date-utils';
 import { capacityFactorColorMap } from '@/shared/capacity-factor-color-map';
 import { featureFlags } from '@/shared/feature-flags';
+import { TooltipData } from '@/components/CapFacTooltip';
 
 export class FacilityYearTile {
   private facility: Facility;
@@ -199,13 +200,7 @@ export class FacilityYearTile {
    * @param y Y coordinate within the tile (0-based)
    * @returns Tooltip data including date and capacity factor, or null if out of bounds
    */
-  getTooltipData(x: number, y: number): {
-    date: CalendarDate;
-    capacityFactor: number | null;
-    facilityCode: string;
-    unitName: string;
-    network: string;
-  } | null {
+  getTooltipData(x: number, y: number): TooltipData | null {
     // Check bounds
     if (!this.unitHeights || x < 0 || y < 0) {
       return null;
@@ -242,11 +237,15 @@ export class FacilityYearTile {
     const date = getDateFromIndex(this.year, dayIndex);
 
     return {
-      date,
+      startDate: date,
+      endDate: null,
+      label: `${this.facility.facilityName} ${unit.unitName}`,
       capacityFactor,
+      tooltipType: 'day',
+      regionCode: this.facility.region || this.facility.network, // Use network as fallback for WEM
       facilityCode: this.facility.facilityCode,
-      unitName: unit.unitName,
-      network: this.facility.network
+      network: this.facility.network,
+      unitName: unit.unitName
     };
   }
 

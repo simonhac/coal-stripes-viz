@@ -156,78 +156,39 @@ const CompositeTileComponent = ({
       : getDaysInYear(startYear) - 1; // 0-based index for last day of year
     const leftWidth = leftEndDay - leftStartDay + 1;
     
-    let hoveredDate: CalendarDate | null = null;
+    let tooltipData = null;
     
     if (x < leftWidth) {
       // Mouse is in left tile
       if (tiles.left) {
         const tileX = x + leftStartDay;
-        const tooltipData = tiles.left.getTooltipData(tileX, y);
-        if (tooltipData) {
-          hoveredDate = tooltipData.date;
-          
-          // Format unit name - for WA units, show only the part after underscore
-          let unitName = tooltipData.unitName;
-          if (tooltipData.network.toUpperCase() === 'WEM' && unitName.includes('_')) {
-            unitName = unitName.split('_').pop() || unitName;
-          }
-          
-          // Convert to new format
-          const formattedData: any = {
-            startDate: tooltipData.date,
-            endDate: null,
-            label: `${facilityName} ${unitName}`,
-            capacityFactor: tooltipData.capacityFactor,
-            tooltipType: 'day',
-            regionCode: regionCode
-          };
-          onHover(formattedData);
-        }
+        tooltipData = tiles.left.getTooltipData(tileX, y);
       }
     } else if (startYear !== endYear) {
       // Mouse is in right tile
       if (tiles.right) {
         const tileX = x - leftWidth;
-        const tooltipData = tiles.right.getTooltipData(tileX, y);
-        if (tooltipData) {
-          hoveredDate = tooltipData.date;
-          
-          // Format unit name - for WA units, show only the part after underscore
-          let unitName = tooltipData.unitName;
-          if (tooltipData.network.toUpperCase() === 'WEM' && unitName.includes('_')) {
-            unitName = unitName.split('_').pop() || unitName;
-          }
-          
-          // Convert to new format
-          const formattedData: any = {
-            startDate: tooltipData.date,
-            endDate: null,
-            label: `${facilityName} ${unitName}`,
-            capacityFactor: tooltipData.capacityFactor,
-            tooltipType: 'day',
-            regionCode: regionCode
-          };
-          onHover(formattedData);
-        }
+        tooltipData = tiles.right.getTooltipData(tileX, y);
       }
     }
     
-    // Broadcast the tooltip data via custom event
-    if (hoveredDate && x >= 0) {
-      // Get the raw tooltip data that contains all the info
-      let tooltipData = null;
-      if (x < leftWidth && tiles.left) {
-        tooltipData = tiles.left.getTooltipData(x + leftStartDay, y);
-      } else if (x >= leftWidth && tiles.right) {
-        tooltipData = tiles.right.getTooltipData(x - leftWidth, y);
+    if (tooltipData) {
+      // Format unit name - for WA units, show only the part after underscore
+      let unitName = tooltipData.unitName;
+      if (tooltipData.network && tooltipData.network.toUpperCase() === 'WEM' && unitName && unitName.includes('_')) {
+        unitName = unitName.split('_').pop() || unitName;
+        // Update the label to use formatted unit name
+        tooltipData.label = `${facilityName} ${unitName}`;
       }
       
-      if (tooltipData) {
-        const event = new CustomEvent('tooltip-data-hover', { 
-          detail: tooltipData
-        });
-        window.dispatchEvent(event);
-      }
+      // Call the hover callback
+      onHover(tooltipData);
+      
+      // Broadcast the tooltip data via custom event
+      const event = new CustomEvent('tooltip-data-hover', { 
+        detail: tooltipData
+      });
+      window.dispatchEvent(event);
     }
   }, [dateRange, onHover, tiles, facilityName]);
 
