@@ -3,6 +3,8 @@ import { LRUCache, CacheStats } from '@/shared/lru-cache';
 import { CapFacYear, createCapFacYear } from './cap-fac-year';
 import { RequestQueue, RequestQueueConfig, QueueStats } from '@/shared/request-queue';
 import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
+import { CalendarDate } from '@internationalized/date';
+import { getDayIndex } from '@/shared/date-utils';
 
 /**
  * Vendor for year-based capacity factor data with pre-rendered tiles
@@ -33,7 +35,11 @@ export class YearDataVendor {
    * @returns The data if cached, null otherwise
    */
   getYearSync(year: number): CapFacYear | null {
-    return this.cache.get(year.toString()) || null;
+    const result = this.cache.get(year.toString());
+    if (!result) {
+      console.log(`getYearSync(${year}) returned null, cache size: ${this.cache.size()}`);
+    }
+    return result || null;
   }
 
   /**
@@ -121,6 +127,126 @@ export class YearDataVendor {
    */
   clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Get facility codes for a specific region from cached data
+   * Returns null if year data is not cached
+   */
+  getFacilityCodesInRegion(regionCode: string, year: number): string[] | null {
+    const yearData = this.getYearSync(year);
+    if (!yearData) {
+      return null;
+    }
+    
+    const facilityCodesInRegion: string[] = [];
+    
+    // Check each unit in the raw data to find facilities in this region
+    for (const unit of yearData.data.data) {
+      const unitRegion = unit.network === 'WEM' ? 'WEM' : (unit.region || 'UNKNOWN');
+      if (unitRegion === regionCode && !facilityCodesInRegion.includes(unit.facility_code)) {
+        facilityCodesInRegion.push(unit.facility_code);
+      }
+    }
+    
+    return facilityCodesInRegion;
+  }
+
+  /**
+   * Calculate average capacity factor for a facility across a date range
+   * Returns null if data is not available in cache
+   */
+  calculateFacilityAverage(facilityCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): number | null {
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
+    
+    let totalWeightedCapacityFactor = 0;
+    let totalCapacityDays = 0;
+    
+    // Calculate for start year
+    const leftYearData = this.getYearSync(startYear);
+    if (!leftYearData) return null;
+    
+    const leftTile = leftYearData.facilityTiles.get(facilityCode);
+    if (!leftTile) return null;
+    
+    const leftStartDay = getDayIndex(dateRange.start);
+    const leftEndDay = startYear === endYear 
+      ? getDayIndex(dateRange.end) 
+      : leftYearData.daysInYear - 1;
+    
+    for (const unit of leftTile.getUnits()) {
+      for (let day = leftStartDay; day <= leftEndDay; day++) {
+        const cf = unit.history.data[day];
+        if (cf !== null) {
+          totalWeightedCapacityFactor += cf * unit.capacity;
+          totalCapacityDays += unit.capacity;
+        }
+      }
+    }
+    
+    // Calculate for end year if different
+    if (startYear !== endYear) {
+      const rightYearData = this.getYearSync(endYear);
+      if (!rightYearData) return null;
+      
+      const rightTile = rightYearData.facilityTiles.get(facilityCode);
+      if (!rightTile) return null;
+      
+      const rightEndDay = getDayIndex(dateRange.end);
+      
+      for (const unit of rightTile.getUnits()) {
+        for (let day = 0; day <= rightEndDay; day++) {
+          const cf = unit.history.data[day];
+          if (cf !== null) {
+            totalWeightedCapacityFactor += cf * unit.capacity;
+            totalCapacityDays += unit.capacity;
+          }
+        }
+      }
+    }
+    
+    return totalCapacityDays > 0 ? totalWeightedCapacityFactor / totalCapacityDays : null;
+  }
+
+  /**
+   * Calculate average capacity factor for a region across a date range
+   * Returns null if data is not available in cache
+   */
+  calculateRegionAverage(regionCode: string, dateRange: { start: CalendarDate; end: CalendarDate }): number | null {
+    let totalWeightedCapacityFactor = 0;
+    let totalCapacity = 0;
+    
+    const startYear = dateRange.start.year;
+    const endYear = dateRange.end.year;
+    console.log(`calculateRegionAverage for ${regionCode}, date range: ${dateRange.start.toString()} to ${dateRange.end.toString()}, years: ${startYear}-${endYear}`);
+    
+    // Get facilities for this region
+    const facilitiesInRegion = this.getFacilityCodesInRegion(regionCode, startYear);
+    
+    // If year data not cached, return null
+    if (!facilitiesInRegion) {
+      return null;
+    }
+    
+    // Calculate weighted average across all facilities in the region
+    for (const facilityCode of facilitiesInRegion) {
+      const avgCapacityFactor = this.calculateFacilityAverage(facilityCode, dateRange);
+      if (avgCapacityFactor === null) continue; // Skip if facility data is missing
+      
+      // Get facility's total capacity from the first year's data
+      const yearData = this.getYearSync(startYear);
+      if (!yearData) return null;
+      
+      const facilityTile = yearData.facilityTiles.get(facilityCode);
+      if (!facilityTile) continue;
+      
+      const facilityCapacity = facilityTile.getTotalCapacity();
+      totalWeightedCapacityFactor += avgCapacityFactor * facilityCapacity;
+      totalCapacity += facilityCapacity;
+    }
+    
+    return totalCapacity > 0 ? totalWeightedCapacityFactor / totalCapacity : null;
   }
 }
 

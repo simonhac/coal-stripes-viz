@@ -5,6 +5,8 @@ import { CalendarDate } from '@internationalized/date';
 import { CompositeTile, CompositeTileRef } from './CompositeTile';
 import { CapFacTooltip, TooltipData } from './CapFacTooltip';
 import { CapFacXAxis } from './CapFacXAxis';
+import { FacilityLabel } from './FacilityLabel';
+import { RegionLabel } from './RegionLabel';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -42,51 +44,20 @@ export function RegionSection({
     setTooltipData(null);
   }, []);
   
-  // Calculate capacity-weighted average capacity factor for the region
-  const calculateRegionAverage = useCallback(() => {
-    if (!animatedDateRange) return null;
-    
-    let totalWeightedCapacityFactor = 0;
-    let totalCapacity = 0;
-    
-    // Calculate weighted average across all facilities in this region
-    facilities.forEach(facility => {
-      const ref = tileRefs.current.get(facility.code);
-      if (ref?.current) {
-        const stats = ref.current.getStats();
-        if (stats && stats.avgCapacityFactor !== null) {
-          totalWeightedCapacityFactor += stats.avgCapacityFactor * stats.totalCapacity;
-          totalCapacity += stats.totalCapacity;
-        }
-      }
-    });
-    
-    return totalCapacity > 0 ? totalWeightedCapacityFactor / totalCapacity : null;
-  }, [facilities, animatedDateRange]);
-  
   return (
     <div key={regionCode} className="opennem-region">
       <div className="opennem-region-header">
-        <span 
-          style={{ cursor: 'pointer' }}
-          onMouseEnter={() => {
-            if (animatedDateRange) {
-              const avgCapacityFactor = calculateRegionAverage();
-              if (avgCapacityFactor !== null) {
-                handleHover({
-                  startDate: animatedDateRange.start,
-                  endDate: animatedDateRange.end,
-                  label: regionName,
-                  capacityFactor: avgCapacityFactor,
-                  tooltipType: 'period'
-                });
-              }
-            }
-          }}
-          onMouseLeave={handleHoverEnd}
-        >
-          {regionName}
-        </span>
+        {animatedDateRange ? (
+          <RegionLabel
+            regionCode={regionCode}
+            regionName={regionName}
+            dateRange={animatedDateRange}
+            onHover={handleHover}
+            onHoverEnd={handleHoverEnd}
+          />
+        ) : (
+          <span>{regionName}</span>
+        )}
         <CapFacTooltip data={tooltipData} />
       </div>
       <div className="opennem-region-content">
@@ -98,17 +69,26 @@ export function RegionSection({
               const ref = tileRefs.current.get(facility.code);
               if (!ref) return null; // This should never happen due to initialization above
               return (
-                <CompositeTile
-                  key={facility.code}
-                  ref={ref}
-                  endDate={endDate}
-                  facilityCode={facility.code}
-                  facilityName={facility.name}
-                  animatedDateRange={animatedDateRange}
-                  onHover={handleHover}
-                  onHoverEnd={handleHoverEnd}
-                  minCanvasHeight={25}
-                />
+                <div key={facility.code} className="opennem-stripe-row" style={{ display: 'flex' }}>
+                  <FacilityLabel
+                    facilityCode={facility.code}
+                    facilityName={facility.name}
+                    regionCode={regionCode}
+                    dateRange={animatedDateRange}
+                    onHover={handleHover}
+                    onHoverEnd={handleHoverEnd}
+                  />
+                  <CompositeTile
+                    ref={ref}
+                    endDate={endDate}
+                    facilityCode={facility.code}
+                    facilityName={facility.name}
+                    animatedDateRange={animatedDateRange}
+                    onHover={handleHover}
+                    onHoverEnd={handleHoverEnd}
+                    minCanvasHeight={25}
+                  />
+                </div>
               );
             })}
             

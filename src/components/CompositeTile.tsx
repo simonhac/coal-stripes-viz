@@ -144,68 +144,19 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
     }
   };
 
-  // Calculate capacity-weighted average capacity factor for the facility across the date range
-  const calculateFacilityAverage = useCallback(() => {
-    if (!tiles.left && !tiles.right) return null;
-    
-    let totalWeightedCapacityFactor = 0;
-    let totalCapacityDays = 0;
-    
-    const startYear = dateRange.start.year;
-    const endYear = dateRange.end.year;
-    
-    // Calculate left tile contribution
-    if (tiles.left) {
-      const leftStartDay = getDayIndex(dateRange.start);
-      const leftEndDay = startYear === endYear 
-        ? getDayIndex(dateRange.end) 
-        : getDaysInYear(startYear) - 1;
-      
-      // Get all units from the left tile
-      for (const unit of tiles.left.getUnits()) {
-        for (let day = leftStartDay; day <= leftEndDay; day++) {
-          const cf = unit.history.data[day];
-          if (cf !== null) {
-            totalWeightedCapacityFactor += cf * unit.capacity;
-            totalCapacityDays += unit.capacity;
-          }
-        }
-      }
-    }
-    
-    // Calculate right tile contribution (if spanning two years)
-    if (startYear !== endYear && tiles.right) {
-      const rightEndDay = getDayIndex(dateRange.end);
-      
-      // Get all units from the right tile
-      for (const unit of tiles.right.getUnits()) {
-        for (let day = 0; day <= rightEndDay; day++) {
-          const cf = unit.history.data[day];
-          if (cf !== null) {
-            totalWeightedCapacityFactor += cf * unit.capacity;
-            totalCapacityDays += unit.capacity;
-          }
-        }
-      }
-    }
-    
-    return totalCapacityDays > 0 ? totalWeightedCapacityFactor / totalCapacityDays : null;
-  }, [tiles, dateRange]);
   
   // Expose getStats method via ref
   useImperativeHandle(ref, () => ({
     getStats: () => {
       if (!tiles.left) return null;
       
-      const avgCapacityFactor = calculateFacilityAverage();
       const totalCapacity = tiles.left.getTotalCapacity();
       
       return {
-        avgCapacityFactor,
         totalCapacity
       };
     }
-  }), [tiles, calculateFacilityAverage]);
+  }), [tiles]);
   
   const updateTooltip = useCallback((x: number, y: number) => {
     if (!onHover) return;
@@ -608,48 +559,26 @@ const CompositeTileComponent = React.forwardRef<CompositeTileRef, CompositeTileP
   };
 
   return (
-    <div className="opennem-stripe-row" style={{ display: 'flex' }}>
-      <div 
-        className="opennem-facility-label"
-        onMouseEnter={() => {
-          if (onHover) {
-            const avgCapacityFactor = calculateFacilityAverage();
-            if (avgCapacityFactor !== null) {
-              onHover({
-                startDate: dateRange.start,
-                endDate: dateRange.end,
-                label: facilityName,
-                capacityFactor: avgCapacityFactor,
-                tooltipType: 'period'
-              });
-            }
+    <div 
+      className="opennem-stripe-data"
+      style={{ cursor: 'grab' }}
+    >
+      <canvas
+        ref={canvasRef}
+        className="opennem-facility-canvas"
+        style={{ 
+          width: '100%',
+          imageRendering: 'pixelated'
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => {
+          // Clear hover position on document root
+          document.documentElement.style.removeProperty('--hover-x');
+          if (onHoverEnd) {
+            onHoverEnd();
           }
         }}
-        onMouseLeave={onHoverEnd}
-      >
-        {facilityName}
-      </div>
-      <div 
-        className="opennem-stripe-data"
-        style={{ cursor: 'grab' }}
-      >
-        <canvas
-          ref={canvasRef}
-          className="opennem-facility-canvas"
-          style={{ 
-            width: '100%',
-            imageRendering: 'pixelated'
-          }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => {
-            // Clear hover position on document root
-            document.documentElement.style.removeProperty('--hover-x');
-            if (onHoverEnd) {
-              onHoverEnd();
-            }
-          }}
-        />
-      </div>
+      />
     </div>
   );
 });
