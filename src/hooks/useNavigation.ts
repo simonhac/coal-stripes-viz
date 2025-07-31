@@ -16,6 +16,27 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
   const preloadYearsForDate = useCallback((newEndDate: CalendarDate) => {
     const startDate = newEndDate.subtract({ days: 364 });
     const years = new Set([startDate.year, newEndDate.year]);
+    
+    // Add year before and after
+    const yearBefore = startDate.year - 1;
+    const yearAfter = newEndDate.year + 1;
+    
+    // Get current year to check upper boundary
+    const currentYear = getTodayAEST().year;
+    
+    // Add adjacent years if they're within valid bounds
+    // Lower bound: 2006 (earliest data is from 2006)
+    if (yearBefore >= 2006) {
+      years.add(yearBefore);
+    }
+    
+    // Upper bound: current year (can't have data for future years)
+    if (yearAfter <= currentYear) {
+      years.add(yearAfter);
+    }
+    
+    console.log(`📅 Preloading years: ${Array.from(years).sort().join(', ')}`);
+    
     years.forEach(year => {
       yearDataVendor.requestYear(year).catch(err => {
         console.error(`Failed to preload year ${year}:`, err);
