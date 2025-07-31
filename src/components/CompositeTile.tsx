@@ -472,6 +472,22 @@ const CompositeTileComponent = ({
     };
   }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight]);
   
+  // Define handleMouseUp before the useEffect that uses it
+  const handleMouseUp = useCallback(() => {
+    // If we were dragging, emit a final event with isDragging: false
+    // This allows the animation to smooth out to the final position
+    if (isDragging && endDate) {
+      const event = new CustomEvent('date-navigate', { 
+        detail: { newEndDate: endDate, isDragging: false } 
+      });
+      window.dispatchEvent(event);
+    }
+    
+    setIsDragging(false);
+    dragStateRef.current.startX = 0;
+    dragStateRef.current.startEndDate = null;
+    document.body.style.cursor = '';
+  }, [isDragging, endDate]);
   
   // Mouse position tracking effect and global mouse handlers for drag
   useEffect(() => {
@@ -552,7 +568,7 @@ const CompositeTileComponent = ({
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [endDate, isDragging]);
+  }, [endDate, isDragging, handleMouseUp]);
   
   // Handle window scroll to update tooltip
   useEffect(() => {
@@ -617,22 +633,6 @@ const CompositeTileComponent = ({
     
     // Normal hover behavior - tooltip
     updateTooltip(canvasX, canvasY);
-  };
-
-  const handleMouseUp = () => {
-    // If we were dragging, emit a final event with isDragging: false
-    // This allows the animation to smooth out to the final position
-    if (isDragging && endDate) {
-      const event = new CustomEvent('date-navigate', { 
-        detail: { newEndDate: endDate, isDragging: false } 
-      });
-      window.dispatchEvent(event);
-    }
-    
-    setIsDragging(false);
-    dragStateRef.current.startX = 0;
-    dragStateRef.current.startEndDate = null;
-    document.body.style.cursor = '';
   };
 
   return (

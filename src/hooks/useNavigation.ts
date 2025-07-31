@@ -35,13 +35,18 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
       years.add(yearAfter);
     }
     
-    console.log(`📅 Preloading years: ${Array.from(years).sort().join(', ')}`);
+    // Filter out years that are already cached
+    const yearsToLoad = Array.from(years).filter(year => !yearDataVendor.hasYear(year));
     
-    years.forEach(year => {
-      yearDataVendor.requestYear(year).catch(err => {
-        console.error(`Failed to preload year ${year}:`, err);
+    if (yearsToLoad.length > 0) {
+      console.log(`📅 Preloading years: ${yearsToLoad.sort().join(', ')}`);
+      
+      yearsToLoad.forEach(year => {
+        yearDataVendor.requestYear(year).catch(err => {
+          console.error(`Failed to preload year ${year}:`, err);
+        });
       });
-    });
+    }
   }, []);
 
   // Navigate to a specific date (used by drag navigation)

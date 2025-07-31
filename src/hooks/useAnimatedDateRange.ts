@@ -72,18 +72,13 @@ export function useAnimatedDateRange(targetEndDate: CalendarDate | null, options
       setCurrentRange(targetRange);
       setIsAnimating(false);
     }
-    // Only animate if change is not "too much"
-    else if (Math.abs(daysDiff) > 0 && Math.abs(daysDiff) <= 2000) {
+    // Animate for any change
+    else if (Math.abs(daysDiff) > 0) {
       anim.fromStart = currentRange.start;
       anim.targetStart = targetRange.start;
       anim.animationStartTime = performance.now();
       anim.isActive = true;
       setIsAnimating(true);
-    } else if (Math.abs(daysDiff) > 0) {
-      // Jump directly for large changes
-      anim.isActive = false;
-      setCurrentRange(targetRange);
-      setIsAnimating(false);
     }
   }, [targetEndDate, options?.skipAnimation]); // eslint-disable-line react-hooks/exhaustive-deps
   

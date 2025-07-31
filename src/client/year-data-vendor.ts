@@ -257,4 +257,4 @@ export class YearDataVendor {
 }
 
 // Export singleton instance
-export const yearDataVendor = new YearDataVendor(10);
+export const yearDataVendor = new YearDataVendor(15);
