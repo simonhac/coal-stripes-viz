@@ -473,10 +473,52 @@ const CompositeTileComponent = ({
   }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight]);
   
   
-  // Mouse position tracking effect and global mouseup for drag
+  // Mouse position tracking effect and global mouse handlers for drag
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
+      
+      // Handle dragging globally (not just on canvas)
+      if (dragStateRef.current.isDragging && dragStateRef.current.startEndDate && canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const deltaX = e.clientX - dragStateRef.current.startX;
+        // Convert screen pixels to days (negative because dragging right should move back in time)
+        const daysDelta = -Math.round((deltaX / rect.width) * 365);
+        
+        const yesterday = getTodayAEST().subtract({ days: 1 });
+        const currentEndDate = endDate || dragStateRef.current.startEndDate;
+        
+        // Check if we're trying to go past yesterday
+        // Dragging left (negative deltaX) = positive daysDelta = forward in time
+        const tryingToGoForward = daysDelta > 0;
+        const alreadyAtYesterday = currentEndDate.compare(yesterday) === 0;
+        
+        // Emit boundary hit event if we're at the boundary and trying to go forward
+        if (tryingToGoForward && alreadyAtYesterday) {
+          // Emit boundary hit event (debounced to prevent rapid flashing)
+          const now = Date.now();
+          if (now - dragStateRef.current.lastBoundaryHitTime > 500) { // 500ms debounce
+            dragStateRef.current.lastBoundaryHitTime = now;
+            const boundaryEvent = new CustomEvent('navigation-boundary-hit');
+            window.dispatchEvent(boundaryEvent);
+          }
+        }
+        
+        if (daysDelta !== 0) {
+          let newEndDate = dragStateRef.current.startEndDate.add({ days: daysDelta });
+          
+          // Don't allow dragging past yesterday
+          if (newEndDate.compare(yesterday) > 0) {
+            newEndDate = yesterday;
+          }
+          
+          // Emit custom event with new date and dragging flag
+          const event = new CustomEvent('date-navigate', { 
+            detail: { newEndDate, isDragging: true } 
+          });
+          window.dispatchEvent(event);
+        }
+      }
     };
     
     const handleGlobalMouseUp = () => {
@@ -485,14 +527,14 @@ const CompositeTileComponent = ({
       }
     };
     
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mousemove', handleGlobalMouseMove);
     document.addEventListener('mouseup', handleGlobalMouseUp);
     
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, []);
+  }, [endDate]);
   
   // Handle window scroll to update tooltip
   useEffect(() => {
@@ -541,6 +583,11 @@ const CompositeTileComponent = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Skip if dragging (handled globally)
+    if (dragStateRef.current.isDragging) {
+      return;
+    }
+    
     const canvas = e.currentTarget;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -550,57 +597,15 @@ const CompositeTileComponent = ({
     const canvasX = (x / rect.width) * canvas.width;
     const canvasY = (y / rect.height) * canvas.height;
     
-    // Handle dragging
-    if (dragStateRef.current.isDragging && dragStateRef.current.startEndDate) {
-      const deltaX = e.clientX - dragStateRef.current.startX;
-      // Convert screen pixels to days (negative because dragging right should move back in time)
-      const daysDelta = -Math.round((deltaX / rect.width) * 365);
-      
-      const yesterday = getTodayAEST().subtract({ days: 1 });
-      const currentEndDate = endDate || dragStateRef.current.startEndDate;
-      
-      // Check if we're trying to go past yesterday
-      // Dragging left (negative deltaX) = positive daysDelta = forward in time
-      const tryingToGoForward = daysDelta > 0;
-      const alreadyAtYesterday = currentEndDate.compare(yesterday) === 0;
-      
-      // Emit boundary hit event if we're at the boundary and trying to go forward
-      if (tryingToGoForward && alreadyAtYesterday) {
-        // Emit boundary hit event (debounced to prevent rapid flashing)
-        const now = Date.now();
-        if (now - dragStateRef.current.lastBoundaryHitTime > 500) { // 500ms debounce
-          dragStateRef.current.lastBoundaryHitTime = now;
-          const boundaryEvent = new CustomEvent('navigation-boundary-hit');
-          window.dispatchEvent(boundaryEvent);
-        }
-      }
-      
-      if (daysDelta !== 0) {
-        let newEndDate = dragStateRef.current.startEndDate.add({ days: daysDelta });
-        
-        // Don't allow dragging past yesterday
-        if (newEndDate.compare(yesterday) > 0) {
-          newEndDate = yesterday;
-        }
-        
-        
-        // Emit custom event with new date and dragging flag
-        const event = new CustomEvent('date-navigate', { 
-          detail: { newEndDate, isDragging: true } 
-        });
-        window.dispatchEvent(event);
-      }
-    } else {
-      // Normal hover behavior
-      updateTooltip(canvasX, canvasY);
-      
-      // Update CSS variable for hover position on the document root to affect all regions
-      const dayColumn = Math.floor(canvasX);
-      if (dayColumn >= 0 && dayColumn < 365) {
-        const percentage = (dayColumn / 365) * 100;
-        // Set on document root so all regions share the same hover position
-        document.documentElement.style.setProperty('--hover-x', `${percentage}%`);
-      }
+    // Normal hover behavior
+    updateTooltip(canvasX, canvasY);
+    
+    // Update CSS variable for hover position on the document root to affect all regions
+    const dayColumn = Math.floor(canvasX);
+    if (dayColumn >= 0 && dayColumn < 365) {
+      const percentage = (dayColumn / 365) * 100;
+      // Set on document root so all regions share the same hover position
+      document.documentElement.style.setProperty('--hover-x', `${percentage}%`);
     }
   };
 
@@ -636,16 +641,14 @@ const CompositeTileComponent = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => {
-          // Clear hover position on document root
-          document.documentElement.style.removeProperty('--hover-x');
-          
-          // Broadcast hover end event
-          const event = new CustomEvent('tooltip-data-hover-end');
-          window.dispatchEvent(event);
-          
-          // Cancel drag if leaving canvas
-          if (dragStateRef.current.isDragging) {
-            handleMouseUp();
+          // Only handle hover cleanup when not dragging
+          if (!dragStateRef.current.isDragging) {
+            // Clear hover position on document root
+            document.documentElement.style.removeProperty('--hover-x');
+            
+            // Broadcast hover end event
+            const event = new CustomEvent('tooltip-data-hover-end');
+            window.dispatchEvent(event);
           }
         }}
       />
