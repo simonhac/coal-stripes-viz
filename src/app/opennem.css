@@ -132,6 +132,12 @@ header a {
   align-items: center;
   margin-bottom: 20px;
   padding: 0 var(--app-padding);
+  position: sticky;
+  top: 0;
+  background-color: #faf9f6;
+  z-index: 100;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .opennem-stripes-title {
@@ -518,14 +524,13 @@ header a {
   }
   
   .opennem-stripes-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
+    flex-direction: row;
+    justify-content: flex-end;
   }
   
-  /* Hide date range on mobile */
+  /* Show date range on mobile with smaller font */
   .opennem-date-range {
-    display: none;
+    font-size: 14px;
   }
   
   .opennem-scale-bar {

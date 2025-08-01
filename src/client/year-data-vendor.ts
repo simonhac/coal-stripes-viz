@@ -23,6 +23,22 @@ export function calculateAverageCapacityFactor(stats: GenerationStats | null): n
 }
 
 /**
+ * Get region names (long and short) for a given region code
+ */
+export function getRegionNames(regionCode: string): { long: string; short: string } {
+  const regionNames: Record<string, { long: string; short: string }> = {
+    'NSW1': { long: 'New South Wales', short: 'NSW' },
+    'QLD1': { long: 'Queensland', short: 'QLD' },
+    'SA1': { long: 'South Australia', short: 'SA' },
+    'TAS1': { long: 'Tasmania', short: 'TAS' },
+    'VIC1': { long: 'Victoria', short: 'VIC' },
+    'WEM': { long: 'Western Australia', short: 'WA' }
+  };
+  
+  return regionNames[regionCode] || { long: regionCode, short: regionCode };
+}
+
+/**
  * Vendor for year-based capacity factor data with pre-rendered tiles
  * Always returns a promise - resolved immediately for cached data
  */

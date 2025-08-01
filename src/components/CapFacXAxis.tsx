@@ -3,21 +3,23 @@ import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween, getMonthName } from '@/shared/date-utils';
 import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 import { CapFacYear } from '@/client/cap-fac-year';
-import { yearDataVendor } from '@/client/year-data-vendor';
+import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
 
 interface CapFacXAxisProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
   regionCode: string;
-  regionName: string;
   onMonthClick?: (year: number, month: number) => void;
+  isMobile?: boolean;
 }
 
 export function CapFacXAxis({ 
   dateRange, 
   regionCode,
-  regionName,
-  onMonthClick
+  onMonthClick,
+  isMobile = false
 }: CapFacXAxisProps) {
+  const regionNames = getRegionNames(regionCode);
+  const tooltipRegionName = isMobile ? regionNames.short : regionNames.long;
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
   const [useShortLabels, setUseShortLabels] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -145,7 +147,7 @@ export function CapFacXAxis({
     const tooltipData = {
       startDate: month.date,
       endDate: null,
-      label: regionName,
+      label: tooltipRegionName,
       capacityFactor: month.capacityFactor,
       tooltipType: 'month',
       regionCode: regionCode

@@ -7,26 +7,30 @@ import { CapFacTooltip, TooltipData, getTooltipFormattedDate } from './CapFacToo
 import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
-import { yearDataVendor, calculateAverageCapacityFactor } from '@/client/year-data-vendor';
+import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
 
 interface RegionSectionProps {
   regionCode: string;
-  regionName: string;
   facilities: { code: string; name: string }[];
   endDate: CalendarDate;
   animatedDateRange: { start: CalendarDate; end: CalendarDate } | null;
   onMonthClick: (year: number, month: number) => void;
+  isMobile: boolean;
 }
 
 export function RegionSection({
   regionCode,
-  regionName,
   facilities,
   endDate,
   animatedDateRange,
-  onMonthClick
+  onMonthClick,
+  isMobile
 }: RegionSectionProps) {
   const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
+  
+  // Get region names
+  const regionNames = getRegionNames(regionCode);
+  const tooltipRegionName = isMobile ? regionNames.short : regionNames.long;
   
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {
@@ -91,7 +95,7 @@ export function RegionSection({
           const myTooltipData: TooltipData = {
             startDate: data.startDate,
             endDate: data.tooltipType === 'day' ? null : data.endDate,
-            label: regionName,
+            label: tooltipRegionName,
             capacityFactor:  avgCapacityFactor,
             tooltipType: data.tooltipType,
             regionCode: regionCode 
@@ -115,7 +119,7 @@ export function RegionSection({
       window.removeEventListener('tooltip-data-hover', handleTooltipHover);
       window.removeEventListener('tooltip-data-hover-end', handleTooltipHoverEnd);
     };
-  }, [regionCode, regionName]);
+  }, [regionCode, tooltipRegionName]);
   
   if (!animatedDateRange) {
     return null;
@@ -126,8 +130,8 @@ export function RegionSection({
       <div className="opennem-region-header">
         <RegionLabel
           regionCode={regionCode}
-          regionName={regionName}
           dateRange={animatedDateRange}
+          isMobile={isMobile}
         />
         <CapFacTooltip data={tooltipData} />
       </div>
@@ -158,8 +162,8 @@ export function RegionSection({
           <CapFacXAxis 
             dateRange={animatedDateRange}
             regionCode={regionCode}
-            regionName={regionName}
             onMonthClick={onMonthClick}
+            isMobile={isMobile}
           />
         </div>
       </div>

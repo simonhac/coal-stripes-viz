@@ -2,28 +2,35 @@
 
 import React from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { yearDataVendor, calculateAverageCapacityFactor } from '@/client/year-data-vendor';
+import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
 
 interface RegionLabelProps {
   regionCode: string;
-  regionName: string;
   dateRange: { start: CalendarDate; end: CalendarDate };
+  isMobile: boolean;
 }
 
 export function RegionLabel({
   regionCode,
-  regionName,
-  dateRange
+  dateRange,
+  isMobile
 }: RegionLabelProps) {
+  const regionNames = getRegionNames(regionCode);
+  const regionName = regionNames.long;
   const handleMouseEnter = () => {
     if (dateRange) {
       const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
       const avgCapacityFactor = calculateAverageCapacityFactor(stats);
       if (avgCapacityFactor !== null) {
+        // Use short name for tooltip on mobile
+        const tooltipLabel = isMobile 
+          ? regionNames.short 
+          : regionNames.long;
+          
         const tooltipData = {
           startDate: dateRange.start,
           endDate: dateRange.end,
-          label: regionName,
+          label: tooltipLabel,
           capacityFactor: avgCapacityFactor,
           tooltipType: 'period',
           regionCode: regionCode

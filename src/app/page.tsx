@@ -7,7 +7,7 @@ import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
 import { DateRange } from '../components/DateRange';
-import { yearDataVendor } from '@/client/year-data-vendor';
+import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
 import { useAnimatedDateRange } from '@/hooks/useAnimatedDateRange';
 import { useNavigation } from '@/hooks/useNavigation';
 import './opennem.css';
@@ -19,30 +19,11 @@ export default function Home() {
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
   const [boundaryFlash, setBoundaryFlash] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate, { skipAnimation: isDragging });
-  
-  // // Debug: Listen for hover events
-  // useEffect(() => {
-  //   const handleHover = (e: Event) => {
-  //     const customEvent = e as CustomEvent;
-  //     console.log('Tooltip data hover event:', customEvent.detail);
-  //   };
-    
-  //   const handleHoverEnd = () => {
-  //     console.log('Tooltip data hover end');
-  //   };
-    
-  //   window.addEventListener('tooltip-data-hover', handleHover);
-  //   window.addEventListener('tooltip-data-hover-end', handleHoverEnd);
-    
-  //   return () => {
-  //     window.removeEventListener('tooltip-data-hover', handleHover);
-  //     window.removeEventListener('tooltip-data-hover-end', handleHoverEnd);
-  //   };
-  // }, []);
   
   // Set up navigation
   const { navigateToMonth, navigateToDate } = useNavigation({
@@ -138,20 +119,10 @@ export default function Home() {
         // Convert to sorted structure
         const facilitiesMap = new Map<string, { code: string; name: string }[]>();
         
-        // Define region display names
-        const regionNames = new Map([
-          ['NSW1', 'New South Wales'],
-          ['QLD1', 'Queensland'],
-          ['SA1', 'South Australia'],
-          ['TAS1', 'Tasmania'],
-          ['VIC1', 'Victoria'],
-          ['WEM', 'Western Australia']
-        ]);
-        
-        // Sort regions alphabetically by display name
-        const sortedRegions = Array.from(regionNames.entries())
-          .sort((a, b) => a[1].localeCompare(b[1]))
-          .map(([code]) => code);
+        // Get all region codes and sort alphabetically by long name
+        const allRegionCodes = ['NSW1', 'QLD1', 'SA1', 'TAS1', 'VIC1', 'WEM'];
+        const sortedRegions = allRegionCodes
+          .sort((a, b) => getRegionNames(a).long.localeCompare(getRegionNames(b).long));
         
         // Process each region
         for (const regionCode of sortedRegions) {
@@ -182,6 +153,20 @@ export default function Home() {
   // Ensure the page has focus on mount for keyboard navigation
   useEffect(() => {
     window.focus();
+  }, []);
+
+  // Detect mobile screen width
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
   }, []);
 
 
@@ -229,25 +214,15 @@ export default function Home() {
         >
           {/* Create a section for each region */}
           {Array.from(facilitiesByRegion.entries()).map(([regionCode, facilities]) => {
-            // Get region display name
-            const regionName = {
-              'NSW1': 'New South Wales',
-              'QLD1': 'Queensland',
-              'SA1': 'South Australia',
-              'TAS1': 'Tasmania',
-              'VIC1': 'Victoria',
-              'WEM': 'Western Australia'
-            }[regionCode] || regionCode;
-            
             return (
               <RegionSection
                 key={regionCode}
                 regionCode={regionCode}
-                regionName={regionName}
                 facilities={facilities}
                 endDate={endDate!}
                 animatedDateRange={animatedDateRange}
                 onMonthClick={handleMonthClick}
+                isMobile={isMobile}
               />
             );
           })}
