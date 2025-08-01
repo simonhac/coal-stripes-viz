@@ -8,12 +8,15 @@ jest.mock('../date-utils', () => ({
 }));
 
 // Mock the config module
-jest.mock('../config', () => ({
-  DATE_BOUNDARIES: {
-    EARLIEST_START_DATE: new (require('@internationalized/date').CalendarDate)(2006, 1, 1),
-    DISPLAY_SLOP_MONTHS: 6
-  }
-}));
+jest.mock('../config', () => {
+  const { CalendarDate } = jest.requireActual('@internationalized/date');
+  return {
+    DATE_BOUNDARIES: {
+      EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
+      DISPLAY_SLOP_MONTHS: 6
+    }
+  };
+});
 
 describe('date-boundaries', () => {
   const mockTodayAEST = getTodayAEST as jest.MockedFunction<typeof getTodayAEST>;

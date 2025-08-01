@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { getDaysBetween } from '@/shared/date-utils';
+import { SPRING_PHYSICS_CONFIG } from '@/shared/config';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
@@ -57,23 +58,37 @@ export default function Home() {
           
           let adjustedDate = rawEndDate;
           
-          // Apply rubber band effect if beyond display boundaries (for end dates)
-          if (!boundaries.isEndDateWithinDisplayBounds(rawEndDate)) {
-            // Calculate how far beyond the boundary we are
-            const clampedDate = boundaries.clampEndDateToDisplayBounds(rawEndDate);
-            const overshoot = rawEndDate.compare(clampedDate) > 0 
-              ? getDaysBetween(clampedDate, rawEndDate)
-              : getDaysBetween(rawEndDate, clampedDate);
+          // Check if we're beyond data boundaries (not display boundaries)
+          const beyondDataBoundary = rawEndDate.compare(boundaries.latestDataDay) > 0 || 
+                                    rawEndDate.compare(boundaries.earliestDataEndDay) < 0;
+          
+          if (beyondDataBoundary) {
+            // Apply rubber band effect only when beyond data boundaries
+            const dataBoundaryDate = rawEndDate.compare(boundaries.latestDataDay) > 0 
+              ? boundaries.latestDataDay 
+              : boundaries.earliestDataEndDay;
             
-            // Apply rubber band resistance (logarithmic scaling)
-            const resistance = 0.12; // Lower value = more resistance, slightly stiffer
-            const rubberBandDays = Math.sign(overshoot) * Math.log(1 + Math.abs(overshoot)) * resistance;
+            // Calculate overshoot from data boundary (not display boundary)
+            const overshoot = rawEndDate.compare(dataBoundaryDate) > 0 
+              ? getDaysBetween(dataBoundaryDate, rawEndDate)
+              : getDaysBetween(rawEndDate, dataBoundaryDate);
             
-            // Apply the rubber band effect
-            if (rawEndDate.compare(clampedDate) > 0) {
-              adjustedDate = clampedDate.add({ days: Math.ceil(rubberBandDays) });
+            // Apply rubber band resistance with increasing difficulty
+            // Calculate max stretch based on data-to-display boundary distance
+            const maxStretch = rawEndDate.compare(dataBoundaryDate) > 0 
+              ? getDaysBetween(boundaries.latestDataDay, boundaries.latestDisplayDay)
+              : getDaysBetween(boundaries.earliestDisplayEndDay, boundaries.earliestDataEndDay);
+            
+            // Logarithmic function: more pull = less additional movement
+            const scaleFactor = 0.4; // Controls how much you can stretch (0.4 = 40% of max at infinity)
+            const rubberBandDays = maxStretch * scaleFactor * Math.log(1 + Math.abs(overshoot) / maxStretch) * Math.sign(overshoot);
+            
+            
+            // Apply the rubber band effect from the data boundary
+            if (rawEndDate.compare(dataBoundaryDate) > 0) {
+              adjustedDate = dataBoundaryDate.add({ days: Math.ceil(rubberBandDays) });
             } else {
-              adjustedDate = clampedDate.add({ days: Math.floor(rubberBandDays) });
+              adjustedDate = dataBoundaryDate.add({ days: Math.floor(rubberBandDays) });
             }
           }
           
@@ -81,8 +96,6 @@ export default function Home() {
         }
       } else if (isDragging === false && !newEndDate) {
         // Mouse up without position - check if we need to spring back
-        setIsDragging(false);
-        
         if (endDate) {
           const boundaries = getDateBoundaries();
           
@@ -91,39 +104,80 @@ export default function Home() {
             const targetDate = endDate.compare(boundaries.latestDataDay) > 0 
               ? boundaries.latestDataDay 
               : boundaries.earliestDataEndDay;
-            const totalDays = getDaysBetween(endDate, targetDate);
-            const startTime = Date.now();
-            const duration = 250; // Faster animation
+            // Store the starting position
             const startDate = endDate;
+            let currentPosition = 0; // Start at 0 (current position)
+            const totalDistance = getDaysBetween(targetDate, startDate); // Distance from target to start (positive when past boundary)
+            
+            // Spring physics parameters from config
+            const { STIFFNESS: stiffness, DAMPING: damping, MASS: mass } = SPRING_PHYSICS_CONFIG;
+            
+            // Calculate initial velocity - give it a kick proportional to displacement
+            // Start with zero velocity and let the spring force accelerate naturally
+            let velocity = 0; // Let spring force provide the acceleration
             
             // Cancel any existing animation
             if (animationFrameRef.current) {
               cancelAnimationFrame(animationFrameRef.current);
             }
             
+            let lastTime = performance.now();
+            const startTime = performance.now();
+            let frameCount = 0;
+            console.log('=== SNAP BACK START ===');
+            console.log(`Total distance: ${totalDistance} days`);
+            console.log(`Initial velocity: ${velocity} days/s`);
+            console.log(`Stiffness: ${stiffness}, Damping: ${damping}`);
+            
             // Start immediately without delay
             const animate = () => {
-              const elapsed = Date.now() - startTime;
-              const progress = Math.min(elapsed / duration, 1);
+              const currentTime = performance.now();
+              const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.25); // Cap at 250ms
+              lastTime = currentTime;
+              const elapsed = currentTime - startTime;
               
-              // Use ease-out cubic for smooth deceleration
-              const easeOut = 1 - Math.pow(1 - progress, 3);
+              // Calculate how far we still need to go (positive when we haven't reached target yet)
+              const remainingDistance = totalDistance - currentPosition;
               
-              if (progress < 1) {
-                // Interpolate between current position and target
-                const daysToMove = Math.round(totalDays * easeOut);
-                const interpolatedDate = startDate.add({ days: daysToMove });
-                
-                setEndDate(interpolatedDate);
-                animationFrameRef.current = requestAnimationFrame(animate);
-              } else {
-                // Animation complete
+              // Spring force pulls toward target (remainingDistance = 0)
+              // When remainingDistance is positive, we want positive force (to increase position)
+              const springForce = stiffness * remainingDistance;
+              const dampingForce = -damping * velocity;
+              
+              // Update velocity and position
+              const acceleration = (springForce + dampingForce) / mass;
+              velocity += acceleration * deltaTime;
+              currentPosition += velocity * deltaTime;
+              
+              frameCount++;
+              
+              // Calculate new position by moving from start position TOWARD target
+              // When past the right boundary, we need to move LEFT (negative days)
+              // When past the left boundary, we need to move RIGHT (positive days)
+              const isRightBoundary = startDate.compare(boundaries.latestDataDay) > 0;
+              const daysToMove = isRightBoundary ? -Math.round(currentPosition) : Math.round(currentPosition);
+              const newDate = startDate.add({ days: daysToMove });
+              
+              // Log key parameters
+              console.log(`Frame ${frameCount} @ ${elapsed.toFixed(1)}ms: pos=${currentPosition.toFixed(1)} remaining=${remainingDistance.toFixed(1)} vel=${velocity.toFixed(1)} springF=${springForce.toFixed(1)} dampF=${dampingForce.toFixed(1)} dt=${deltaTime.toFixed(3)} endDate=${newDate.toString()}`);
+              
+              // Check if we should stop (very close and very slow)
+              if (Math.abs(remainingDistance) < SPRING_PHYSICS_CONFIG.MIN_DISTANCE && 
+                  Math.abs(velocity) < SPRING_PHYSICS_CONFIG.MIN_VELOCITY) {
                 animationFrameRef.current = null;
+                console.log(`=== SNAP BACK END (${elapsed.toFixed(1)}ms, ${frameCount} frames) ===`);
                 setEndDate(targetDate);
+                setIsDragging(false);
+              } else {
+                setEndDate(newDate);
+                animationFrameRef.current = requestAnimationFrame(animate);
               }
             };
             
             animationFrameRef.current = requestAnimationFrame(animate);
+          } else {
+            // Within boundaries - just clear dragging state
+            setIsDragging(false);
           }
         }
       } else if (newEndDate) {
@@ -144,9 +198,17 @@ export default function Home() {
               ? getDaysBetween(clampedDate, newEndDate)
               : getDaysBetween(newEndDate, clampedDate);
             
-            // Apply rubber band resistance (logarithmic scaling)
-            const resistance = 0.12; // Lower value = more resistance, slightly stiffer
-            const rubberBandDays = Math.sign(overshoot) * Math.log(1 + Math.abs(overshoot)) * resistance;
+            // Apply rubber band resistance with increasing difficulty
+            // Use a power function that makes it progressively harder to pull
+            // Calculate max stretch based on display boundary distance
+            const dataToDisplayDays = rawEndDate.compare(clampedDate) > 0 
+              ? getDaysBetween(boundaries.latestDataDay, boundaries.latestDisplayDay)
+              : getDaysBetween(boundaries.earliestDisplayEndDay, boundaries.earliestDataEndDay);
+            const maxStretch = dataToDisplayDays; // Can stretch up to the display boundary
+            const power = 0.5; // Lower = more resistance (0.5 = square root)
+            const normalizedOvershoot = Math.min(Math.abs(overshoot) / maxStretch, 1);
+            const stretchFactor = Math.pow(normalizedOvershoot, power);
+            const rubberBandDays = Math.sign(overshoot) * stretchFactor * maxStretch;
             
             // Apply the rubber band effect
             if (newEndDate.compare(clampedDate) > 0) {
@@ -212,7 +274,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('date-navigate', handleDateNavigate);
     };
-  }, [navigateToDate]);
+  }, [navigateToDate, endDate]);
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {

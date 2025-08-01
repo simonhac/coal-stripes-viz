@@ -10,6 +10,17 @@ export const DRAG_CONFIG = {
   MIN_DRAG_DISTANCE: 5,             // Minimum pixels to start a drag
 } as const;
 
+// Spring physics configuration for rubber band snap-back
+export const SPRING_PHYSICS_CONFIG = {
+  STIFFNESS: 200,                   // Spring constant - higher for snappier response
+  DAMPING: 30,                      // Damping coefficient - adjusted for the stiffness
+  MASS: 1,                          // Mass of the spring system
+  
+  // Thresholds for stopping the animation
+  MIN_DISTANCE: 0.5,                // Stop when within 0.5 days of target
+  MIN_VELOCITY: 10,                 // Stop when velocity is below 10 days/s
+} as const;
+
 // Performance monitoring
 export const PERF_CONFIG = {
   SLOW_OPERATION_THRESHOLD: 16.67,  // Operations slower than 60fps (16.67ms)

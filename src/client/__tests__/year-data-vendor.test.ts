@@ -16,12 +16,15 @@ jest.mock('@/shared/date-utils', () => ({
 }));
 
 // Mock the config to ensure CalendarDate is properly constructed
-jest.mock('@/shared/config', () => ({
-  DATE_BOUNDARIES: {
-    EARLIEST_START_DATE: new (require('@internationalized/date').CalendarDate)(2006, 1, 1),
-    DISPLAY_SLOP_MONTHS: 6
-  }
-}));
+jest.mock('@/shared/config', () => {
+  const { CalendarDate } = jest.requireActual('@internationalized/date');
+  return {
+    DATE_BOUNDARIES: {
+      EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
+      DISPLAY_SLOP_MONTHS: 6
+    }
+  };
+});
 
 describe('YearDataVendor', () => {
   let vendor: YearDataVendor;

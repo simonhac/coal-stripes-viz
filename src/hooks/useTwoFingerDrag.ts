@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { getDaysBetween } from '@/shared/date-utils';
+import { SPRING_PHYSICS_CONFIG } from '@/shared/config';
 
 interface TwoFingerDragOptions {
   endDate: CalendarDate;
@@ -168,26 +169,36 @@ export function useTwoFingerDrag({
       // Get display boundaries
       const boundaries = getDateBoundaries();
       
-      // Apply rubber band effect if beyond display boundaries (for end dates)
-      if (!boundaries.isEndDateWithinDisplayBounds(newEndDate)) {
-        // Calculate how far beyond the boundary we are
-        const clampedDate = boundaries.clampEndDateToDisplayBounds(newEndDate);
-        const overshoot = newEndDate.compare(clampedDate) > 0 
-          ? newEndDate.toDate().getTime() - clampedDate.toDate().getTime()
-          : clampedDate.toDate().getTime() - newEndDate.toDate().getTime();
+      // Check if we're beyond data boundaries (not display boundaries)
+      const beyondDataBoundary = newEndDate.compare(boundaries.latestDataDay) > 0 || 
+                                newEndDate.compare(boundaries.earliestDataEndDay) < 0;
+      
+      if (beyondDataBoundary) {
+        // Apply rubber band effect only when beyond data boundaries
+        const dataBoundaryDate = newEndDate.compare(boundaries.latestDataDay) > 0 
+          ? boundaries.latestDataDay 
+          : boundaries.earliestDataEndDay;
         
-        // Convert overshoot to days
-        const overshootDays = overshoot / (1000 * 60 * 60 * 24);
+        // Calculate overshoot from data boundary
+        const overshoot = newEndDate.compare(dataBoundaryDate) > 0 
+          ? getDaysBetween(dataBoundaryDate, newEndDate)
+          : getDaysBetween(newEndDate, dataBoundaryDate);
         
-        // Apply rubber band resistance (logarithmic scaling)
-        const resistance = 0.12; // Lower value = more resistance, slightly stiffer
-        const rubberBandDays = Math.sign(overshootDays) * Math.log(1 + Math.abs(overshootDays)) * resistance;
+        // Apply rubber band resistance with increasing difficulty
+        // Calculate max stretch based on data-to-display boundary distance
+        const maxStretch = newEndDate.compare(dataBoundaryDate) > 0 
+          ? getDaysBetween(boundaries.latestDataDay, boundaries.latestDisplayDay)
+          : getDaysBetween(boundaries.earliestDisplayEndDay, boundaries.earliestDataEndDay);
         
-        // Apply the rubber band effect
-        if (newEndDate.compare(clampedDate) > 0) {
-          newEndDate = clampedDate.add({ days: Math.ceil(rubberBandDays) });
+        // Logarithmic function: more pull = less additional movement
+        const scaleFactor = 0.4; // Controls how much you can stretch (0.4 = 40% of max at infinity)
+        const rubberBandDays = maxStretch * scaleFactor * Math.log(1 + Math.abs(overshoot) / maxStretch) * Math.sign(overshoot);
+        
+        // Apply the rubber band effect from the data boundary
+        if (newEndDate.compare(dataBoundaryDate) > 0) {
+          newEndDate = dataBoundaryDate.add({ days: Math.ceil(rubberBandDays) });
         } else {
-          newEndDate = clampedDate.add({ days: Math.floor(rubberBandDays) });
+          newEndDate = dataBoundaryDate.add({ days: Math.floor(rubberBandDays) });
         }
       }
       
@@ -221,31 +232,58 @@ export function useTwoFingerDrag({
       const boundaries = getDateBoundaries();
       
       // Check if we need to bounce back from rubber band
-      if (wasHorizontalDrag && endDate && !boundaries.isEndDateWithinDisplayBounds(endDate)) {
-        // We're beyond the boundaries, animate back
-        const targetDate = boundaries.clampEndDateToDisplayBounds(endDate);
-        const totalDays = getDaysBetween(endDate, targetDate);
-        const startTime = Date.now();
-        const duration = 250; // Faster animation
+      const beyondDataBoundary = endDate && (endDate.compare(boundaries.latestDataDay) > 0 || 
+                                             endDate.compare(boundaries.earliestDataEndDay) < 0);
+      
+      if (wasHorizontalDrag && beyondDataBoundary) {
+        // We're beyond the data boundaries, animate back
+        const targetDate = endDate!.compare(boundaries.latestDataDay) > 0 
+          ? boundaries.latestDataDay 
+          : boundaries.earliestDataEndDay;
+        let displacement = getDaysBetween(targetDate, endDate);
+        
+        // Spring physics parameters from config
+        const { STIFFNESS: stiffness, DAMPING: damping, MASS: mass } = SPRING_PHYSICS_CONFIG;
+        
+        // Calculate initial velocity from drag samples
+        let velocity = 0; // Start with zero, but add drag velocity if available
+        if (dragStateRef.current.velocitySamples.length > 0) {
+          const avgVelocityX = dragStateRef.current.velocitySamples.reduce(
+            (sum, sample) => sum + sample.x, 0
+          ) / dragStateRef.current.velocitySamples.length;
+          // Add drag velocity to initial kick (negative because dragging right = going back in time)
+          velocity += -avgVelocityX * 365 / 1000; // Approximate conversion
+        }
+        
+        let lastTime = performance.now();
         
         const animate = () => {
-          const elapsed = Date.now() - startTime;
-          const progress = Math.min(elapsed / duration, 1);
+          const currentTime = performance.now();
+          const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+          lastTime = currentTime;
           
-          // Use ease-out cubic for smooth deceleration
-          const easeOut = 1 - Math.pow(1 - progress, 3);
+          // Spring force
+          const springForce = -stiffness * displacement;
+          const dampingForce = -damping * velocity;
           
-          if (progress < 1) {
-            // Interpolate between current position and target
-            const daysToMove = Math.round(totalDays * easeOut);
-            const interpolatedDate = endDate.add({ days: daysToMove });
-            
-            onDateNavigate(interpolatedDate, true);
-            dragStateRef.current.momentumAnimationId = requestAnimationFrame(animate);
-          } else {
-            // Animation complete
+          // Update velocity and position
+          const acceleration = (springForce + dampingForce) / mass;
+          velocity += acceleration * deltaTime;
+          const deltaPosition = velocity * deltaTime;
+          
+          // Update displacement
+          displacement += deltaPosition;
+          
+          // Check if we should stop (very close and very slow)
+          if (Math.abs(displacement) < SPRING_PHYSICS_CONFIG.MIN_DISTANCE && 
+              Math.abs(velocity) < SPRING_PHYSICS_CONFIG.MIN_VELOCITY) {
             dragStateRef.current.momentumAnimationId = null;
             onDateNavigate(targetDate, false);
+          } else {
+            // Calculate new position - don't round to preserve smooth motion
+            const newDate = targetDate.add({ days: -displacement });
+            onDateNavigate(newDate, true);
+            dragStateRef.current.momentumAnimationId = requestAnimationFrame(animate);
           }
         };
         
@@ -282,10 +320,15 @@ export function useTwoFingerDrag({
             if (currentDate && daysChange !== 0) {
               const newDate = currentDate.add({ days: daysChange });
               
-              // Check if we're approaching boundaries  
-              if (!boundaries.isEndDateWithinDisplayBounds(newDate)) {
-                // We've hit the boundary, start bounce back animation
-                const clampedDate = boundaries.clampEndDateToDisplayBounds(newDate);
+              // Check if we're approaching data boundaries  
+              const beyondDataBoundary = newDate.compare(boundaries.latestDataDay) > 0 || 
+                                        newDate.compare(boundaries.earliestDataEndDay) < 0;
+              
+              if (beyondDataBoundary) {
+                // We've hit the data boundary, start bounce back animation
+                const clampedDate = newDate.compare(boundaries.latestDataDay) > 0 
+                  ? boundaries.latestDataDay 
+                  : boundaries.earliestDataEndDay;
                 const startTime = Date.now();
                 const duration = 300;
                 const startDate = currentDate;
