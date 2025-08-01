@@ -34,7 +34,9 @@ export const API_CONFIG = {
 
 // Date boundaries
 export const DATE_BOUNDARIES = {
-  // The earliest date we can show data from (365 days will show from Jan 1, 2006)
+  // The earliest date we have data from
+  EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
+  // The earliest end date we can show (365 days from start)
   EARLIEST_END_DATE: new CalendarDate(2006, 12, 31),
 } as const;
 

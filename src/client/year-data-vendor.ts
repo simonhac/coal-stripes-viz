@@ -4,7 +4,8 @@ import { CapFacYear, createCapFacYear } from './cap-fac-year';
 import { RequestQueue, RequestQueueConfig, QueueStats } from '@/shared/request-queue';
 import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 import { CalendarDate } from '@internationalized/date';
-import { getDayIndex } from '@/shared/date-utils';
+import { getDayIndex, getTodayAEST } from '@/shared/date-utils';
+import { DATE_BOUNDARIES } from '@/shared/config';
 
 export interface GenerationStats {
   totalWeightedCapacityFactor: number;
@@ -46,6 +47,28 @@ export class YearDataVendor {
   private cache: LRUCache<CapFacYear>;
   private requestQueue: RequestQueue<CapFacYear>;
 
+  /**
+   * Get the earliest year for which data is available
+   */
+  static getEarliestYear(): number {
+    return DATE_BOUNDARIES.EARLIEST_START_DATE.year;
+  }
+
+  /**
+   * Get the latest year for which data might be available
+   * This is the current year since data is collected in real-time
+   */
+  static getLatestYear(): number {
+    return getTodayAEST().year;
+  }
+
+  /**
+   * Check if a year is within valid bounds
+   */
+  static isValidYear(year: number): boolean {
+    return year >= YearDataVendor.getEarliestYear() && year <= YearDataVendor.getLatestYear();
+  }
+
   constructor(maxYears: number = 10, queueConfig?: Partial<RequestQueueConfig>) {
     this.cache = new LRUCache<CapFacYear>(maxYears);
     this.requestQueue = new RequestQueue<CapFacYear>({
@@ -65,8 +88,16 @@ export class YearDataVendor {
    * Get data for a year synchronously if it's in the cache
    * @param year The year to get
    * @returns The data if cached, null otherwise
+   * @throws Error if year is outside valid bounds
    */
   getYearSync(year: number): CapFacYear | null {
+    // Validate year bounds
+    if (!YearDataVendor.isValidYear(year)) {
+      const earliest = YearDataVendor.getEarliestYear();
+      const latest = YearDataVendor.getLatestYear();
+      throw new Error(`Year ${year} is outside valid bounds. Data is available from ${earliest} to ${latest}.`);
+    }
+
     const result = this.cache.get(year.toString());
     return result || null;
   }
@@ -74,8 +105,16 @@ export class YearDataVendor {
   /**
    * Request data for a specific year
    * @returns Promise that resolves with the data (immediately if cached)
+   * @throws Error if year is outside valid bounds
    */
   async requestYear(year: number): Promise<CapFacYear> {
+    // Validate year bounds
+    if (!YearDataVendor.isValidYear(year)) {
+      const earliest = YearDataVendor.getEarliestYear();
+      const latest = YearDataVendor.getLatestYear();
+      throw new Error(`Year ${year} is outside valid bounds. Data is available from ${earliest} to ${latest}.`);
+    }
+
     // Check cache first
     const cached = this.cache.get(year.toString());
     if (cached) {

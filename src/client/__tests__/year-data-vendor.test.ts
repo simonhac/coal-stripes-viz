@@ -1,18 +1,30 @@
 import { YearDataVendor } from '../year-data-vendor';
 import { GeneratingUnitCapFacHistoryDTO } from '@/shared/types';
 import { MockCanvas } from './helpers/mock-canvas';
+import { CalendarDate } from '@internationalized/date';
+import * as dateUtils from '@/shared/date-utils';
 
 global.OffscreenCanvas = MockCanvas as any;
 
 // Mock fetch
 global.fetch = jest.fn();
 
+// Mock the date utilities
+jest.mock('@/shared/date-utils', () => ({
+  ...jest.requireActual('@/shared/date-utils'),
+  getTodayAEST: jest.fn()
+}));
+
 describe('YearDataVendor', () => {
   let vendor: YearDataVendor;
+  const mockGetTodayAEST = dateUtils.getTodayAEST as jest.MockedFunction<typeof dateUtils.getTodayAEST>;
   
   beforeEach(() => {
     vendor = new YearDataVendor(3, { maxRetries: 0 }); // Small cache for testing, no retries
     jest.clearAllMocks();
+    
+    // Default to 2024 for tests
+    mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 7, 15));
   });
   
   afterEach(() => {
@@ -268,6 +280,108 @@ describe('YearDataVendor', () => {
       expect(vendor.hasYear(2021)).toBe(true);
       expect(vendor.hasYear(2022)).toBe(true);
       expect(vendor.hasYear(2023)).toBe(true);
+    });
+  });
+
+  describe('Year bounds validation', () => {
+    describe('getEarliestYear', () => {
+      it('should return 2006 as the earliest year', () => {
+        expect(YearDataVendor.getEarliestYear()).toBe(2006);
+      });
+    });
+
+    describe('getLatestYear', () => {
+      it('should return the current year', () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 7, 15));
+        expect(YearDataVendor.getLatestYear()).toBe(2024);
+      });
+
+      it('should update when the year changes', () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2025, 1, 1));
+        expect(YearDataVendor.getLatestYear()).toBe(2025);
+      });
+    });
+
+    describe('isValidYear', () => {
+      it('should accept valid years', () => {
+        expect(YearDataVendor.isValidYear(2006)).toBe(true);
+        expect(YearDataVendor.isValidYear(2015)).toBe(true);
+        expect(YearDataVendor.isValidYear(2024)).toBe(true);
+      });
+
+      it('should reject years before 2006', () => {
+        expect(YearDataVendor.isValidYear(2005)).toBe(false);
+        expect(YearDataVendor.isValidYear(2000)).toBe(false);
+        expect(YearDataVendor.isValidYear(1999)).toBe(false);
+      });
+
+      it('should reject years after the current year', () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 7, 15));
+        expect(YearDataVendor.isValidYear(2025)).toBe(false);
+        expect(YearDataVendor.isValidYear(2030)).toBe(false);
+      });
+    });
+
+    describe('requestYear with year validation', () => {
+      it('should throw error for year before 2006', async () => {
+        await expect(vendor.requestYear(2005)).rejects.toThrow(
+          'Year 2005 is outside valid bounds. Data is available from 2006 to 2024.'
+        );
+      });
+
+      it('should throw error for future year', async () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 7, 15));
+        await expect(vendor.requestYear(2025)).rejects.toThrow(
+          'Year 2025 is outside valid bounds. Data is available from 2006 to 2024.'
+        );
+      });
+
+      it('should accept valid year within bounds', async () => {
+        const mockData = mockYearData(2020);
+        (global.fetch as jest.Mock).mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockData
+        });
+
+        const result = await vendor.requestYear(2020);
+        expect(result.year).toBe(2020);
+      });
+    });
+
+    describe('getYearSync with year validation', () => {
+      it('should throw error for year before 2006', () => {
+        expect(() => vendor.getYearSync(2005)).toThrow(
+          'Year 2005 is outside valid bounds. Data is available from 2006 to 2024.'
+        );
+      });
+
+      it('should throw error for future year', () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 7, 15));
+        expect(() => vendor.getYearSync(2025)).toThrow(
+          'Year 2025 is outside valid bounds. Data is available from 2006 to 2024.'
+        );
+      });
+
+      it('should return null for valid but uncached year', () => {
+        expect(vendor.getYearSync(2020)).toBeNull();
+      });
+    });
+
+    describe('Year boundary edge cases', () => {
+      it('should handle year boundary on Dec 31', () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 12, 31));
+        expect(YearDataVendor.getLatestYear()).toBe(2024);
+        expect(YearDataVendor.isValidYear(2024)).toBe(true);
+        expect(YearDataVendor.isValidYear(2025)).toBe(false);
+      });
+
+      it('should handle year boundary on Jan 1', () => {
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2025, 1, 1));
+        expect(YearDataVendor.getLatestYear()).toBe(2025);
+        expect(YearDataVendor.isValidYear(2024)).toBe(true);
+        expect(YearDataVendor.isValidYear(2025)).toBe(true);
+        expect(YearDataVendor.isValidYear(2026)).toBe(false);
+      });
     });
   });
 });
