@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST } from '@/shared/date-utils';
 import { DATE_BOUNDARIES } from '@/shared/config';
@@ -22,6 +22,23 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const boundaryFlashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Debounced boundary flash function
+  const triggerBoundaryFlash = useCallback(() => {
+    // Clear any existing timeout
+    if (boundaryFlashTimeoutRef.current) {
+      clearTimeout(boundaryFlashTimeoutRef.current);
+      boundaryFlashTimeoutRef.current = null;
+    }
+    
+    // Always trigger the flash
+    setBoundaryFlash(true);
+    boundaryFlashTimeoutRef.current = setTimeout(() => {
+      setBoundaryFlash(false);
+      boundaryFlashTimeoutRef.current = null;
+    }, 300);
+  }, []);
   
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate, { skipAnimation: isDragging });
@@ -30,10 +47,7 @@ export default function Home() {
   const { navigateToMonth, navigateToDate } = useNavigation({
     endDate,
     onDateChange: setEndDate,
-    onBoundaryHit: () => {
-      setBoundaryFlash(true);
-      setTimeout(() => setBoundaryFlash(false), 300);
-    },
+    onBoundaryHit: triggerBoundaryFlash,
     isDragging
   });
   
@@ -76,19 +90,14 @@ export default function Home() {
       }
     };
     
-    const handleBoundaryHit = () => {
-      setBoundaryFlash(true);
-      setTimeout(() => setBoundaryFlash(false), 300);
-    };
-    
     window.addEventListener('date-navigate', handleDateNavigate);
-    window.addEventListener('navigation-boundary-hit', handleBoundaryHit);
+    window.addEventListener('navigation-boundary-hit', triggerBoundaryFlash);
     
     return () => {
       window.removeEventListener('date-navigate', handleDateNavigate);
-      window.removeEventListener('navigation-boundary-hit', handleBoundaryHit);
+      window.removeEventListener('navigation-boundary-hit', triggerBoundaryFlash);
     };
-  }, [navigateToDate, endDate, setEndDate]);
+  }, [navigateToDate, endDate, setEndDate, triggerBoundaryFlash]);
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
@@ -167,6 +176,13 @@ export default function Home() {
   // Ensure the page has focus on mount for keyboard navigation
   useEffect(() => {
     window.focus();
+    
+    // Cleanup boundary flash timeout on unmount
+    return () => {
+      if (boundaryFlashTimeoutRef.current) {
+        clearTimeout(boundaryFlashTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Detect mobile screen width

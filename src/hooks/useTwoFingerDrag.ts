@@ -112,8 +112,8 @@ export function useTwoFingerDrag({
     // Calculate horizontal movement
     const deltaX = currentCenterX - dragStateRef.current.startCenterX;
     
-    // Convert pixel movement to days (same ratio as mouse drag)
-    const daysChange = Math.round(deltaX / 5);
+    // Convert pixel movement to days
+    const daysChange = Math.round(deltaX);
     
     if (dragStateRef.current.startEndDate) {
       const newEndDate = dragStateRef.current.startEndDate.add({ days: -daysChange });
