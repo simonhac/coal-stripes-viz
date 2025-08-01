@@ -185,6 +185,33 @@ export default function Home() {
     };
   }, []);
 
+  // Clear pinned tooltips when touching outside interactive elements
+  useEffect(() => {
+    const handleGlobalTouch = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Check if the touch is on an interactive element
+      const isInteractiveElement = 
+        target.closest('.opennem-facility-label') ||
+        target.closest('.opennem-region-label') ||
+        target.closest('.opennem-facility-canvas') ||
+        target.closest('.opennem-month-label') ||
+        target.closest('.tooltip-container');
+      
+      // If touching outside interactive elements, clear any pinned tooltips
+      if (!isInteractiveElement) {
+        const event = new CustomEvent('tooltip-data-hover-end');
+        window.dispatchEvent(event);
+      }
+    };
+
+    document.addEventListener('touchstart', handleGlobalTouch);
+    
+    return () => {
+      document.removeEventListener('touchstart', handleGlobalTouch);
+    };
+  }, []);
+
   // Detect mobile screen width
   useEffect(() => {
     const checkMobile = () => {
