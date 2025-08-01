@@ -157,10 +157,9 @@ const CompositeTileComponent = ({
   }
 
   const drawErrorState = (ctx: CanvasRenderingContext2D, left: number, width: number, height: number) => {
-    ctx.fillStyle = '#ff0000';
-    for (let i = 0; i < width; i += 4) {
-      ctx.fillRect(left + i, 0, 2, height);
-    }
+    // Use light blue color to indicate unavailable data
+    ctx.fillStyle = '#e6f3ff';
+    ctx.fillRect(left, 0, width, height);
   };
 
   // Helper to convert client coordinates to canvas coordinates
