@@ -124,8 +124,9 @@ export function RegionSection({
     };
     
     const handleTooltipHoverEnd = () => {
-      // Don't clear if the current tooltip is pinned
-      setTooltipData(prev => prev?.pinned ? prev : null);
+      console.log(`RegionSection ${regionCode}: Received tooltip-data-hover-end event`);
+      // Always clear on explicit hover-end event (this now handles unpinning too)
+      setTooltipData(null);
     };
     
     window.addEventListener('tooltip-data-hover', handleTooltipHover);
