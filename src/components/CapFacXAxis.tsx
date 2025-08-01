@@ -3,7 +3,7 @@ import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween, getMonthName } from '@/shared/date-utils';
 import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 import { CapFacYear } from '@/client/cap-fac-year';
-import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
+import { yearDataVendor, getRegionNames, YearDataVendor } from '@/client/year-data-vendor';
 import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 
 interface CapFacXAxisProps {
@@ -29,6 +29,13 @@ export function CapFacXAxis({
   useEffect(() => {
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
+    
+    // Skip if years are invalid
+    if (!YearDataVendor.isValidYear(startYear) || !YearDataVendor.isValidYear(endYear)) {
+      console.warn(`CapFacXAxis: Skipping invalid year range ${startYear}-${endYear}`);
+      return;
+    }
+    
     const years = startYear === endYear ? [startYear] : [startYear, endYear];
     
     // Track current request years to ignore stale responses
@@ -47,27 +54,32 @@ export function CapFacXAxis({
     
     // Fetch year data without waiting
     years.forEach(year => {
-      yearDataVendor.requestYear(year)
-        .then(yearData => {
-          // Ignore if we've moved to different years
-          if (!currentYears.has(year)) {
-            return;
-          }
-          
-          setYearDataMap(prevMap => {
-            const newMap = new Map(prevMap);
-            newMap.set(yearData.year, yearData);
-            return newMap;
+      try {
+        yearDataVendor.requestYear(year)
+          .then(yearData => {
+            // Ignore if we've moved to different years
+            if (!currentYears.has(year)) {
+              return;
+            }
+            
+            setYearDataMap(prevMap => {
+              const newMap = new Map(prevMap);
+              newMap.set(yearData.year, yearData);
+              return newMap;
+            });
+          })
+          .catch(err => {
+            // Ignore if we've moved to different years
+            if (!currentYears.has(year)) {
+              return;
+            }
+            
+            console.error(`CapFacXAxis: Failed to load year ${year}:`, err);
           });
-        })
-        .catch(err => {
-          // Ignore if we've moved to different years
-          if (!currentYears.has(year)) {
-            return;
-          }
-          
-          console.error(`CapFacXAxis: Failed to load year ${year}:`, err);
-        });
+      } catch (error) {
+        // Handle synchronous validation errors
+        console.error(`CapFacXAxis: Invalid year ${year}:`, error);
+      }
     });
     
     // Cleanup function to mark requests as stale

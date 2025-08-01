@@ -42,7 +42,13 @@ export default function Home() {
       const { newEndDate, isDragging } = customEvent.detail;
       
       if (newEndDate) {
-        setIsDragging(isDragging);
+        // Only update isDragging if it changed
+        setIsDragging(prev => {
+          if (prev !== isDragging) {
+            return isDragging;
+          }
+          return prev;
+        });
         
         if (isDragging) {
           // During drag, allow date to go beyond boundaries

@@ -245,8 +245,9 @@ const CompositeTileComponent = ({
     
     // Load left tile only if not found in cache
     if (needsAsyncLeftLoad) {
-      yearDataVendor.requestYear(startYear)
-        .then(leftYearData => {
+      try {
+        yearDataVendor.requestYear(startYear)
+          .then(leftYearData => {
           // Ignore if we've moved to a different year
           if (currentStartYear !== startYear) {
             return;
@@ -272,12 +273,18 @@ const CompositeTileComponent = ({
           console.error(`Failed to load year ${startYear}:`, error);
           setTiles(prev => ({ ...prev, leftState: 'error' }));
         });
+      } catch (error) {
+        // Handle synchronous validation errors
+        console.error(`Invalid year ${startYear}:`, error);
+        setTiles(prev => ({ ...prev, leftState: 'error' }));
+      }
     }
 
     // Load right tile only if not found in cache and we're spanning two years
     if (needsAsyncRightLoad) {
-      yearDataVendor.requestYear(endYear)
-        .then(rightYearData => {
+      try {
+        yearDataVendor.requestYear(endYear)
+          .then(rightYearData => {
           // Ignore if we've moved to different years
           if (currentStartYear !== startYear || currentEndYear !== endYear) {
             return;
@@ -305,6 +312,11 @@ const CompositeTileComponent = ({
           console.error(`Failed to load year ${endYear}:`, error);
           setTiles(prev => ({ ...prev, rightState: 'error' }));
         });
+      } catch (error) {
+        // Handle synchronous validation errors
+        console.error(`Invalid year ${endYear}:`, error);
+        setTiles(prev => ({ ...prev, rightState: 'error' }));
+      }
     }
     
     // Cleanup function to mark requests as stale
