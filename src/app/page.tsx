@@ -240,6 +240,9 @@ export default function Home() {
               />
             );
           })}
+          
+          {/* Bottom spacer */}
+          <div style={{ height: '50px', clear: 'both' }} />
         </div>
       </div>
     </>
