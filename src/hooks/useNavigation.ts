@@ -7,11 +7,10 @@ import { DATE_BOUNDARIES } from '@/shared/config';
 interface NavigationOptions {
   endDate: CalendarDate | null;
   onDateChange: (newEndDate: CalendarDate) => void;
-  onBoundaryHit?: () => void;
   isDragging?: boolean;
 }
 
-export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging }: NavigationOptions) {
+export function useNavigation({ endDate, onDateChange, isDragging }: NavigationOptions) {
   // Preload years for a given date range
   const preloadYearsForDate = useCallback((newEndDate: CalendarDate) => {
     const startDate = newEndDate.subtract({ days: 364 });
@@ -60,23 +59,19 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
       if (!endDate || endDate.compare(yesterday) < 0) {
         onDateChange(yesterday);
         preloadYearsForDate(yesterday);
-      } else if (onBoundaryHit) {
-        onBoundaryHit();
       }
     } else if (newEndDate.compare(earliestDate) < 0) {
       // Trying to go before earliest date
       if (!endDate || endDate.compare(earliestDate) > 0) {
         onDateChange(earliestDate);
         preloadYearsForDate(earliestDate);
-      } else if (onBoundaryHit) {
-        onBoundaryHit();
       }
     } else {
       // Date is within valid range
       onDateChange(newEndDate);
       preloadYearsForDate(newEndDate);
     }
-  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
+  }, [endDate, onDateChange, preloadYearsForDate]);
 
   // Navigate by months (used by keyboard navigation)
   const navigateByMonths = useCallback((months: number) => {
@@ -92,23 +87,19 @@ export function useNavigation({ endDate, onDateChange, onBoundaryHit, isDragging
       if (endDate.compare(yesterday) < 0) {
         onDateChange(yesterday);
         preloadYearsForDate(yesterday);
-      } else if (onBoundaryHit) {
-        onBoundaryHit();
       }
     } else if (newEndDate.compare(earliestDate) < 0) {
       // Trying to go before earliest date
       if (endDate.compare(earliestDate) > 0) {
         onDateChange(earliestDate);
         preloadYearsForDate(earliestDate);
-      } else if (onBoundaryHit) {
-        onBoundaryHit();
       }
     } else {
       // Date is within valid range
       onDateChange(newEndDate);
       preloadYearsForDate(newEndDate);
     }
-  }, [endDate, onDateChange, preloadYearsForDate, onBoundaryHit]);
+  }, [endDate, onDateChange, preloadYearsForDate]);
 
   // Navigate to a specific month (used by clicking month boxes)
   const navigateToMonth = useCallback((year: number, month: number) => {

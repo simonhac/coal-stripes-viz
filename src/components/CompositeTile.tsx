@@ -89,17 +89,24 @@ const CompositeTileComponent = ({
     
     // Check left tile
     if (!tiles.left || tiles.left.getYear() !== neededTiles.leftYear) {
-      const cachedLeftYear = yearDataVendor.getYearSync(neededTiles.leftYear);
-      if (cachedLeftYear) {
-        // If year is cached, tile MUST exist - use non-null assertion
-        const cachedLeftTile = cachedLeftYear.facilityTiles.get(facilityCode)!;
-        newTiles.left = cachedLeftTile;
-        newTiles.leftState = 'hasData';
-        needsUpdate = true;
-      } else {
-        // Year not in cache yet
+      try {
+        const cachedLeftYear = yearDataVendor.getYearSync(neededTiles.leftYear);
+        if (cachedLeftYear) {
+          // If year is cached, tile MUST exist - use non-null assertion
+          const cachedLeftTile = cachedLeftYear.facilityTiles.get(facilityCode)!;
+          newTiles.left = cachedLeftTile;
+          newTiles.leftState = 'hasData';
+          needsUpdate = true;
+        } else {
+          // Year not in cache yet
+          newTiles.left = null;
+          newTiles.leftState = 'pendingData';
+          needsUpdate = true;
+        }
+      } catch {
+        // Year is out of bounds - no data available
         newTiles.left = null;
-        newTiles.leftState = 'pendingData';
+        newTiles.leftState = 'error';
         needsUpdate = true;
       }
     }
@@ -107,17 +114,24 @@ const CompositeTileComponent = ({
     // Check right tile
     if (neededTiles.rightYear) {
       if (!tiles.right || tiles.right.getYear() !== neededTiles.rightYear) {
-        const cachedRightYear = yearDataVendor.getYearSync(neededTiles.rightYear);
-        if (cachedRightYear) {
-          // If year is cached, tile MUST exist - use non-null assertion
-          const cachedRightTile = cachedRightYear.facilityTiles.get(facilityCode)!;
-          newTiles.right = cachedRightTile;
-          newTiles.rightState = 'hasData';
-          needsUpdate = true;
-        } else {
-          // Year not in cache yet
+        try {
+          const cachedRightYear = yearDataVendor.getYearSync(neededTiles.rightYear);
+          if (cachedRightYear) {
+            // If year is cached, tile MUST exist - use non-null assertion
+            const cachedRightTile = cachedRightYear.facilityTiles.get(facilityCode)!;
+            newTiles.right = cachedRightTile;
+            newTiles.rightState = 'hasData';
+            needsUpdate = true;
+          } else {
+            // Year not in cache yet
+            newTiles.right = null;
+            newTiles.rightState = 'pendingData';
+            needsUpdate = true;
+          }
+        } catch {
+          // Year is out of bounds - no data available
           newTiles.right = null;
-          newTiles.rightState = 'pendingData';
+          newTiles.rightState = 'error';
           needsUpdate = true;
         }
       } else if (tiles.right && tiles.rightState !== 'hasData') {

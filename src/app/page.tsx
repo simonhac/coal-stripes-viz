@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST } from '@/shared/date-utils';
 import { DATE_BOUNDARIES } from '@/shared/config';
@@ -18,27 +18,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<CalendarDate | null>(null);
   const [facilitiesByRegion, setFacilitiesByRegion] = useState<Map<string, { code: string; name: string }[]>>(new Map());
-  const [boundaryFlash, setBoundaryFlash] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const boundaryFlashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Debounced boundary flash function
-  const triggerBoundaryFlash = useCallback(() => {
-    // Clear any existing timeout
-    if (boundaryFlashTimeoutRef.current) {
-      clearTimeout(boundaryFlashTimeoutRef.current);
-      boundaryFlashTimeoutRef.current = null;
-    }
-    
-    // Always trigger the flash
-    setBoundaryFlash(true);
-    boundaryFlashTimeoutRef.current = setTimeout(() => {
-      setBoundaryFlash(false);
-      boundaryFlashTimeoutRef.current = null;
-    }, 300);
-  }, []);
   
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate, { skipAnimation: isDragging });
@@ -47,7 +29,6 @@ export default function Home() {
   const { navigateToMonth, navigateToDate } = useNavigation({
     endDate,
     onDateChange: setEndDate,
-    onBoundaryHit: triggerBoundaryFlash,
     isDragging
   });
   
@@ -61,43 +42,36 @@ export default function Home() {
       const { newEndDate, isDragging } = customEvent.detail;
       
       if (newEndDate) {
-        // Check boundaries
-        const yesterday = getTodayAEST().subtract({ days: 1 });
-        const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
-        
-        // Clamp the date within boundaries
-        let clampedDate = newEndDate;
-        if (newEndDate.compare(yesterday) > 0) {
-          clampedDate = yesterday;
-          // Emit boundary hit event
-          const boundaryEvent = new CustomEvent('navigation-boundary-hit');
-          window.dispatchEvent(boundaryEvent);
-        } else if (newEndDate.compare(earliestDate) < 0) {
-          clampedDate = earliestDate;
-          // Emit boundary hit event
-          const boundaryEvent = new CustomEvent('navigation-boundary-hit');
-          window.dispatchEvent(boundaryEvent);
-        }
-        
         setIsDragging(isDragging);
+        
         if (isDragging) {
-          // During drag, update date directly without animation
-          setEndDate(clampedDate);
+          // During drag, allow date to go beyond boundaries
+          setEndDate(newEndDate);
         } else {
-          // On drag end or other navigation, use animation
-          navigateToDate(clampedDate);
+          // On drag end, check boundaries and spring back if needed
+          const yesterday = getTodayAEST().subtract({ days: 1 });
+          const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
+          
+          if (newEndDate.compare(yesterday) > 0) {
+            // Beyond future boundary - spring back to yesterday
+            navigateToDate(yesterday);
+          } else if (newEndDate.compare(earliestDate) < 0) {
+            // Beyond past boundary - spring back to earliest date
+            navigateToDate(earliestDate);
+          } else {
+            // Within boundaries - just animate to position
+            navigateToDate(newEndDate);
+          }
         }
       }
     };
     
     window.addEventListener('date-navigate', handleDateNavigate);
-    window.addEventListener('navigation-boundary-hit', triggerBoundaryFlash);
     
     return () => {
       window.removeEventListener('date-navigate', handleDateNavigate);
-      window.removeEventListener('navigation-boundary-hit', triggerBoundaryFlash);
     };
-  }, [navigateToDate, endDate, setEndDate, triggerBoundaryFlash]);
+  }, [navigateToDate, setEndDate]);
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
@@ -176,13 +150,6 @@ export default function Home() {
   // Ensure the page has focus on mount for keyboard navigation
   useEffect(() => {
     window.focus();
-    
-    // Cleanup boundary flash timeout on unmount
-    return () => {
-      if (boundaryFlashTimeoutRef.current) {
-        clearTimeout(boundaryFlashTimeoutRef.current);
-      }
-    };
   }, []);
 
   // Clear pinned tooltips when touching outside interactive elements
@@ -267,7 +234,7 @@ export default function Home() {
         {/* Main Stripes Visualization */}
         <div 
           ref={containerRef} 
-          className={`opennem-stripes-viz ${boundaryFlash ? 'boundary-flash' : ''}`}
+          className="opennem-stripes-viz"
         >
           {/* Create a section for each region */}
           {Array.from(facilitiesByRegion.entries()).map(([regionCode, facilities]) => {
