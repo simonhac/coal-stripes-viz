@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
@@ -9,6 +9,7 @@ import { RegionSection } from '../components/RegionSection';
 import { DateRange } from '../components/DateRange';
 import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useDateRangeAnimator } from '@/hooks/useDateRangeAnimator';
 import './opennem.css';
 
 export default function Home() {
@@ -75,6 +76,37 @@ export default function Home() {
       window.removeEventListener('date-animate', handleDateAnimate);
     };
   }, []);
+  
+  // Create a shared animator for handling drag physics
+  const handleAnimatorNavigate = useCallback((date: CalendarDate, isDragging: boolean) => {
+    setEndDate(date);
+    setIsDragging(isDragging);
+    if (!isDragging) {
+      setAnimatedEndDate(date);
+    }
+  }, []);
+  
+  const dragAnimator = useDateRangeAnimator({
+    currentEndDate: endDate || getDateBoundaries().latestDataDay,
+    onDateNavigate: handleAnimatorNavigate,
+  });
+  
+  // Handle drag end events that need snap-back checking
+  useEffect(() => {
+    const handleDragEnd = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { applyMomentum } = customEvent.detail;
+      
+      // Use the shared animator to handle snap-back
+      dragAnimator.endDrag(applyMomentum);
+    };
+    
+    window.addEventListener('drag-end', handleDragEnd);
+    
+    return () => {
+      window.removeEventListener('drag-end', handleDragEnd);
+    };
+  }, [dragAnimator]);
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
