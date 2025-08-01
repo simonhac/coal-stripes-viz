@@ -17,7 +17,8 @@ export function RegionLabel({
 }: RegionLabelProps) {
   const regionNames = getRegionNames(regionCode);
   const regionName = regionNames.long;
-  const handleMouseEnter = () => {
+  
+  const sendTooltipData = (pinned: boolean = false) => {
     if (dateRange) {
       const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
       const avgCapacityFactor = calculateAverageCapacityFactor(stats);
@@ -32,8 +33,9 @@ export function RegionLabel({
           endDate: dateRange.end,
           label: tooltipLabel,
           capacityFactor: avgCapacityFactor,
-          tooltipType: 'period',
-          regionCode: regionCode
+          tooltipType: 'period' as const,
+          regionCode: regionCode,
+          pinned
         };
         
         // Broadcast the tooltip data
@@ -44,18 +46,22 @@ export function RegionLabel({
       }
     }
   };
+  
+  const handleMouseEnter = () => sendTooltipData(false);
+  const handleClick = () => sendTooltipData(true);
 
   return (
-    <span 
-      style={{ cursor: 'pointer' }}
+    <div 
+      className="opennem-region-label"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => {
         // Broadcast hover end
         const event = new CustomEvent('tooltip-data-hover-end');
         window.dispatchEvent(event);
       }}
+      onClick={handleClick}
     >
       {regionName}
-    </span>
+    </div>
   );
 }

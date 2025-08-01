@@ -98,7 +98,8 @@ export function RegionSection({
             label: tooltipRegionName,
             capacityFactor:  avgCapacityFactor,
             tooltipType: data.tooltipType,
-            regionCode: regionCode 
+            regionCode: regionCode,
+            pinned: data.pinned
           }
         
           // console.log(`${regionCode} got ${data.regionCode}'s update: ${formatTooltipDebug(myTooltipData)}`);
@@ -108,8 +109,8 @@ export function RegionSection({
     };
     
     const handleTooltipHoverEnd = () => {
-      // Clear tooltip for this region
-      setTooltipData(null);
+      // Don't clear if the current tooltip is pinned
+      setTooltipData(prev => prev?.pinned ? prev : null);
     };
     
     window.addEventListener('tooltip-data-hover', handleTooltipHover);

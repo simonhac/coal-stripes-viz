@@ -12,6 +12,7 @@ export interface TooltipData {
   facilityCode?: string;
   network?: string;
   unitName?: string;
+  pinned?: boolean;
 }
 
 interface CapFacTooltipProps {

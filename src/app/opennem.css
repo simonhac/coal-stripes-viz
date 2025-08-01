@@ -240,7 +240,7 @@ header a {
 }
 
 .opennem-region {
-  margin: 24px 0;
+  margin: 0;
   position: relative; /* Create containing block for sticky header */
 }
 
@@ -264,6 +264,11 @@ header a {
   top: 0;
   z-index: 100;
   justify-content: space-between;
+}
+
+.opennem-region-label {
+  cursor: pointer;
+  padding-top: 24px;
 }
 
 .opennem-region-content {
@@ -485,7 +490,7 @@ header a {
 
 .hover-values strong {
   font-weight: 700;
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .tooltip-icon {

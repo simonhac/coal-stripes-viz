@@ -17,7 +17,7 @@ export function FacilityLabel({
   regionCode,
   dateRange
 }: FacilityLabelProps) {
-  const handleMouseEnter = () => {
+  const sendTooltipData = (pinned: boolean = false) => {
     const stats = yearDataVendor.calculateFacilityStats(regionCode, facilityCode, dateRange);
     const avgCapacityFactor = calculateAverageCapacityFactor(stats);
     if (avgCapacityFactor !== null) {
@@ -26,9 +26,10 @@ export function FacilityLabel({
         endDate: dateRange.end,
         label: facilityName,
         capacityFactor: avgCapacityFactor,
-        tooltipType: 'period',
+        tooltipType: 'period' as const,
         regionCode: regionCode,
-        facilityCode: facilityCode
+        facilityCode: facilityCode,
+        pinned
       };
       
       // Broadcast the tooltip data
@@ -38,6 +39,9 @@ export function FacilityLabel({
       window.dispatchEvent(event);
     }
   };
+  
+  const handleMouseEnter = () => sendTooltipData(false);
+  const handleClick = () => sendTooltipData(true);
 
   return (
     <div 
@@ -48,6 +52,7 @@ export function FacilityLabel({
         const event = new CustomEvent('tooltip-data-hover-end');
         window.dispatchEvent(event);
       }}
+      onClick={handleClick}
     >
       {facilityName}
     </div>
