@@ -1,5 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { CalendarDate } from '@internationalized/date';
+import { getTodayAEST } from '@/shared/date-utils';
+import { DATE_BOUNDARIES } from '@/shared/config';
 
 interface TwoFingerDragOptions {
   endDate: CalendarDate;
@@ -10,6 +12,12 @@ interface TouchPoint {
   id: number;
   x: number;
   y: number;
+}
+
+interface VelocitySample {
+  x: number;
+  y: number;
+  time: number;
 }
 
 export function useTwoFingerDrag({
@@ -24,6 +32,10 @@ export function useTwoFingerDrag({
     touches: Map<number, TouchPoint>;
     isHorizontalDrag: boolean;
     hasMoved: boolean;
+    velocitySamples: VelocitySample[];
+    lastCenterX: number;
+    lastCenterY: number;
+    momentumAnimationId: number | null;
   }>({
     isActive: false,
     startCenterX: 0,
@@ -31,7 +43,11 @@ export function useTwoFingerDrag({
     startEndDate: null,
     touches: new Map(),
     isHorizontalDrag: false,
-    hasMoved: false
+    hasMoved: false,
+    velocitySamples: [],
+    lastCenterX: 0,
+    lastCenterY: 0,
+    momentumAnimationId: null
   });
 
   // Add passive touch move handler to prevent scrolling during horizontal drag
@@ -50,6 +66,12 @@ export function useTwoFingerDrag({
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Cancel any ongoing momentum animation
+    if (dragStateRef.current.momentumAnimationId !== null) {
+      cancelAnimationFrame(dragStateRef.current.momentumAnimationId);
+      dragStateRef.current.momentumAnimationId = null;
+    }
+
     // Store all current touches
     const touches = new Map<number, TouchPoint>();
     for (let i = 0; i < e.touches.length; i++) {
@@ -79,7 +101,10 @@ export function useTwoFingerDrag({
         startCenterY: centerY,
         startEndDate: endDate,
         isHorizontalDrag: false,
-        hasMoved: false
+        hasMoved: false,
+        velocitySamples: [],
+        lastCenterX: centerX,
+        lastCenterY: centerY
       };
       
       // Set dragging cursor
@@ -109,6 +134,28 @@ export function useTwoFingerDrag({
       }
     }
     
+    // Track velocity
+    const now = Date.now();
+    const velocityX = currentCenterX - dragStateRef.current.lastCenterX;
+    const velocityY = currentCenterY - dragStateRef.current.lastCenterY;
+    
+    // Add velocity sample
+    dragStateRef.current.velocitySamples.push({
+      x: velocityX,
+      y: velocityY,
+      time: now
+    });
+    
+    // Keep only recent samples (last 100ms)
+    const cutoffTime = now - 100;
+    dragStateRef.current.velocitySamples = dragStateRef.current.velocitySamples.filter(
+      sample => sample.time > cutoffTime
+    );
+    
+    // Update last position
+    dragStateRef.current.lastCenterX = currentCenterX;
+    dragStateRef.current.lastCenterY = currentCenterY;
+    
     // Calculate horizontal movement
     const deltaX = currentCenterX - dragStateRef.current.startCenterX;
     
@@ -136,14 +183,78 @@ export function useTwoFingerDrag({
 
     // If we no longer have two touches, end the drag
     if (dragStateRef.current.isActive && e.touches.length < 2) {
+      const wasHorizontalDrag = dragStateRef.current.isHorizontalDrag;
+      
       dragStateRef.current.isActive = false;
       dragStateRef.current.isHorizontalDrag = false;
       dragStateRef.current.hasMoved = false;
       document.body.style.cursor = '';
       
-      // Emit final navigation event with isDragging: false
-      if (endDate) {
-        onDateNavigate(endDate, false);
+      // Calculate average velocity from recent samples
+      if (wasHorizontalDrag && dragStateRef.current.velocitySamples.length > 0) {
+        const avgVelocityX = dragStateRef.current.velocitySamples.reduce(
+          (sum, sample) => sum + sample.x, 0
+        ) / dragStateRef.current.velocitySamples.length;
+        
+        // Only apply momentum if velocity is significant
+        if (Math.abs(avgVelocityX) > 2) {
+          // Start momentum animation
+          let currentVelocity = avgVelocityX * 15; // Scale up the velocity
+          let currentDate = endDate;
+          const friction = 0.92; // Deceleration factor
+          const minVelocity = 0.5;
+          
+          // Calculate boundaries with 6 month buffer
+          const yesterday = getTodayAEST().subtract({ days: 1 });
+          const upperBoundary = yesterday.add({ months: 6 });
+          const lowerBoundary = DATE_BOUNDARIES.EARLIEST_END_DATE.subtract({ months: 6 });
+          
+          const animate = () => {
+            // Apply friction
+            currentVelocity *= friction;
+            
+            // Stop if velocity is too small
+            if (Math.abs(currentVelocity) < minVelocity) {
+              dragStateRef.current.momentumAnimationId = null;
+              onDateNavigate(currentDate, false);
+              return;
+            }
+            
+            // Calculate days to move (velocity is in pixels, convert to days)
+            const daysChange = Math.round(-currentVelocity / 10); // Round to whole days
+            
+            // Update date only if we're moving at least 1 day
+            if (currentDate && daysChange !== 0) {
+              const newDate = currentDate.add({ days: daysChange });
+              
+              // Check if we're approaching boundaries and stop momentum if so
+              if (newDate.compare(upperBoundary) > 0 || newDate.compare(lowerBoundary) < 0) {
+                dragStateRef.current.momentumAnimationId = null;
+                onDateNavigate(currentDate, false);
+                return;
+              }
+              
+              currentDate = newDate;
+              onDateNavigate(newDate, true);
+            }
+            
+            // Continue animation
+            dragStateRef.current.momentumAnimationId = requestAnimationFrame(animate);
+          };
+          
+          // Start the animation
+          dragStateRef.current.momentumAnimationId = requestAnimationFrame(animate);
+        } else {
+          // No momentum, just emit final navigation event
+          if (endDate) {
+            onDateNavigate(endDate, false);
+          }
+        }
+      } else {
+        // Not a horizontal drag or no velocity data
+        if (endDate) {
+          onDateNavigate(endDate, false);
+        }
       }
     }
   }, [endDate, onDateNavigate]);
@@ -151,6 +262,12 @@ export function useTwoFingerDrag({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      // Cancel any ongoing momentum animation
+      if (dragStateRef.current.momentumAnimationId !== null) {
+        cancelAnimationFrame(dragStateRef.current.momentumAnimationId);
+        dragStateRef.current.momentumAnimationId = null;
+      }
+      
       if (dragStateRef.current.isActive) {
         dragStateRef.current.isActive = false;
         dragStateRef.current.isHorizontalDrag = false;
