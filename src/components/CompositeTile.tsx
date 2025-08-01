@@ -177,18 +177,24 @@ const CompositeTileComponent = ({
       : getDaysInYear(startYear) - 1; // 0-based index for last day of year
     const leftWidth = leftEndDay - leftStartDay + 1;
     
+    // Calculate total width of the composite tile
+    const totalWidth = startYear === endYear ? leftWidth : leftWidth + getDayIndex(dateRange.end) + 1;
+    
+    // Clamp x coordinate to valid range
+    const clampedX = Math.max(0, Math.min(x, totalWidth - 1));
+    
     let tooltipData = null;
     
-    if (x < leftWidth) {
+    if (clampedX < leftWidth) {
       // Mouse is in left tile
       if (tiles.left) {
-        const tileX = x + leftStartDay;
+        const tileX = clampedX + leftStartDay;
         tooltipData = tiles.left.getTooltipData(tileX, y);
       }
     } else if (startYear !== endYear) {
       // Mouse is in right tile
       if (tiles.right) {
-        const tileX = x - leftWidth;
+        const tileX = clampedX - leftWidth;
         tooltipData = tiles.right.getTooltipData(tileX, y);
       }
     }

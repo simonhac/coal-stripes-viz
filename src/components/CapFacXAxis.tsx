@@ -4,6 +4,7 @@ import { getDaysBetween, getMonthName } from '@/shared/date-utils';
 import { getProportionColorHex } from '@/shared/capacity-factor-color-map';
 import { CapFacYear } from '@/client/cap-fac-year';
 import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
+import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 
 interface CapFacXAxisProps {
   dateRange: { start: CalendarDate; end: CalendarDate };
@@ -23,6 +24,7 @@ export function CapFacXAxis({
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
   const [useShortLabels, setUseShortLabels] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const monthRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     const startYear = dateRange.start.year;
@@ -166,16 +168,54 @@ export function CapFacXAxis({
     }
   };
 
+  // Touch handlers for hover functionality
+  const findMonthAtPosition = (clientX: number, clientY: number) => {
+    for (let i = 0; i < monthRefs.current.length; i++) {
+      const element = monthRefs.current[i];
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        if (clientX >= rect.left && clientX <= rect.right && 
+            clientY >= rect.top && clientY <= rect.bottom) {
+          return monthBars[i];
+        }
+      }
+    }
+    return null;
+  };
+
+  const touchHandlers = useTouchAsHover({
+    onHoverStart: (clientX, clientY) => {
+      const month = findMonthAtPosition(clientX, clientY);
+      if (month) {
+        handleMouseEnter(month);
+      }
+    },
+    onHoverMove: (clientX, clientY) => {
+      const month = findMonthAtPosition(clientX, clientY);
+      if (month) {
+        handleMouseEnter(month);
+      } else {
+        const event = new CustomEvent('tooltip-data-hover-end');
+        window.dispatchEvent(event);
+      }
+    },
+    onHoverEnd: () => {
+      const event = new CustomEvent('tooltip-data-hover-end');
+      window.dispatchEvent(event);
+    }
+  });
+
   return (
     <div className="opennem-stripe-row" style={{ display: 'flex' }}>
       <div className="opennem-facility-label">
         {/* Empty label for alignment */}
       </div>
-      <div className="opennem-stripe-data" ref={containerRef} style={{ cursor: 'default' }}>
+      <div className="opennem-stripe-data" ref={containerRef} style={{ cursor: 'default' }} {...touchHandlers}>
         <div style={{ display: 'flex', width: '100%', height: '16px' }}>
             {monthBars.map((month, idx) => (
               <div
                 key={idx}
+                ref={(el) => { monthRefs.current[idx] = el; }}
                 className="opennem-month-label"
                 style={{ 
                   backgroundColor: month.color,
