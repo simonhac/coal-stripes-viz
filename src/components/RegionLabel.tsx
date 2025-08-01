@@ -3,6 +3,7 @@
 import React from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
+import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 
 interface RegionLabelProps {
   regionCode: string;
@@ -50,6 +51,16 @@ export function RegionLabel({
   const handleMouseEnter = () => sendTooltipData(false);
   const handleClick = () => sendTooltipData(true);
 
+  // Touch handlers for hover functionality
+  const touchHandlers = useTouchAsHover({
+    onHoverStart: () => sendTooltipData(false),
+    onHoverMove: () => {}, // No need to update on move for labels
+    onHoverEnd: () => {
+      const event = new CustomEvent('tooltip-data-hover-end');
+      window.dispatchEvent(event);
+    }
+  });
+
   return (
     <div 
       className="opennem-region-label"
@@ -60,6 +71,7 @@ export function RegionLabel({
         window.dispatchEvent(event);
       }}
       onClick={handleClick}
+      {...touchHandlers}
     >
       {regionName}
     </div>

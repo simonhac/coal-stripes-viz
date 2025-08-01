@@ -7,6 +7,7 @@ import { getDayIndex, isLeapYear, getTodayAEST } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { DATE_BOUNDARIES } from '@/shared/config';
+import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 
 interface CompositeTileProps {
   endDate: CalendarDate;
@@ -151,6 +152,21 @@ const CompositeTileComponent = ({
     }
   };
 
+  // Helper to convert client coordinates to canvas coordinates
+  const clientToCanvasCoordinates = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { canvasX: 0, canvasY: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    
+    // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
+    const canvasX = (x / rect.width) * canvas.width;
+    const canvasY = (y / rect.height) * canvas.height;
+    
+    return { canvasX, canvasY };
+  }, []);
   
   const updateTooltip = useCallback((x: number, y: number) => {
     
@@ -344,14 +360,7 @@ const CompositeTileComponent = ({
     if (mousePosRef.current && canvasRef.current) {
       const elementAtMouse = document.elementFromPoint(mousePosRef.current.x, mousePosRef.current.y);
       if (elementAtMouse === canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = mousePosRef.current.x - rect.left;
-        const y = mousePosRef.current.y - rect.top;
-        
-        // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
-        const canvasX = (x / rect.width) * canvasRef.current.width;
-        const canvasY = (y / rect.height) * canvasRef.current.height;
-        
+        const { canvasX, canvasY } = clientToCanvasCoordinates(mousePosRef.current.x, mousePosRef.current.y);
         updateTooltip(canvasX, canvasY);
       }
     }
@@ -580,14 +589,7 @@ const CompositeTileComponent = ({
       
       // Check if it's our canvas
       if (elementAtMouse === canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = mousePosRef.current.x - rect.left;
-        const y = mousePosRef.current.y - rect.top;
-        
-        // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
-        const canvasX = (x / rect.width) * canvasRef.current.width;
-        const canvasY = (y / rect.height) * canvasRef.current.height;
-        
+        const { canvasX, canvasY } = clientToCanvasCoordinates(mousePosRef.current.x, mousePosRef.current.y);
         updateTooltip(canvasX, canvasY);
       } else {
         // Mouse not over our canvas - check if we need to call onHoverEnd
@@ -622,18 +624,32 @@ const CompositeTileComponent = ({
       return;
     }
     
-    const canvas = e.currentTarget;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Since CSS is stretching the canvas, convert screen coordinates back to canvas coordinates
-    const canvasX = (x / rect.width) * canvas.width;
-    const canvasY = (y / rect.height) * canvas.height;
+    const { canvasX, canvasY } = clientToCanvasCoordinates(e.clientX, e.clientY);
     
     // Normal hover behavior - tooltip
     updateTooltip(canvasX, canvasY);
   };
+
+  // Touch handlers for hover functionality
+  const touchHandlers = useTouchAsHover({
+    onHoverStart: (clientX, clientY) => {
+      const { canvasX, canvasY } = clientToCanvasCoordinates(clientX, clientY);
+      updateTooltip(canvasX, canvasY);
+    },
+    onHoverMove: (clientX, clientY) => {
+      if (isDragging) return;
+      
+      const { canvasX, canvasY } = clientToCanvasCoordinates(clientX, clientY);
+      updateTooltip(canvasX, canvasY);
+    },
+    onHoverEnd: () => {
+      if (!isDragging) {
+        document.documentElement.style.removeProperty('--hover-x');
+        const event = new CustomEvent('tooltip-data-hover-end');
+        window.dispatchEvent(event);
+      }
+    }
+  });
 
   return (
     <div 
@@ -661,6 +677,7 @@ const CompositeTileComponent = ({
             window.dispatchEvent(event);
           }
         }}
+        {...touchHandlers}
       />
     </div>
   );

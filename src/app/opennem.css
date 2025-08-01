@@ -269,6 +269,9 @@ header a {
 .opennem-region-label {
   cursor: pointer;
   padding-top: 24px;
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+  -webkit-touch-callout: none; /* Disable callout popup */
+  user-select: none; /* Prevent selection */
 }
 
 .opennem-region-content {
@@ -365,6 +368,9 @@ header a {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+  -webkit-touch-callout: none; /* Disable callout popup */
+  user-select: none; /* Prevent selection */
 }
 
 .opennem-stripe-data {
@@ -380,6 +386,9 @@ header a {
   display: block;
   width: 100%;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+  -webkit-touch-callout: none; /* Disable callout popup */
+  user-select: none; /* Prevent selection */
 }
 
 /* Override cursor when dragging */
@@ -605,6 +614,24 @@ header a {
     margin-left: 0;
     width: 100%;
     position: relative;
+  }
+  
+  /* Prevent region label from line breaking on mobile */
+  .opennem-region-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Hide the black square (tooltip icon) on mobile */
+  .tooltip-icon {
+    display: none;
+  }
+  
+  /* Reduce padding on hover-date and hover-values on mobile */
+  .hover-date,
+  .hover-values {
+    padding: 3px 6px 2px;
   }
   
 }
