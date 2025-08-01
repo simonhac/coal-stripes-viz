@@ -225,6 +225,7 @@ export class RequestLogger {
 
 // Singleton instance
 let loggerInstance: RequestLogger | null = null;
+let cleanupIntervalId: NodeJS.Timeout | null = null;
 
 export function initializeRequestLogger(port: number): void {
   if (!loggerInstance) {
@@ -233,7 +234,7 @@ export function initializeRequestLogger(port: number): void {
     // Only set up cleanup if file logging is enabled
     if (loggerInstance.fileLoggingEnabled) {
       // Set up daily cleanup
-      setInterval(() => {
+      cleanupIntervalId = setInterval(() => {
         loggerInstance!.cleanOldLogs();
       }, 24 * 60 * 60 * 1000); // Run once per day
       
@@ -248,4 +249,12 @@ export function getRequestLogger(): RequestLogger {
     throw new Error('Request logger not initialized. Call initializeRequestLogger(port) first.');
   }
   return loggerInstance;
+}
+
+export function cleanupRequestLogger(): void {
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+  }
+  loggerInstance = null;
 }

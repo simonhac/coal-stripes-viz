@@ -1,10 +1,15 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { parseDate } from '@internationalized/date';
-import { setupTestLogger } from '../test-helpers';
+import { setupTestLogger, cleanupTestLogger } from '../test-helpers';
 
 // Initialize logger for tests
 beforeAll(() => {
   setupTestLogger();
+});
+
+// Cleanup logger after all tests
+afterAll(() => {
+  cleanupTestLogger();
 });
 
 describe('Timezone Date Mapping', () => {
