@@ -32,7 +32,6 @@ export function CapFacXAxis({
     
     // Skip if years are invalid
     if (!YearDataVendor.isValidYear(startYear) || !YearDataVendor.isValidYear(endYear)) {
-      console.warn(`CapFacXAxis: Skipping invalid year range ${startYear}-${endYear}`);
       return;
     }
     

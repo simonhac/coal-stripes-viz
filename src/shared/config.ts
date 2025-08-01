@@ -36,8 +36,9 @@ export const API_CONFIG = {
 export const DATE_BOUNDARIES = {
   // The earliest date we have data from
   EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
+
   // Buffer months to allow beyond data boundaries for UI flexibility
-  DISPLAY_SLOP_MONTHS: 6,
+  DISPLAY_SLOP_MONTHS: 9,
 } as const;
 
 // Tile rendering configuration

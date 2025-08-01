@@ -21,6 +21,8 @@ export function getDateBoundaries() {
   const slopMonths = DATE_BOUNDARIES.DISPLAY_SLOP_MONTHS;
   const earliestDisplayDay = earliestDataDay.subtract({ months: slopMonths });
   const latestDisplayDay = latestDataDay.add({ months: slopMonths });
+  // For end date navigation, the earliest we can display is based on earliestDataEndDay
+  const earliestDisplayEndDay = earliestDataEndDay.subtract({ months: slopMonths });
   
   // Year boundaries
   const earliestDataYear = earliestDataDay.year;
@@ -36,6 +38,7 @@ export function getDateBoundaries() {
     
     // Display boundaries (soft limits with buffer for UI)
     earliestDisplayDay,
+    earliestDisplayEndDay,
     latestDisplayDay,
     
     // Utility methods
@@ -45,6 +48,10 @@ export function getDateBoundaries() {
     
     isWithinDisplayBounds(date: CalendarDate): boolean {
       return date.compare(earliestDisplayDay) >= 0 && date.compare(latestDisplayDay) <= 0;
+    },
+    
+    isEndDateWithinDisplayBounds(endDate: CalendarDate): boolean {
+      return endDate.compare(earliestDisplayEndDay) >= 0 && endDate.compare(latestDisplayDay) <= 0;
     },
     
     clampToDataBounds(date: CalendarDate): CalendarDate {
@@ -57,6 +64,12 @@ export function getDateBoundaries() {
       if (date.compare(earliestDisplayDay) < 0) return earliestDisplayDay;
       if (date.compare(latestDisplayDay) > 0) return latestDisplayDay;
       return date;
+    },
+    
+    clampEndDateToDisplayBounds(endDate: CalendarDate): CalendarDate {
+      if (endDate.compare(earliestDisplayEndDay) < 0) return earliestDisplayEndDay;
+      if (endDate.compare(latestDisplayDay) > 0) return latestDisplayDay;
+      return endDate;
     }
   };
 }

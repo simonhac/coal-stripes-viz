@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
+import { getDaysBetween } from '@/shared/date-utils';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
@@ -20,6 +21,7 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
   // Get animated date range
   const animatedDateRange = useAnimatedDateRange(endDate, { skipAnimation: isDragging });
@@ -37,36 +39,171 @@ export default function Home() {
   // Handle drag navigation from tiles
   useEffect(() => {
     const handleDateNavigate = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const { newEndDate, isDragging } = customEvent.detail;
+      try {
+        const customEvent = e as CustomEvent;
+        const { newEndDate, deltaDays, startEndDate, isDragging } = customEvent.detail;
       
-      if (newEndDate) {
-        // Only update isDragging if it changed
-        setIsDragging(prev => {
-          if (prev !== isDragging) {
-            return isDragging;
-          }
-          return prev;
-        });
+      
+      // Handle new format with deltaDays (desktop drag)
+      if (deltaDays !== undefined && startEndDate) {
+        // Calculate the raw position from start
+        const rawEndDate = startEndDate.add({ days: deltaDays });
         
         if (isDragging) {
-          // During drag, allow date to go beyond boundaries
-          setEndDate(newEndDate);
-        } else {
-          // On drag end, check boundaries and spring back if needed
+          // Update dragging state only if needed
+          setIsDragging(prev => prev !== true ? true : prev);
+          // During drag, apply rubber band effect if beyond display boundaries
           const boundaries = getDateBoundaries();
           
-          if (newEndDate.compare(boundaries.latestDataDay) > 0) {
-            // Beyond future boundary - spring back to latest data day
-            navigateToDate(boundaries.latestDataDay);
-          } else if (newEndDate.compare(boundaries.earliestDataEndDay) < 0) {
-            // Beyond past boundary - spring back to earliest data end day
-            navigateToDate(boundaries.earliestDataEndDay);
-          } else {
-            // Within boundaries - just animate to position
-            navigateToDate(newEndDate);
+          let adjustedDate = rawEndDate;
+          
+          // Apply rubber band effect if beyond display boundaries (for end dates)
+          if (!boundaries.isEndDateWithinDisplayBounds(rawEndDate)) {
+            // Calculate how far beyond the boundary we are
+            const clampedDate = boundaries.clampEndDateToDisplayBounds(rawEndDate);
+            const overshoot = rawEndDate.compare(clampedDate) > 0 
+              ? getDaysBetween(clampedDate, rawEndDate)
+              : getDaysBetween(rawEndDate, clampedDate);
+            
+            // Apply rubber band resistance (logarithmic scaling)
+            const resistance = 0.12; // Lower value = more resistance, slightly stiffer
+            const rubberBandDays = Math.sign(overshoot) * Math.log(1 + Math.abs(overshoot)) * resistance;
+            
+            // Apply the rubber band effect
+            if (rawEndDate.compare(clampedDate) > 0) {
+              adjustedDate = clampedDate.add({ days: Math.ceil(rubberBandDays) });
+            } else {
+              adjustedDate = clampedDate.add({ days: Math.floor(rubberBandDays) });
+            }
+          }
+          
+          setEndDate(adjustedDate);
+        }
+      } else if (isDragging === false && !newEndDate) {
+        // Mouse up without position - check if we need to spring back
+        setIsDragging(false);
+        
+        if (endDate) {
+          const boundaries = getDateBoundaries();
+          
+          if (endDate.compare(boundaries.latestDataDay) > 0 || endDate.compare(boundaries.earliestDataEndDay) < 0) {
+            // Beyond data boundaries - animate spring back to data boundary
+            const targetDate = endDate.compare(boundaries.latestDataDay) > 0 
+              ? boundaries.latestDataDay 
+              : boundaries.earliestDataEndDay;
+            const totalDays = getDaysBetween(endDate, targetDate);
+            const startTime = Date.now();
+            const duration = 250; // Faster animation
+            const startDate = endDate;
+            
+            // Cancel any existing animation
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current);
+            }
+            
+            // Start immediately without delay
+            const animate = () => {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / duration, 1);
+              
+              // Use ease-out cubic for smooth deceleration
+              const easeOut = 1 - Math.pow(1 - progress, 3);
+              
+              if (progress < 1) {
+                // Interpolate between current position and target
+                const daysToMove = Math.round(totalDays * easeOut);
+                const interpolatedDate = startDate.add({ days: daysToMove });
+                
+                setEndDate(interpolatedDate);
+                animationFrameRef.current = requestAnimationFrame(animate);
+              } else {
+                // Animation complete
+                animationFrameRef.current = null;
+                setEndDate(targetDate);
+              }
+            };
+            
+            animationFrameRef.current = requestAnimationFrame(animate);
           }
         }
+      } else if (newEndDate) {
+        // Handle old format (touch drag already has rubber band applied)
+        if (isDragging) {
+          // Update dragging state only if needed
+          setIsDragging(prev => prev !== true ? true : prev);
+          // During drag, apply rubber band effect if beyond display boundaries
+          const boundaries = getDateBoundaries();
+          
+          let adjustedDate = newEndDate;
+          
+          // Apply rubber band effect if beyond display boundaries (for end dates)
+          if (!boundaries.isEndDateWithinDisplayBounds(newEndDate)) {
+            // Calculate how far beyond the boundary we are
+            const clampedDate = boundaries.clampEndDateToDisplayBounds(newEndDate);
+            const overshoot = newEndDate.compare(clampedDate) > 0 
+              ? getDaysBetween(clampedDate, newEndDate)
+              : getDaysBetween(newEndDate, clampedDate);
+            
+            // Apply rubber band resistance (logarithmic scaling)
+            const resistance = 0.12; // Lower value = more resistance, slightly stiffer
+            const rubberBandDays = Math.sign(overshoot) * Math.log(1 + Math.abs(overshoot)) * resistance;
+            
+            // Apply the rubber band effect
+            if (newEndDate.compare(clampedDate) > 0) {
+              adjustedDate = clampedDate.add({ days: Math.ceil(rubberBandDays) });
+            } else {
+              adjustedDate = clampedDate.add({ days: Math.floor(rubberBandDays) });
+            }
+          }
+          
+          setEndDate(adjustedDate);
+        } else {
+          // On drag end, check display boundaries and spring back if needed
+          const boundaries = getDateBoundaries();
+          
+          if (!boundaries.isWithinDisplayBounds(newEndDate)) {
+            // Beyond display boundaries - animate spring back
+            const targetDate = boundaries.clampToDisplayBounds(newEndDate);
+            const totalDays = getDaysBetween(newEndDate, targetDate);
+            const startTime = Date.now();
+            const duration = 300; // 300ms animation
+            const startDate = newEndDate;
+            
+            // Cancel any existing animation
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current);
+            }
+            
+            const animate = () => {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / duration, 1);
+              
+              // Use ease-out cubic for smooth deceleration
+              const easeOut = 1 - Math.pow(1 - progress, 3);
+              
+              if (progress < 1) {
+                // Interpolate between current position and target
+                const daysToMove = Math.round(totalDays * easeOut);
+                const interpolatedDate = startDate.add({ days: daysToMove });
+                
+                setEndDate(interpolatedDate);
+                animationFrameRef.current = requestAnimationFrame(animate);
+              } else {
+                // Animation complete
+                animationFrameRef.current = null;
+                setEndDate(targetDate);
+              }
+            };
+            
+            animationFrameRef.current = requestAnimationFrame(animate);
+          } else {
+            // Within boundaries - just set the position
+            setEndDate(newEndDate);
+          }
+        }
+      }
+      } catch (error) {
+        console.error('Error in handleDateNavigate:', error);
       }
     };
     
@@ -75,7 +212,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('date-navigate', handleDateNavigate);
     };
-  }, [navigateToDate, setEndDate]);
+  }, [navigateToDate]);
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
@@ -149,6 +286,15 @@ export default function Home() {
     }
     
     initialLoad();
+  }, []);
+
+  // Cleanup animation on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, []);
 
   // Ensure the page has focus on mount for keyboard navigation

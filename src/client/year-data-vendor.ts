@@ -228,6 +228,11 @@ export class YearDataVendor {
     const startYear = dateRange.start.year;
     const endYear = dateRange.end.year;
     
+    // Check if years are within bounds
+    if (!YearDataVendor.isValidYear(startYear) || !YearDataVendor.isValidYear(endYear)) {
+      return null;
+    }
+    
     let totalWeightedCapacityFactor = 0;
     let totalCapacityDays = 0;
     

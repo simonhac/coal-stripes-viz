@@ -71,8 +71,9 @@ export function RegionSection({
   // Listen for ALL tooltip hover events
   useEffect(() => {
     const handleTooltipHover = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const data = customEvent.detail as TooltipData;
+      try {
+        const customEvent = e as CustomEvent;
+        const data = customEvent.detail as TooltipData;
       
       if (data) {
         // Check if hover is from our region or another region
@@ -121,10 +122,12 @@ export function RegionSection({
           setTooltipData(myTooltipData);
         }
       }
+      } catch (error) {
+        console.error(`Error in RegionSection ${regionCode} handleTooltipHover:`, error);
+      }
     };
     
     const handleTooltipHoverEnd = () => {
-      console.log(`RegionSection ${regionCode}: Received tooltip-data-hover-end event`);
       // Always clear on explicit hover-end event (this now handles unpinning too)
       setTooltipData(null);
     };

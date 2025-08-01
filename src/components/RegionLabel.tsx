@@ -28,17 +28,14 @@ export function RegionLabel({
       
       // Check if this region is the one that's pinned
       if (data && data.regionCode === regionCode && data.tooltipType === 'period' && !data.facilityCode) {
-        console.log(`RegionLabel ${regionCode}: Setting isPinned to ${data.pinned || false}`);
         setIsPinned(data.pinned || false);
       } else if (data) {
         // Another tooltip is active, so this one is not pinned
-        console.log(`RegionLabel ${regionCode}: Another tooltip active, setting isPinned to false`);
         setIsPinned(false);
       }
     };
 
     const handleTooltipEnd = () => {
-      console.log(`RegionLabel ${regionCode}: Tooltip end event, setting isPinned to false`);
       setIsPinned(false);
     };
 
@@ -54,6 +51,12 @@ export function RegionLabel({
   const sendTooltipData = (pinned: boolean = false) => {
     if (dateRange) {
       const stats = yearDataVendor.calculateRegionStats(regionCode, dateRange);
+      if (!stats) {
+        // No data available for this date range - clear tooltip
+        const event = new CustomEvent('tooltip-data-hover-end');
+        window.dispatchEvent(event);
+        return;
+      }
       const avgCapacityFactor = calculateAverageCapacityFactor(stats);
       if (avgCapacityFactor !== null) {
         // Use short name for tooltip on mobile
@@ -71,7 +74,6 @@ export function RegionLabel({
           pinned
         };
         
-        console.log(`RegionLabel ${regionCode}: Sending tooltip data with pinned=${pinned}`);
         // Broadcast the tooltip data
         const event = new CustomEvent('tooltip-data-hover', { 
           detail: tooltipData
@@ -95,16 +97,13 @@ export function RegionLabel({
       return;
     }
     
-    console.log(`RegionLabel ${regionCode}: Click handler, isPinned=${isPinned}`);
     if (isPinned) {
       // If already pinned, send hover-end event to unpin
-      console.log(`RegionLabel ${regionCode}: Sending tooltip-data-hover-end event to unpin`);
       setIsPinned(false); // Update local state immediately
       const event = new CustomEvent('tooltip-data-hover-end');
       window.dispatchEvent(event);
     } else {
       // Pin the tooltip
-      console.log(`RegionLabel ${regionCode}: Pinning tooltip`);
       setIsPinned(true); // Update local state immediately
       sendTooltipData(true);
     }
@@ -122,13 +121,11 @@ export function RegionLabel({
     console.log(`RegionLabel ${regionCode}: Touch start, isPinned=${isPinned}`);
     if (isPinned) {
       // If already pinned, send hover-end event to unpin
-      console.log(`RegionLabel ${regionCode}: Sending tooltip-data-hover-end event to unpin (touch)`);
       setIsPinned(false); // Update local state immediately
       const event = new CustomEvent('tooltip-data-hover-end');
       window.dispatchEvent(event);
     } else {
       // Pin the tooltip
-      console.log(`RegionLabel ${regionCode}: Pinning tooltip (touch)`);
       setIsPinned(true); // Update local state immediately
       sendTooltipData(true);
     }

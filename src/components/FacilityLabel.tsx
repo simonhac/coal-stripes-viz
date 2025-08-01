@@ -28,17 +28,14 @@ export function FacilityLabel({
       
       // Check if this facility is the one that's pinned
       if (data && data.facilityCode === facilityCode && data.regionCode === regionCode) {
-        console.log(`FacilityLabel ${facilityCode}: Setting isPinned to ${data.pinned || false}`);
         setIsPinned(data.pinned || false);
       } else if (data) {
         // Another tooltip is active, so this one is not pinned
-        console.log(`FacilityLabel ${facilityCode}: Another tooltip active, setting isPinned to false`);
         setIsPinned(false);
       }
     };
 
     const handleTooltipEnd = () => {
-      console.log(`FacilityLabel ${facilityCode}: Tooltip end event, setting isPinned to false`);
       setIsPinned(false);
     };
 
@@ -53,6 +50,12 @@ export function FacilityLabel({
 
   const sendTooltipData = (pinned: boolean = false) => {
     const stats = yearDataVendor.calculateFacilityStats(regionCode, facilityCode, dateRange);
+    if (!stats) {
+      // No data available for this date range - clear tooltip
+      const event = new CustomEvent('tooltip-data-hover-end');
+      window.dispatchEvent(event);
+      return;
+    }
     const avgCapacityFactor = calculateAverageCapacityFactor(stats);
     if (avgCapacityFactor !== null) {
       const tooltipData = {
@@ -88,16 +91,13 @@ export function FacilityLabel({
       return;
     }
     
-    console.log(`FacilityLabel ${facilityCode}: Click handler, isPinned=${isPinned}`);
     if (isPinned) {
       // If already pinned, send hover-end event to unpin
-      console.log(`FacilityLabel ${facilityCode}: Sending tooltip-data-hover-end event to unpin`);
       setIsPinned(false); // Update local state immediately
       const event = new CustomEvent('tooltip-data-hover-end');
       window.dispatchEvent(event);
     } else {
       // Pin the tooltip
-      console.log(`FacilityLabel ${facilityCode}: Pinning tooltip`);
       setIsPinned(true); // Update local state immediately
       sendTooltipData(true);
     }
@@ -115,13 +115,11 @@ export function FacilityLabel({
     console.log(`FacilityLabel ${facilityCode}: Touch start, isPinned=${isPinned}`);
     if (isPinned) {
       // If already pinned, send hover-end event to unpin
-      console.log(`FacilityLabel ${facilityCode}: Sending tooltip-data-hover-end event to unpin (touch)`);
       setIsPinned(false); // Update local state immediately
       const event = new CustomEvent('tooltip-data-hover-end');
       window.dispatchEvent(event);
     } else {
       // Pin the tooltip
-      console.log(`FacilityLabel ${facilityCode}: Pinning tooltip (touch)`);
       setIsPinned(true); // Update local state immediately
       sendTooltipData(true);
     }

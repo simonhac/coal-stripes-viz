@@ -179,9 +179,9 @@ const CompositeTileComponent = ({
   }, []);
   
   const updateTooltip = useCallback((x: number, y: number) => {
-    
-    const startYear = dateRange.start.year;
-    const endYear = dateRange.end.year;
+    try {
+      const startYear = dateRange.start.year;
+      const endYear = dateRange.end.year;
     
     // Calculate left tile dimensions
     const leftStartDay = getDayIndex(dateRange.start);
@@ -227,7 +227,10 @@ const CompositeTileComponent = ({
       });
       window.dispatchEvent(event);
     }
-  }, [dateRange, tiles, facilityName]);
+    } catch (error) {
+      console.error(`Error in CompositeTile updateTooltip for ${facilityCode}:`, error);
+    }
+  }, [dateRange, tiles, facilityName, facilityCode]);
 
   // Handle async loading of tiles that aren't in cache
   useEffect(() => {
@@ -512,10 +515,9 @@ const CompositeTileComponent = ({
   // Define handleMouseUp before the useEffect that uses it
   const handleMouseUp = useCallback(() => {
     // If we were dragging, emit a final event with isDragging: false
-    // This allows the animation to smooth out to the final position
-    if (isDragging && endDate) {
+    if (isDragging) {
       const event = new CustomEvent('date-navigate', { 
-        detail: { newEndDate: endDate, isDragging: false } 
+        detail: { isDragging: false } 
       });
       window.dispatchEvent(event);
     }
@@ -524,7 +526,7 @@ const CompositeTileComponent = ({
     dragStateRef.current.startX = 0;
     dragStateRef.current.startEndDate = null;
     document.body.style.cursor = '';
-  }, [isDragging, endDate]);
+  }, [isDragging]);
   
   // Mouse position tracking effect and global mouse handlers for drag
   useEffect(() => {
@@ -552,12 +554,15 @@ const CompositeTileComponent = ({
         const daysDelta = -Math.round((deltaX / rect.width) * 365);
         
         if (daysDelta !== 0) {
-          const newEndDate = dragStateRef.current.startEndDate.add({ days: daysDelta });
-          
-          // Emit custom event with new date and dragging flag
-          // Boundary checking is now handled centrally in page.tsx
+          // Emit custom event with delta days and dragging flag
+          // Let page.tsx handle the actual date calculation and rubber band effect
           const event = new CustomEvent('date-navigate', { 
-            detail: { newEndDate, isDragging: true } 
+            detail: { 
+              deltaX: deltaX,
+              deltaDays: daysDelta,
+              startEndDate: dragStateRef.current.startEndDate,
+              isDragging: true 
+            } 
           });
           window.dispatchEvent(event);
         }
