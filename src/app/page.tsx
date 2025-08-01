@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getTodayAEST } from '@/shared/date-utils';
+import { DATE_BOUNDARIES } from '@/shared/config';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
@@ -44,20 +45,33 @@ export default function Home() {
     const handleDateNavigate = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { newEndDate, isDragging } = customEvent.detail;
-      // console.log('📅 date-navigate event received:', {
-      //   newEndDate: newEndDate?.toString(),
-      //   currentEndDate: endDate?.toString(),
-      //   isDragging,
-      //   timestamp: Date.now()
-      // });
+      
       if (newEndDate) {
+        // Check boundaries
+        const yesterday = getTodayAEST().subtract({ days: 1 });
+        const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
+        
+        // Clamp the date within boundaries
+        let clampedDate = newEndDate;
+        if (newEndDate.compare(yesterday) > 0) {
+          clampedDate = yesterday;
+          // Emit boundary hit event
+          const boundaryEvent = new CustomEvent('navigation-boundary-hit');
+          window.dispatchEvent(boundaryEvent);
+        } else if (newEndDate.compare(earliestDate) < 0) {
+          clampedDate = earliestDate;
+          // Emit boundary hit event
+          const boundaryEvent = new CustomEvent('navigation-boundary-hit');
+          window.dispatchEvent(boundaryEvent);
+        }
+        
         setIsDragging(isDragging);
         if (isDragging) {
           // During drag, update date directly without animation
-          setEndDate(newEndDate);
+          setEndDate(clampedDate);
         } else {
           // On drag end or other navigation, use animation
-          navigateToDate(newEndDate);
+          navigateToDate(clampedDate);
         }
       }
     };

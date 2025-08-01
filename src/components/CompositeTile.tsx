@@ -3,10 +3,9 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
-import { getDayIndex, isLeapYear, getTodayAEST } from '@/shared/date-utils';
+import { getDayIndex, isLeapYear } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
-import { DATE_BOUNDARIES } from '@/shared/config';
 import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 
 interface CompositeTileProps {
@@ -57,11 +56,9 @@ const CompositeTileComponent = ({
   const dragStateRef = useRef<{
     startX: number;
     startEndDate: CalendarDate | null;
-    lastBoundaryHitTime: number;
   }>({
     startX: 0,
-    startEndDate: null,
-    lastBoundaryHitTime: 0
+    startEndDate: null
   });
   
   // Simple global mouse position tracking (using ref to avoid re-renders)
@@ -523,39 +520,11 @@ const CompositeTileComponent = ({
         // Convert screen pixels to days (negative because dragging right should move back in time)
         const daysDelta = -Math.round((deltaX / rect.width) * 365);
         
-        const yesterday = getTodayAEST().subtract({ days: 1 });
-        const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
-        const currentEndDate = endDate || dragStateRef.current.startEndDate;
-        
-        // Check if we're trying to go past boundaries
-        // Dragging left (negative deltaX) = positive daysDelta = forward in time
-        const tryingToGoForward = daysDelta > 0;
-        const tryingToGoBackward = daysDelta < 0;
-        const alreadyAtYesterday = currentEndDate.compare(yesterday) === 0;
-        const alreadyAtEarliest = currentEndDate.compare(earliestDate) === 0;
-        
-        // Emit boundary hit event if we're at either boundary
-        if ((tryingToGoForward && alreadyAtYesterday) || (tryingToGoBackward && alreadyAtEarliest)) {
-          // Emit boundary hit event (debounced to prevent rapid flashing)
-          const now = Date.now();
-          if (now - dragStateRef.current.lastBoundaryHitTime > 500) { // 500ms debounce
-            dragStateRef.current.lastBoundaryHitTime = now;
-            const boundaryEvent = new CustomEvent('navigation-boundary-hit');
-            window.dispatchEvent(boundaryEvent);
-          }
-        }
-        
         if (daysDelta !== 0) {
-          let newEndDate = dragStateRef.current.startEndDate.add({ days: daysDelta });
-          
-          // Clamp date to boundaries
-          if (newEndDate.compare(yesterday) > 0) {
-            newEndDate = yesterday;
-          } else if (newEndDate.compare(earliestDate) < 0) {
-            newEndDate = earliestDate;
-          }
+          const newEndDate = dragStateRef.current.startEndDate.add({ days: daysDelta });
           
           // Emit custom event with new date and dragging flag
+          // Boundary checking is now handled centrally in page.tsx
           const event = new CustomEvent('date-navigate', { 
             detail: { newEndDate, isDragging: true } 
           });
@@ -610,8 +579,7 @@ const CompositeTileComponent = ({
     setIsDragging(true);
     dragStateRef.current = {
       startX: e.clientX,
-      startEndDate: endDate,
-      lastBoundaryHitTime: 0
+      startEndDate: endDate
     };
     
     // Update cursor

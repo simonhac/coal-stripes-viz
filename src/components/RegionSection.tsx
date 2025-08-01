@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { CompositeTile } from './CompositeTile';
 import { CapFacTooltip, TooltipData, getTooltipFormattedDate } from './CapFacTooltip';
@@ -8,6 +8,7 @@ import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
 import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
+import { useTwoFingerDrag } from '@/hooks/useTwoFingerDrag';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -31,6 +32,20 @@ export function RegionSection({
   // Get region names
   const regionNames = getRegionNames(regionCode);
   const tooltipRegionName = isMobile ? regionNames.short : regionNames.long;
+  
+  // Handle date navigation from two-finger drag
+  const handleDateNavigate = useCallback((newEndDate: CalendarDate, isDragging: boolean) => {
+    const event = new CustomEvent('date-navigate', { 
+      detail: { newEndDate, isDragging } 
+    });
+    window.dispatchEvent(event);
+  }, []);
+  
+  // Set up two-finger drag handling
+  const twoFingerDragHandlers = useTwoFingerDrag({
+    endDate,
+    onDateNavigate: handleDateNavigate
+  });
   
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {
@@ -136,7 +151,7 @@ export function RegionSection({
         />
         <CapFacTooltip data={tooltipData} />
       </div>
-      <div className="opennem-region-content">
+      <div className="opennem-region-content" {...twoFingerDragHandlers}>
         <div className="opennem-facility-group">
           {/* Display all facilities for this region */}
           {facilities.map(facility => {
