@@ -4,8 +4,8 @@ import { CapFacYear, createCapFacYear } from './cap-fac-year';
 import { RequestQueue, RequestQueueConfig, QueueStats } from '@/shared/request-queue';
 import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 import { CalendarDate } from '@internationalized/date';
-import { getDayIndex, getTodayAEST } from '@/shared/date-utils';
-import { DATE_BOUNDARIES } from '@/shared/config';
+import { getDayIndex } from '@/shared/date-utils';
+import { getDateBoundaries } from '@/shared/date-boundaries';
 
 export interface GenerationStats {
   totalWeightedCapacityFactor: number;
@@ -51,7 +51,7 @@ export class YearDataVendor {
    * Get the earliest year for which data is available
    */
   static getEarliestYear(): number {
-    return DATE_BOUNDARIES.EARLIEST_START_DATE.year;
+    return getDateBoundaries().earliestDataYear;
   }
 
   /**
@@ -59,7 +59,7 @@ export class YearDataVendor {
    * This is the current year since data is collected in real-time
    */
   static getLatestYear(): number {
-    return getTodayAEST().year;
+    return getDateBoundaries().latestDataYear;
   }
 
   /**

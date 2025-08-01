@@ -1,8 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { getTodayAEST } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
-import { DATE_BOUNDARIES } from '@/shared/config';
+import { getDateBoundaries } from '@/shared/date-boundaries';
 
 interface NavigationOptions {
   endDate: CalendarDate | null;
@@ -20,17 +19,16 @@ export function useNavigation({ endDate, onDateChange, isDragging }: NavigationO
     const yearBefore = startDate.year - 1;
     const yearAfter = newEndDate.year + 1;
     
-    // Get current year to check upper boundary
-    const currentYear = getTodayAEST().year;
+    // Get date boundaries
+    const boundaries = getDateBoundaries();
     
     // Add adjacent years if they're within valid bounds
-    // Lower bound: 2006 (earliest data is from 2006)
-    if (yearBefore >= 2006) {
+    if (yearBefore >= boundaries.earliestDataYear) {
       years.add(yearBefore);
     }
     
-    // Upper bound: current year (can't have data for future years)
-    if (yearAfter <= currentYear) {
+    // Upper bound: latest data year (can't have data for future years)
+    if (yearAfter <= boundaries.latestDataYear) {
       years.add(yearAfter);
     }
     
@@ -50,21 +48,20 @@ export function useNavigation({ endDate, onDateChange, isDragging }: NavigationO
 
   // Navigate to a specific date (used by drag navigation)
   const navigateToDate = useCallback((newEndDate: CalendarDate) => {
-    const yesterday = getTodayAEST().subtract({ days: 1 });
-    const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
+    const boundaries = getDateBoundaries();
     
-    // Check both boundaries
-    if (newEndDate.compare(yesterday) > 0) {
-      // Trying to go past yesterday
-      if (!endDate || endDate.compare(yesterday) < 0) {
-        onDateChange(yesterday);
-        preloadYearsForDate(yesterday);
+    // Check both boundaries using data bounds (hard limits)
+    if (newEndDate.compare(boundaries.latestDataDay) > 0) {
+      // Trying to go past latest data day
+      if (!endDate || endDate.compare(boundaries.latestDataDay) < 0) {
+        onDateChange(boundaries.latestDataDay);
+        preloadYearsForDate(boundaries.latestDataDay);
       }
-    } else if (newEndDate.compare(earliestDate) < 0) {
-      // Trying to go before earliest date
-      if (!endDate || endDate.compare(earliestDate) > 0) {
-        onDateChange(earliestDate);
-        preloadYearsForDate(earliestDate);
+    } else if (newEndDate.compare(boundaries.earliestDataEndDay) < 0) {
+      // Trying to go before earliest data end day
+      if (!endDate || endDate.compare(boundaries.earliestDataEndDay) > 0) {
+        onDateChange(boundaries.earliestDataEndDay);
+        preloadYearsForDate(boundaries.earliestDataEndDay);
       }
     } else {
       // Date is within valid range
@@ -78,21 +75,20 @@ export function useNavigation({ endDate, onDateChange, isDragging }: NavigationO
     if (!endDate) return;
     
     const newEndDate = endDate.add({ months });
-    const yesterday = getTodayAEST().subtract({ days: 1 });
-    const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
+    const boundaries = getDateBoundaries();
     
-    // Check both boundaries
-    if (newEndDate.compare(yesterday) > 0) {
-      // Trying to go past yesterday
-      if (endDate.compare(yesterday) < 0) {
-        onDateChange(yesterday);
-        preloadYearsForDate(yesterday);
+    // Check both boundaries using data bounds (hard limits)
+    if (newEndDate.compare(boundaries.latestDataDay) > 0) {
+      // Trying to go past latest data day
+      if (endDate.compare(boundaries.latestDataDay) < 0) {
+        onDateChange(boundaries.latestDataDay);
+        preloadYearsForDate(boundaries.latestDataDay);
       }
-    } else if (newEndDate.compare(earliestDate) < 0) {
-      // Trying to go before earliest date
-      if (endDate.compare(earliestDate) > 0) {
-        onDateChange(earliestDate);
-        preloadYearsForDate(earliestDate);
+    } else if (newEndDate.compare(boundaries.earliestDataEndDay) < 0) {
+      // Trying to go before earliest data end day
+      if (endDate.compare(boundaries.earliestDataEndDay) > 0) {
+        onDateChange(boundaries.earliestDataEndDay);
+        preloadYearsForDate(boundaries.earliestDataEndDay);
       }
     } else {
       // Date is within valid range
@@ -113,8 +109,8 @@ export function useNavigation({ endDate, onDateChange, isDragging }: NavigationO
 
   // Navigate to today (minus one day)
   const navigateToToday = useCallback(() => {
-    const yesterday = getTodayAEST().subtract({ days: 1 });
-    navigateToDate(yesterday);
+    const boundaries = getDateBoundaries();
+    navigateToDate(boundaries.latestDataDay);
   }, [navigateToDate]);
 
   // Navigate to January 1 of a given year

@@ -15,19 +15,28 @@ jest.mock('@/shared/date-utils', () => ({
   getTodayAEST: jest.fn()
 }));
 
+// Mock the config to ensure CalendarDate is properly constructed
+jest.mock('@/shared/config', () => ({
+  DATE_BOUNDARIES: {
+    EARLIEST_START_DATE: new (require('@internationalized/date').CalendarDate)(2006, 1, 1),
+    DISPLAY_SLOP_MONTHS: 6
+  }
+}));
+
 describe('YearDataVendor', () => {
   let vendor: YearDataVendor;
   const mockGetTodayAEST = dateUtils.getTodayAEST as jest.MockedFunction<typeof dateUtils.getTodayAEST>;
   
+  
   beforeEach(() => {
     vendor = new YearDataVendor(3, { maxRetries: 0 }); // Small cache for testing, no retries
     jest.clearAllMocks();
-    
     // Default to 2024 for tests
     mockGetTodayAEST.mockReturnValue(new CalendarDate(2024, 7, 15));
   });
   
   afterEach(() => {
+    // Clear any pending operations
     vendor.clear();
   });
 
@@ -189,8 +198,8 @@ describe('YearDataVendor', () => {
         }), 100))
       );
 
-      // Start request but don't await
-      vendor.requestYear(2023);
+      // Start request but don't await initially
+      const promise = vendor.requestYear(2023);
       
       // Give it a moment to start processing
       await new Promise(resolve => setTimeout(resolve, 10));
@@ -198,8 +207,8 @@ describe('YearDataVendor', () => {
       const stats = vendor.getCacheStats();
       expect(stats.activeLabels).toContain('2023');
       
-      // Clean up
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Clean up - wait for the request to complete
+      await promise;
     });
   });
 
@@ -247,7 +256,7 @@ describe('YearDataVendor', () => {
       );
 
       // Start two requests
-      testVendor.requestYear(2023);
+      const promise1 = testVendor.requestYear(2023);
       const promise2 = testVendor.requestYear(2024);
       
       // Give time for first to start processing
@@ -256,8 +265,8 @@ describe('YearDataVendor', () => {
       // Clear should abort the queued request
       testVendor.clear();
       
-      // The first promise might complete (already processing)
-      // The second should reject with cancellation error
+      // Both promises should reject with Queue cleared
+      await expect(promise1).rejects.toThrow('Queue cleared');
       await expect(promise2).rejects.toThrow('Queue cleared');
     });
   });
@@ -297,7 +306,12 @@ describe('YearDataVendor', () => {
       });
 
       it('should update when the year changes', () => {
+        // On Jan 1, 2025, latestDataDay is Dec 31, 2024, so latestDataYear is still 2024
         mockGetTodayAEST.mockReturnValue(new CalendarDate(2025, 1, 1));
+        expect(YearDataVendor.getLatestYear()).toBe(2024);
+        
+        // On Jan 2, 2025, latestDataDay is Jan 1, 2025, so latestDataYear is 2025
+        mockGetTodayAEST.mockReturnValue(new CalendarDate(2025, 1, 2));
         expect(YearDataVendor.getLatestYear()).toBe(2025);
       });
     });
@@ -376,10 +390,11 @@ describe('YearDataVendor', () => {
       });
 
       it('should handle year boundary on Jan 1', () => {
+        // On Jan 1, 2025, latestDataDay is Dec 31, 2024, so latestDataYear is 2024
         mockGetTodayAEST.mockReturnValue(new CalendarDate(2025, 1, 1));
-        expect(YearDataVendor.getLatestYear()).toBe(2025);
+        expect(YearDataVendor.getLatestYear()).toBe(2024);
         expect(YearDataVendor.isValidYear(2024)).toBe(true);
-        expect(YearDataVendor.isValidYear(2025)).toBe(true);
+        expect(YearDataVendor.isValidYear(2025)).toBe(false);
         expect(YearDataVendor.isValidYear(2026)).toBe(false);
       });
     });

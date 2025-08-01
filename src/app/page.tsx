@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { getTodayAEST } from '@/shared/date-utils';
-import { DATE_BOUNDARIES } from '@/shared/config';
+import { getDateBoundaries } from '@/shared/date-boundaries';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
@@ -55,15 +54,14 @@ export default function Home() {
           setEndDate(newEndDate);
         } else {
           // On drag end, check boundaries and spring back if needed
-          const yesterday = getTodayAEST().subtract({ days: 1 });
-          const earliestDate = DATE_BOUNDARIES.EARLIEST_END_DATE;
+          const boundaries = getDateBoundaries();
           
-          if (newEndDate.compare(yesterday) > 0) {
-            // Beyond future boundary - spring back to yesterday
-            navigateToDate(yesterday);
-          } else if (newEndDate.compare(earliestDate) < 0) {
-            // Beyond past boundary - spring back to earliest date
-            navigateToDate(earliestDate);
+          if (newEndDate.compare(boundaries.latestDataDay) > 0) {
+            // Beyond future boundary - spring back to latest data day
+            navigateToDate(boundaries.latestDataDay);
+          } else if (newEndDate.compare(boundaries.earliestDataEndDay) < 0) {
+            // Beyond past boundary - spring back to earliest data end day
+            navigateToDate(boundaries.earliestDataEndDay);
           } else {
             // Within boundaries - just animate to position
             navigateToDate(newEndDate);
@@ -92,8 +90,8 @@ export default function Home() {
     async function initialLoad() {
       try {
         // Calculate end date and determine which years we need
-        const today = getTodayAEST();
-        const calculatedEndDate = today.subtract({ days: 1 }); // Yesterday
+        const boundaries = getDateBoundaries();
+        const calculatedEndDate = boundaries.latestDataDay;
         const startDate = calculatedEndDate.subtract({ days: 364 }); // For determining which years to load
         
         // Determine which years we need

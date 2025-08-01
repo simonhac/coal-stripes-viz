@@ -1,7 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { CalendarDate } from '@internationalized/date';
-import { getTodayAEST } from '@/shared/date-utils';
-import { DATE_BOUNDARIES } from '@/shared/config';
+import { getDateBoundaries } from '@/shared/date-boundaries';
 
 interface TwoFingerDragOptions {
   endDate: CalendarDate;
@@ -204,10 +203,8 @@ export function useTwoFingerDrag({
           const friction = 0.92; // Deceleration factor
           const minVelocity = 0.5;
           
-          // Calculate boundaries with 6 month buffer
-          const yesterday = getTodayAEST().subtract({ days: 1 });
-          const upperBoundary = yesterday.add({ months: 6 });
-          const lowerBoundary = DATE_BOUNDARIES.EARLIEST_END_DATE.subtract({ months: 6 });
+          // Get display boundaries
+          const boundaries = getDateBoundaries();
           
           const animate = () => {
             // Apply friction
@@ -228,7 +225,7 @@ export function useTwoFingerDrag({
               const newDate = currentDate.add({ days: daysChange });
               
               // Check if we're approaching boundaries and stop momentum if so
-              if (newDate.compare(upperBoundary) > 0 || newDate.compare(lowerBoundary) < 0) {
+              if (!boundaries.isWithinDisplayBounds(newDate)) {
                 dragStateRef.current.momentumAnimationId = null;
                 onDateNavigate(currentDate, false);
                 return;

@@ -50,6 +50,8 @@ export class RequestQueue<T = any> {
   private circuitOpenTime: number = 0;
   private logger: RequestQueueLogger;
   private processing: boolean = false;
+  private processTimerId: NodeJS.Timeout | null = null;
+  private activeTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(
     private config: RequestQueueConfig = {
@@ -178,12 +180,16 @@ export class RequestQueue<T = any> {
 
     // Continue processing if there are more requests
     if (this.queue.length > 0) {
-      setTimeout(() => this.processQueue(), this.config.minInterval);
+      this.processTimerId = setTimeout(() => {
+        this.processTimerId = null;
+        this.processQueue();
+      }, this.config.minInterval);
     }
   }
 
   private async processRequest(request: QueuedRequest<T>): Promise<void> {
     const startTime = Date.now();
+    let timeoutId: NodeJS.Timeout | undefined;
 
     try {
       // Log start event
@@ -199,7 +205,11 @@ export class RequestQueue<T = any> {
 
       // Create promise with timeout
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), this.config.timeout);
+        timeoutId = setTimeout(() => {
+          this.activeTimeouts.delete(request.id);
+          reject(new Error('Request timeout'));
+        }, this.config.timeout);
+        this.activeTimeouts.set(request.id, timeoutId);
       });
 
       const executePromise = request.execute();
@@ -208,6 +218,10 @@ export class RequestQueue<T = any> {
 
       // Race between execution and timeout
       const result = await Promise.race([executePromise, timeoutPromise]);
+
+      // Clear the timeout since we got a result
+      clearTimeout(timeoutId);
+      this.activeTimeouts.delete(request.id);
 
       // Success - reset failure count
       this.failureCount = 0;
@@ -235,6 +249,12 @@ export class RequestQueue<T = any> {
       }
 
     } catch (error) {
+      // Clear the timeout if request failed
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        this.activeTimeouts.delete(request.id);
+      }
+      
       this.active.delete(request.id);
       this.activeRequests.delete(request.id);
       const duration = Date.now() - startTime;
@@ -355,10 +375,32 @@ export class RequestQueue<T = any> {
 
   // Clear the queue
   public clear(): void {
+    // Cancel any pending timer
+    if (this.processTimerId) {
+      clearTimeout(this.processTimerId);
+      this.processTimerId = null;
+    }
+    
+    // Clear all active timeouts
+    this.activeTimeouts.forEach(timeoutId => {
+      clearTimeout(timeoutId);
+    });
+    this.activeTimeouts.clear();
+    
+    // Reject queued requests
     this.queue.forEach(request => {
       request.reject(new Error('Queue cleared'));
     });
     this.queue = [];
+    
+    // Also reject active requests
+    this.activeRequests.forEach(request => {
+      request.reject(new Error('Queue cleared'));
+    });
+    this.activeRequests.clear();
+    this.active.clear();
+    
     this.pendingPromises.clear();
+    this.processing = false;
   }
 }

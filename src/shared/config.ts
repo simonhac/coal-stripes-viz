@@ -36,8 +36,8 @@ export const API_CONFIG = {
 export const DATE_BOUNDARIES = {
   // The earliest date we have data from
   EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
-  // The earliest end date we can show (365 days from start)
-  EARLIEST_END_DATE: new CalendarDate(2006, 12, 31),
+  // Buffer months to allow beyond data boundaries for UI flexibility
+  DISPLAY_SLOP_MONTHS: 6,
 } as const;
 
 // Tile rendering configuration
