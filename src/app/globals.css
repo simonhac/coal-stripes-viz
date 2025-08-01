@@ -8,16 +8,3 @@ html, body {
   padding: 0;
 }
 
-/* Prevent scrolling and text selection when dragging */
-body.dragging {
-  overflow: hidden;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  cursor: grabbing !important;
-}
-
-body.dragging * {
-  cursor: grabbing !important;
-}

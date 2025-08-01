@@ -7,6 +7,7 @@ import { getDayIndex, isLeapYear } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { useTouchAsHover } from '@/hooks/useTouchAsHover';
+import { useDateRangeAnimator } from '@/hooks/useDateRangeAnimator';
 
 interface CompositeTileProps {
   endDate: CalendarDate;
@@ -51,18 +52,25 @@ const CompositeTileComponent = ({
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
   
-  // Drag state (using state for isDragging to trigger re-renders for cursor)
+  // Drag state
   const [isDragging, setIsDragging] = useState(false);
-  const dragStateRef = useRef<{
-    startX: number;
-    startEndDate: CalendarDate | null;
-  }>({
-    startX: 0,
-    startEndDate: null
-  });
+  const dragStartRef = useRef<{ clientX: number; startDate: CalendarDate } | null>(null);
   
   // Simple global mouse position tracking (using ref to avoid re-renders)
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
+  
+  // Set up date animator
+  const handleDateNavigate = useCallback((date: CalendarDate, isDragging: boolean) => {
+    const event = new CustomEvent('date-navigate', { 
+      detail: { newEndDate: date, isDragging } 
+    });
+    window.dispatchEvent(event);
+  }, []);
+  
+  const animator = useDateRangeAnimator({
+    currentEndDate: endDate,
+    onDateNavigate: handleDateNavigate,
+  });
   
   // Use provided animated date range, or calculate from endDate
   const dateRange = useMemo(() => {
@@ -512,23 +520,44 @@ const CompositeTileComponent = ({
     };
   }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight, clientToCanvasCoordinates]);
   
-  // Define handleMouseUp before the useEffect that uses it
+  // Mouse handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0) return; // Only handle left click
+    
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      clientX: e.clientX,
+      startDate: endDate
+    };
+    
+    // Update cursor
+    document.body.style.cursor = 'grabbing';
+    animator.startDrag();
+  }, [endDate, animator]);
+  
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Skip if dragging (handled by global handler)
+    if (isDragging) return;
+    
+    const { canvasX, canvasY } = clientToCanvasCoordinates(e.clientX, e.clientY);
+    
+    // Normal hover behavior - tooltip
+    updateTooltip(canvasX, canvasY);
+  }, [isDragging, clientToCanvasCoordinates, updateTooltip]);
+  
   const handleMouseUp = useCallback(() => {
-    // If we were dragging, emit a final event with isDragging: false
-    if (isDragging) {
-      const event = new CustomEvent('date-navigate', { 
-        detail: { isDragging: false } 
-      });
-      window.dispatchEvent(event);
-    }
+    if (!isDragging) return;
     
     setIsDragging(false);
-    dragStateRef.current.startX = 0;
-    dragStateRef.current.startEndDate = null;
+    dragStartRef.current = null;
     document.body.style.cursor = '';
-  }, [isDragging]);
+    
+    // End drag with no momentum for mouse
+    animator.endDrag(false);
+  }, [isDragging, animator]);
   
-  // Mouse position tracking effect and global mouse handlers for drag
+  // Global mouse handlers for drag
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
@@ -546,26 +575,18 @@ const CompositeTileComponent = ({
         }
       }
       
-      // Handle dragging globally (not just on canvas)
-      if (isDragging && dragStateRef.current.startEndDate && canvasRef.current) {
+      // Handle dragging
+      if (isDragging && dragStartRef.current && canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
-        const deltaX = e.clientX - dragStateRef.current.startX;
+        const deltaX = e.clientX - dragStartRef.current.clientX;
         // Convert screen pixels to days (negative because dragging right should move back in time)
         const daysDelta = -Math.round((deltaX / rect.width) * 365);
         
-        if (daysDelta !== 0) {
-          // Emit custom event with delta days and dragging flag
-          // Let page.tsx handle the actual date calculation and rubber band effect
-          const event = new CustomEvent('date-navigate', { 
-            detail: { 
-              deltaX: deltaX,
-              deltaDays: daysDelta,
-              startEndDate: dragStateRef.current.startEndDate,
-              isDragging: true 
-            } 
-          });
-          window.dispatchEvent(event);
-        }
+        // Calculate target date
+        const targetDate = dragStartRef.current.startDate.add({ days: daysDelta });
+        
+        // Use animator to navigate to the target date
+        animator.navigateToDragDate(targetDate);
       }
     };
     
@@ -575,14 +596,22 @@ const CompositeTileComponent = ({
       }
     };
     
-    document.addEventListener('mousemove', handleGlobalMouseMove);
-    document.addEventListener('mouseup', handleGlobalMouseUp);
-    
-    return () => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [endDate, isDragging, handleMouseUp]);
+    if (isDragging) {
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleGlobalMouseMove);
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    } else {
+      // Still track mouse position for hover even when not dragging
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      return () => {
+        document.removeEventListener('mousemove', handleGlobalMouseMove);
+      };
+    }
+  }, [isDragging, animator, handleMouseUp]);
   
   // Handle window scroll to update tooltip
   useEffect(() => {
@@ -608,31 +637,7 @@ const CompositeTileComponent = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, [updateTooltip, facilityCode, clientToCanvasCoordinates]);
   
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0) return; // Only handle left click
-    
-    e.preventDefault();
-    setIsDragging(true);
-    dragStateRef.current = {
-      startX: e.clientX,
-      startEndDate: endDate
-    };
-    
-    // Update cursor
-    document.body.style.cursor = 'grabbing';
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Skip if dragging (tooltip is handled in global mouse move)
-    if (isDragging) {
-      return;
-    }
-    
-    const { canvasX, canvasY } = clientToCanvasCoordinates(e.clientX, e.clientY);
-    
-    // Normal hover behavior - tooltip
-    updateTooltip(canvasX, canvasY);
-  };
+  // Mouse event handlers are defined above, no duplicates needed here
 
   // Touch handlers for hover functionality
   const touchHandlers = useTouchAsHover({

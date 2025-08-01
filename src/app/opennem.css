@@ -217,20 +217,6 @@ header a {
   /* Removed overflow constraints to allow sticky positioning */
 }
 
-.opennem-stripes-viz.dragging {
-  cursor: grabbing !important;
-}
-
-.opennem-stripes-viz.dragging * {
-  cursor: grabbing !important;
-  pointer-events: none; /* Disable interactions during drag */
-}
-
-/* Drag visual feedback */
-.opennem-stripes-viz.dragging {
-  opacity: 0.9;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
 
 /* Visual feedback when at today's date boundary */
 .opennem-stripes-viz.at-boundary {

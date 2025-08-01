@@ -4,22 +4,38 @@
 
 import { CalendarDate } from '@internationalized/date';
 
-// Drag interaction configuration  
-export const DRAG_CONFIG = {
-  DEBOUNCE_DELAY: 150,              // Milliseconds to debounce drag updates
-  MIN_DRAG_DISTANCE: 5,             // Minimum pixels to start a drag
+// Date navigation physics and interaction configuration
+export const DATE_NAV_PHYSICS = {
+  // Rubber band effect when dragging beyond data boundaries
+  RUBBER_BAND: {
+    SCALE_FACTOR: 0.4,              // Controls stretch amount (40% of max at infinity)
+  },
+  
+  // Spring physics for snap-back animations
+  SPRING: {
+    STIFFNESS: 200,                 // Spring constant - higher for snappier response
+    DAMPING: 30,                    // Damping coefficient - adjusted for the stiffness
+    MASS: 1,                        // Mass of the spring system
+    MIN_DISTANCE: 0.5,              // Stop when within 0.5 days of target
+    MIN_VELOCITY: 10,               // Stop when velocity is below 10 days/s
+  },
+  
+  // Momentum scrolling after drag release
+  MOMENTUM: {
+    FRICTION: 0.92,                 // Deceleration factor (8% velocity loss per frame)
+    MIN_VELOCITY: 0.5,              // Minimum velocity to continue momentum
+    VELOCITY_SCALE: 15,             // Scale up velocity for momentum effect
+  },
+  
+  // Drag interaction thresholds
+  DRAG: {
+    MIN_DISTANCE: 5,                // Minimum pixels to start a drag
+    MIN_HORIZONTAL_RATIO: 1.5,      // Horizontal must be 1.5x vertical for drag
+    VELOCITY_SAMPLE_WINDOW: 100,    // Keep velocity samples from last 100ms
+    DEBOUNCE_DELAY: 150,            // Milliseconds to debounce drag updates
+  },
 } as const;
 
-// Spring physics configuration for rubber band snap-back
-export const SPRING_PHYSICS_CONFIG = {
-  STIFFNESS: 200,                   // Spring constant - higher for snappier response
-  DAMPING: 30,                      // Damping coefficient - adjusted for the stiffness
-  MASS: 1,                          // Mass of the spring system
-  
-  // Thresholds for stopping the animation
-  MIN_DISTANCE: 0.5,                // Stop when within 0.5 days of target
-  MIN_VELOCITY: 10,                 // Stop when velocity is below 10 days/s
-} as const;
 
 // Performance monitoring
 export const PERF_CONFIG = {
