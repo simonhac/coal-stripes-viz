@@ -130,14 +130,12 @@ header a {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: 20px;
+  margin-top: 10px;
+  margin-bottom: 0;
   padding: 0 var(--app-padding);
-  position: sticky;
-  top: 0;
   background-color: #faf9f6;
-  z-index: 100;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
 .opennem-stripes-title {
@@ -565,7 +563,7 @@ header a {
   
   /* Reduce region spacing */
   .opennem-region {
-    margin: 20px 0 0 0;
+    margin: 0 0 10px 0;
   }
   
   /* Reduce region header padding but maintain sticky */
@@ -621,6 +619,7 @@ header a {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    padding-top: 16px;
   }
   
   /* Hide the black square (tooltip icon) on mobile */
