@@ -479,7 +479,7 @@ const CompositeTileComponent = ({
         animationFrameRef.current = null;
       }
     };
-  }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight]);
+  }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight, clientToCanvasCoordinates]);
   
   // Define handleMouseUp before the useEffect that uses it
   const handleMouseUp = useCallback(() => {
@@ -601,7 +601,7 @@ const CompositeTileComponent = ({
     
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [updateTooltip, facilityCode]);
+  }, [updateTooltip, facilityCode, clientToCanvasCoordinates]);
   
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (e.button !== 0) return; // Only handle left click

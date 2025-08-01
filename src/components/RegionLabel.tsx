@@ -51,14 +51,11 @@ export function RegionLabel({
   const handleMouseEnter = () => sendTooltipData(false);
   const handleClick = () => sendTooltipData(true);
 
-  // Touch handlers for hover functionality
+  // Touch handlers - treat as click for labels
   const touchHandlers = useTouchAsHover({
-    onHoverStart: () => sendTooltipData(false),
+    onHoverStart: () => sendTooltipData(true), // Send pinned tooltip on touch
     onHoverMove: () => {}, // No need to update on move for labels
-    onHoverEnd: () => {
-      const event = new CustomEvent('tooltip-data-hover-end');
-      window.dispatchEvent(event);
-    }
+    onHoverEnd: () => {} // Don't end on touch release since it's pinned
   });
 
   return (
