@@ -7,7 +7,6 @@ import { getDayIndex, isLeapYear } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { useTouchAsHover } from '@/hooks/useTouchAsHover';
-import { useDateRangeAnimator } from '@/hooks/useDateRangeAnimator';
 
 interface CompositeTileProps {
   endDate: CalendarDate;
@@ -52,25 +51,8 @@ const CompositeTileComponent = ({
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
   
-  // Drag state
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef<{ clientX: number; startDate: CalendarDate } | null>(null);
-  
-  // Simple global mouse position tracking (using ref to avoid re-renders)
+  // Mouse position tracking for tooltip updates during scrolling
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
-  
-  // Set up date animator
-  const handleDateNavigate = useCallback((date: CalendarDate, isDragging: boolean) => {
-    const event = new CustomEvent('date-navigate', { 
-      detail: { newEndDate: date, isDragging } 
-    });
-    window.dispatchEvent(event);
-  }, []);
-  
-  const animator = useDateRangeAnimator({
-    currentEndDate: endDate,
-    onDateNavigate: handleDateNavigate,
-  });
   
   // Use provided animated date range, or calculate from endDate
   const dateRange = useMemo(() => {
@@ -520,49 +502,18 @@ const CompositeTileComponent = ({
     };
   }, [dateRange, tiles, facilityCode, updateTooltip, minCanvasHeight, clientToCanvasCoordinates]);
   
-  // Mouse handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0) return; // Only handle left click
-    
-    e.preventDefault();
-    setIsDragging(true);
-    dragStartRef.current = {
-      clientX: e.clientX,
-      startDate: endDate
-    };
-    
-    // Update cursor
-    document.body.style.cursor = 'grabbing';
-    animator.startDrag();
-  }, [endDate, animator]);
-  
+  // Mouse handlers for hover only
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Skip if dragging (handled by global handler)
-    if (isDragging) return;
-    
     const { canvasX, canvasY } = clientToCanvasCoordinates(e.clientX, e.clientY);
-    
-    // Normal hover behavior - tooltip
     updateTooltip(canvasX, canvasY);
-  }, [isDragging, clientToCanvasCoordinates, updateTooltip]);
+  }, [clientToCanvasCoordinates, updateTooltip]);
   
-  const handleMouseUp = useCallback(() => {
-    if (!isDragging) return;
-    
-    setIsDragging(false);
-    dragStartRef.current = null;
-    document.body.style.cursor = '';
-    
-    // End drag with no momentum for mouse
-    animator.endDrag(false);
-  }, [isDragging, animator]);
-  
-  // Global mouse handlers for drag
+  // Global mouse position tracking for hover indicator
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
       
-      // Update hover indicator if mouse is over any canvas (even during drag)
+      // Update hover indicator if mouse is over any canvas
       const elementAtMouse = document.elementFromPoint(e.clientX, e.clientY);
       if (elementAtMouse && elementAtMouse.classList.contains('opennem-facility-canvas')) {
         const rect = elementAtMouse.getBoundingClientRect();
@@ -574,44 +525,13 @@ const CompositeTileComponent = ({
           document.documentElement.style.setProperty('--hover-x', `${percentage}%`);
         }
       }
-      
-      // Handle dragging
-      if (isDragging && dragStartRef.current && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const deltaX = e.clientX - dragStartRef.current.clientX;
-        // Convert screen pixels to days (negative because dragging right should move back in time)
-        const daysDelta = -Math.round((deltaX / rect.width) * 365);
-        
-        // Calculate target date
-        const targetDate = dragStartRef.current.startDate.add({ days: daysDelta });
-        
-        // Use animator to navigate to the target date
-        animator.navigateToDragDate(targetDate);
-      }
     };
     
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        handleMouseUp();
-      }
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
     };
-    
-    if (isDragging) {
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleGlobalMouseMove);
-        document.removeEventListener('mouseup', handleGlobalMouseUp);
-      };
-    } else {
-      // Still track mouse position for hover even when not dragging
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      return () => {
-        document.removeEventListener('mousemove', handleGlobalMouseMove);
-      };
-    }
-  }, [isDragging, animator, handleMouseUp]);
+  }, []);
   
   // Handle window scroll to update tooltip
   useEffect(() => {
@@ -646,45 +566,33 @@ const CompositeTileComponent = ({
       updateTooltip(canvasX, canvasY);
     },
     onHoverMove: (clientX, clientY) => {
-      if (isDragging) return;
-      
       const { canvasX, canvasY } = clientToCanvasCoordinates(clientX, clientY);
       updateTooltip(canvasX, canvasY);
     },
     onHoverEnd: () => {
-      if (!isDragging) {
-        document.documentElement.style.removeProperty('--hover-x');
-        const event = new CustomEvent('tooltip-data-hover-end');
-        window.dispatchEvent(event);
-      }
+      document.documentElement.style.removeProperty('--hover-x');
+      const event = new CustomEvent('tooltip-data-hover-end');
+      window.dispatchEvent(event);
     }
   });
 
   return (
-    <div 
-      className="opennem-stripe-data"
-      style={{ cursor: isDragging ? 'grabbing' : undefined }}
-    >
+    <div className="opennem-stripe-data">
       <canvas
         ref={canvasRef}
-        className={`opennem-facility-canvas ${isDragging ? 'is-dragging' : ''}`}
+        className="opennem-facility-canvas"
         style={{ 
           width: '100%',
           imageRendering: 'pixelated'
         }}
-        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
         onMouseLeave={() => {
-          // Only handle hover cleanup when not dragging
-          if (!isDragging) {
-            // Clear hover position on document root
-            document.documentElement.style.removeProperty('--hover-x');
-            
-            // Broadcast hover end event
-            const event = new CustomEvent('tooltip-data-hover-end');
-            window.dispatchEvent(event);
-          }
+          // Clear hover position on document root
+          document.documentElement.style.removeProperty('--hover-x');
+          
+          // Broadcast hover end event
+          const event = new CustomEvent('tooltip-data-hover-end');
+          window.dispatchEvent(event);
         }}
         {...touchHandlers}
       />

@@ -8,7 +8,10 @@ import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
 import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
-import { useTwoFingerDrag } from '@/hooks/useTwoFingerDrag';
+import { useUnifiedDrag } from '@/hooks/useUnifiedDrag';
+import { useMouseDrag } from '@/hooks/useMouseDrag';
+import { useTouchDrag } from '@/hooks/useTouchDrag';
+import { useWheelDragNonPassive } from '@/hooks/useWheelDragNonPassive';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -41,11 +44,16 @@ export function RegionSection({
     window.dispatchEvent(event);
   }, []);
   
-  // Set up two-finger drag handling
-  const twoFingerDragHandlers = useTwoFingerDrag({
-    endDate,
-    onDateNavigate: handleDateNavigate
+  // Set up unified drag handling
+  const unifiedDrag = useUnifiedDrag({
+    currentEndDate: endDate,
+    onDateNavigate: handleDateNavigate,
   });
+  
+  // Set up input-specific handlers
+  const mouseDragHandlers = useMouseDrag(unifiedDrag);
+  const touchDragHandlers = useTouchDrag(unifiedDrag);
+  const wheelDragRef = useWheelDragNonPassive(unifiedDrag);
   
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {
@@ -155,7 +163,12 @@ export function RegionSection({
         />
         <CapFacTooltip data={tooltipData} />
       </div>
-      <div className="opennem-region-content" {...twoFingerDragHandlers}>
+      <div 
+        ref={wheelDragRef}
+        className="opennem-region-content" 
+        {...mouseDragHandlers}
+        {...touchDragHandlers}
+      >
         <div className="opennem-facility-group">
           {/* Display all facilities for this region */}
           {facilities.map(facility => {

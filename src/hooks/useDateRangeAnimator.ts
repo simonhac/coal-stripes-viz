@@ -3,11 +3,13 @@ import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween as daysBetween } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { DATE_NAV_PHYSICS } from '@/shared/config';
+import { dragLogger, DragPhase, logDragPhaseStart, logDragPhaseEnd, logDragFrame, logDragEvent } from '@/utils/drag-logger';
 
 export interface AnimatorState {
   velocity: number;
   animationId: number | null;
   isDragging: boolean;
+  currentPosition: CalendarDate | null;
 }
 
 interface DateRangeAnimatorOptions {
@@ -27,6 +29,7 @@ export function useDateRangeAnimator({
     velocity: 0,
     animationId: null,
     isDragging: false,
+    currentPosition: null,
   });
 
   // Cancel any running animation
@@ -88,6 +91,18 @@ export function useDateRangeAnimator({
     const boundaries = getDateBoundaries();
     const clampedDate = boundaries.clampEndDateToDisplayBounds(rubberBandDate);
     
+    stateRef.current.currentPosition = clampedDate;
+    
+    // Check if rubber band is active
+    const isRubberBanding = targetDate.compare(clampedDate) !== 0;
+    
+    logDragFrame({
+      phase: isRubberBanding ? DragPhase.RUBBER_BAND : DragPhase.DRAGGING,
+      position: clampedDate,
+      targetDate: targetDate,
+      velocity: stateRef.current.velocity,
+      rubberBanding: isRubberBanding
+    });
     
     onDateNavigate(clampedDate, true);
   }, [applyRubberBandEffect, onDateNavigate]);
@@ -154,22 +169,29 @@ export function useDateRangeAnimator({
     cancelAnimation();
     stateRef.current.isDragging = true;
     stateRef.current.velocity = 0;
-  }, [cancelAnimation]);
+    dragLogger.reset();
+    logDragPhaseStart(DragPhase.DRAG_START, { currentEndDate: currentEndDate.toString() });
+  }, [cancelAnimation, currentEndDate]);
 
   // Update velocity during drag
   const updateVelocity = useCallback((velocity: number) => {
     stateRef.current.velocity = velocity;
   }, []);
 
-  // Spring animation for snap-back to data boundaries
-  const animateSpringBack = useCallback((targetDate: CalendarDate) => {
-    let velocity = 0;
+  // Spring physics animation (handles momentum and snap-back)
+  const animateSpring = useCallback((targetDate: CalendarDate, initialVelocity: number = 0) => {
+    // Capture the current position at animation start
+    const animationStartDate = stateRef.current.currentPosition || currentEndDate;
+    let velocity = initialVelocity;
     let lastTime = performance.now();
     let fractionalDays = 0; // Accumulate fractional days
-    const startDate = currentEndDate;
     
-    // Immediately set the target date (updates DateRange)
-    onDateNavigate(targetDate, false);
+    logDragPhaseStart(DragPhase.SPRING, {
+      animationStartDate: animationStartDate.toString(),
+      targetDate: targetDate.toString(),
+      initialVelocity: velocity,
+      currentEndDate: currentEndDate.toString()
+    });
     
     const animate = () => {
       const currentTime = performance.now();
@@ -177,16 +199,31 @@ export function useDateRangeAnimator({
       lastTime = currentTime;
       
       // Calculate current date from accumulated position
-      const wholeDays = Math.floor(fractionalDays);
-      const currentDate = startDate.add({ days: wholeDays });
+      // Use proper rounding instead of floor to avoid dead zones
+      const wholeDays = Math.round(fractionalDays);
+      const currentDate = animationStartDate.add({ days: wholeDays });
       
       // Calculate displacement from current to target
       const displacement = daysBetween(currentDate, targetDate);
       
+      // Log rounding details when velocity is low
+      if (Math.abs(velocity) < 20) {
+        logDragEvent('Rounding details', {
+          fractionalDays: fractionalDays.toFixed(6),
+          wholeDays,
+          velocity: velocity.toFixed(6),
+          displacement: displacement.toFixed(6)
+        });
+      }
       
       // Check if we're close enough to stop
       if (Math.abs(displacement) < DATE_NAV_PHYSICS.SPRING.MIN_DISTANCE && 
           Math.abs(velocity) < DATE_NAV_PHYSICS.SPRING.MIN_VELOCITY) {
+        logDragPhaseEnd(DragPhase.SPRING, {
+          finalPosition: targetDate.toString(),
+          finalDisplacement: displacement,
+          finalVelocity: velocity
+        });
         stateRef.current.animationId = null;
         onDateNavigate(targetDate, false);
         return;
@@ -197,12 +234,31 @@ export function useDateRangeAnimator({
       const dampingForce = -DATE_NAV_PHYSICS.SPRING.DAMPING * velocity;
       const acceleration = (springForce + dampingForce) / DATE_NAV_PHYSICS.SPRING.MASS;
       
+      // Apply additional friction when within bounds (simulates momentum decay)
+      const boundaries = getDateBoundaries();
+      const withinBounds = currentDate.compare(boundaries.latestDataDay) <= 0 && 
+                          currentDate.subtract({ days: 364 }).compare(boundaries.earliestDataDay) >= 0;
+      if (withinBounds && Math.abs(displacement) < 1) {
+        // When near target and within bounds, apply friction
+        velocity *= DATE_NAV_PHYSICS.MOMENTUM.FRICTION;
+      }
+      
       velocity += acceleration * dt;
       fractionalDays += velocity * dt;
       
       // Update to new position
-      const newWholeDays = Math.floor(fractionalDays);
-      const newDate = startDate.add({ days: newWholeDays });
+      const newWholeDays = Math.round(fractionalDays);
+      const newDate = animationStartDate.add({ days: newWholeDays });
+      
+      // Log frame
+      logDragFrame({
+        phase: DragPhase.SPRING,
+        position: newDate,
+        targetDate: targetDate,
+        velocity: velocity,
+        acceleration: acceleration,
+        displacement: displacement
+      });
       
       // Emit animation event for visual update
       const event = new CustomEvent('date-animate', { 
@@ -220,50 +276,6 @@ export function useDateRangeAnimator({
     animate();
   }, [currentEndDate, onDateNavigate]);
 
-  // Momentum animation
-  const animateMomentum = useCallback(() => {
-    let currentVelocity = stateRef.current.velocity * DATE_NAV_PHYSICS.MOMENTUM.VELOCITY_SCALE;
-    let currentDate = currentEndDate;
-    
-    const animate = () => {
-      // Apply friction
-      currentVelocity *= DATE_NAV_PHYSICS.MOMENTUM.FRICTION;
-      
-      // Stop if velocity is too small
-      if (Math.abs(currentVelocity) < DATE_NAV_PHYSICS.MOMENTUM.MIN_VELOCITY) {
-        stateRef.current.animationId = null;
-        
-        // Check if we need snap-back
-        const boundaries = getDateBoundaries();
-        const startDate = currentDate.subtract({ days: 364 });
-        
-        if (currentDate.compare(boundaries.latestDataDay) > 0) {
-          animateSpringBack(boundaries.latestDataDay);
-        } else if (startDate.compare(boundaries.earliestDataDay) < 0) {
-          animateSpringBack(boundaries.earliestDataEndDay);
-        } else {
-          onDateNavigate(currentDate, false);
-        }
-        return;
-      }
-      
-      // Calculate new position with momentum (velocity is in days/second)
-      const deltaDays = currentVelocity / 60; // 60fps
-      const rawDate = currentDate.add({ days: Math.round(deltaDays) });
-      
-      // Apply rubber band and boundaries
-      const rubberBandDate = applyRubberBandEffect(rawDate);
-      const boundaries = getDateBoundaries();
-      const clampedDate = boundaries.clampEndDateToDisplayBounds(rubberBandDate);
-      
-      currentDate = clampedDate;
-      onDateNavigate(currentDate, true);
-      
-      stateRef.current.animationId = requestAnimationFrame(animate);
-    };
-    
-    animate();
-  }, [currentEndDate, onDateNavigate, applyRubberBandEffect, animateSpringBack]);
 
   // End drag and start appropriate animation
   const endDrag = useCallback((applyMomentum: boolean = true) => {
@@ -271,25 +283,45 @@ export function useDateRangeAnimator({
     
     const boundaries = getDateBoundaries();
     const startDate = currentEndDate.subtract({ days: 364 });
-    const needsSnapBack = currentEndDate.compare(boundaries.latestDataDay) > 0 ||
-                         startDate.compare(boundaries.earliestDataDay) < 0;
+    const pastMaxBoundary = currentEndDate.compare(boundaries.latestDataDay) > 0;
+    const beforeMinBoundary = startDate.compare(boundaries.earliestDataDay) < 0;
+    const outOfBounds = pastMaxBoundary || beforeMinBoundary;
     
+    logDragPhaseEnd(DragPhase.DRAGGING, {
+      currentEndDate: currentEndDate.toString(),
+      velocity: stateRef.current.velocity,
+      outOfBounds,
+      applyMomentum
+    });
     
-    if (applyMomentum && Math.abs(stateRef.current.velocity) > 2) {
-      // Start momentum animation
-      animateMomentum();
-    } else if (needsSnapBack) {
-      // Snap back to data boundaries
-      if (currentEndDate.compare(boundaries.latestDataDay) > 0) {
-        animateSpringBack(boundaries.latestDataDay);
+    // Determine target position and initial velocity
+    let targetDate = currentEndDate;
+    let initialVelocity = applyMomentum ? stateRef.current.velocity * DATE_NAV_PHYSICS.MOMENTUM.VELOCITY_SCALE : 0;
+    
+    if (outOfBounds) {
+      // If out of bounds, target is the boundary
+      if (pastMaxBoundary) {
+        targetDate = boundaries.latestDataDay;
       } else {
-        animateSpringBack(boundaries.earliestDataEndDay);
+        targetDate = boundaries.earliestDataEndDay;
       }
+      logDragEvent('Starting spring animation to boundary', { 
+        target: targetDate.toString(), 
+        initialVelocity 
+      });
+      animateSpring(targetDate, initialVelocity);
     } else {
-      // Just end the drag
+      // In bounds - no spring animation needed, just let momentum coast to a stop
+      if (Math.abs(initialVelocity) > 2) {
+        logDragEvent('Drag ended with momentum (no spring needed)', { 
+          velocity: initialVelocity 
+        });
+      } else {
+        logDragEvent('Drag ended without animation');
+      }
       onDateNavigate(currentEndDate, false);
     }
-  }, [currentEndDate, onDateNavigate, animateMomentum, animateSpringBack]);
+  }, [currentEndDate, onDateNavigate, animateSpring]);
 
   return {
     navigateToDragDate,

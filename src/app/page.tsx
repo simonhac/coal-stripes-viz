@@ -75,7 +75,7 @@ export default function Home() {
       window.removeEventListener('date-navigate', handleDateNavigate);
       window.removeEventListener('date-animate', handleDateAnimate);
     };
-  }, []);
+  }, []); // Empty array - handlers don't need to change
   
   // Create a shared animator for handling drag physics
   const handleAnimatorNavigate = useCallback((date: CalendarDate, isDragging: boolean) => {
@@ -86,13 +86,29 @@ export default function Home() {
     }
   }, []);
   
+  // Use a ref to store the current end date for the animator to avoid recreating it
+  const animatorEndDateRef = useRef(endDate || getDateBoundaries().latestDataDay);
+  useEffect(() => {
+    animatorEndDateRef.current = endDate || getDateBoundaries().latestDataDay;
+  }, [endDate]);
+  
   const dragAnimator = useDateRangeAnimator({
-    currentEndDate: endDate || getDateBoundaries().latestDataDay,
+    currentEndDate: animatorEndDateRef.current,
     onDateNavigate: handleAnimatorNavigate,
   });
   
   // Handle drag end events that need snap-back checking
   useEffect(() => {
+    const handleDragStart = () => {
+      dragAnimator.startDrag();
+    };
+    
+    const handleDragVelocity = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { velocity } = customEvent.detail;
+      dragAnimator.updateVelocity(velocity);
+    };
+    
     const handleDragEnd = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { applyMomentum } = customEvent.detail;
@@ -101,9 +117,13 @@ export default function Home() {
       dragAnimator.endDrag(applyMomentum);
     };
     
+    window.addEventListener('drag-start', handleDragStart);
+    window.addEventListener('drag-velocity', handleDragVelocity);
     window.addEventListener('drag-end', handleDragEnd);
     
     return () => {
+      window.removeEventListener('drag-start', handleDragStart);
+      window.removeEventListener('drag-velocity', handleDragVelocity);
       window.removeEventListener('drag-end', handleDragEnd);
     };
   }, [dragAnimator]);

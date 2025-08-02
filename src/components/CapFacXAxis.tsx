@@ -97,7 +97,15 @@ export function CapFacXAxis({
         // Switch to short labels if average month width is less than 50px
         // 365 days / 12 months ≈ 30.4 days per month on average
         const avgMonthWidth = width / 12;
-        setUseShortLabels(avgMonthWidth < 50);
+        const shouldUseShort = avgMonthWidth < 50;
+        
+        // Only update if value actually changes
+        setUseShortLabels(prev => {
+          if (prev !== shouldUseShort) {
+            return shouldUseShort;
+          }
+          return prev;
+        });
       }
     });
 
