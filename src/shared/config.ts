@@ -8,7 +8,7 @@ import { CalendarDate } from '@internationalized/date';
 export const DATE_NAV_PHYSICS = {
   // Rubber band effect when dragging beyond data boundaries
   RUBBER_BAND: {
-    SCALE_FACTOR: 0.4,              // Controls stretch amount (40% of max at infinity)
+    SCALE_FACTOR: 0.2,              // Controls stretch amount (20% of max at infinity - more resistance)
   },
   
   // Spring physics for snap-back animations
@@ -65,7 +65,7 @@ export const DATE_BOUNDARIES = {
   EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
 
   // Buffer months to allow beyond data boundaries for UI flexibility
-  DISPLAY_SLOP_MONTHS: 9,
+  DISPLAY_SLOP_MONTHS: 3,
 } as const;
 
 // Tile rendering configuration

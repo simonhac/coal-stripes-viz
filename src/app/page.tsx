@@ -60,11 +60,22 @@ export default function Home() {
       const customEvent = e as CustomEvent;
       const { animatedEndDate, targetEndDate, isAnimating } = customEvent.detail;
       
-      setAnimatedEndDate(animatedEndDate);
+      // Only update if the date actually changed
+      setAnimatedEndDate(prev => {
+        if (!prev || prev.compare(animatedEndDate) !== 0) {
+          return animatedEndDate;
+        }
+        return prev;
+      });
       
       // When animation completes, ensure we're exactly at target
-      if (!isAnimating) {
-        setAnimatedEndDate(targetEndDate);
+      if (!isAnimating && targetEndDate) {
+        setAnimatedEndDate(prev => {
+          if (!prev || prev.compare(targetEndDate) !== 0) {
+            return targetEndDate;
+          }
+          return prev;
+        });
       }
     };
     

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { useDateRangeAnimator } from './useDateRangeAnimator';
 
@@ -22,6 +22,7 @@ export function useUnifiedDrag({
   currentEndDate,
   onDateNavigate,
 }: UnifiedDragOptions) {
+  const [isActive, setIsActive] = useState(false);
   const dragStateRef = useRef<DragState>({
     isActive: false,
     startDate: currentEndDate,
@@ -43,6 +44,7 @@ export function useUnifiedDrag({
     state.startX = startX;
     state.velocitySamples = [{ x: startX, time: Date.now() }];
     
+    setIsActive(true);
     animator.startDrag();
   }, [currentEndDate, animator]);
 
@@ -91,6 +93,7 @@ export function useUnifiedDrag({
     if (!state.isActive) return;
     
     state.isActive = false;
+    setIsActive(false);
     
     // Default to momentum for touch/wheel, no momentum for mouse
     const applyMomentum = options?.applyMomentum ?? true;
@@ -108,6 +111,7 @@ export function useUnifiedDrag({
     if (!state.isActive) return;
     
     state.isActive = false;
+    setIsActive(false);
     state.velocitySamples = [];
     animator.cancelAnimation();
   }, [animator]);
@@ -117,6 +121,6 @@ export function useUnifiedDrag({
     updateDrag,
     endDrag,
     cancelDrag,
-    isActive: dragStateRef.current.isActive,
+    isActive,
   };
 }

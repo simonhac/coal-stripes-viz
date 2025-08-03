@@ -12,6 +12,7 @@ interface WheelState {
   accumulatedX: number;
   isActive: boolean;
   lastUpdateTime: number;
+  startX: number;
 }
 
 /**
@@ -28,6 +29,7 @@ export function useWheelDragNonPassive({
     accumulatedX: 0,
     isActive: false,
     lastUpdateTime: 0,
+    startX: 0,
   });
   
   const elementRef = useRef<HTMLDivElement>(null);
@@ -49,10 +51,31 @@ export function useWheelDragNonPassive({
       const state = wheelStateRef.current;
 
       // Check if this is a new gesture (more than 150ms since last wheel event)
-      if (now - state.lastWheelTime > 150) {
+      if (now - state.lastWheelTime > 150 || !state.isActive) {
+        // For wheel events, always use 0 as the reference point
+        state.startX = 0;
         state.accumulatedX = 0;
+        state.lastUpdateTime = 0;
         state.isActive = true;
-        logDragEvent('Wheel drag started', { deltaX: e.deltaX, deltaY: e.deltaY });
+        logDragEvent('Wheel drag started', { 
+          deltaX: e.deltaX, 
+          deltaY: e.deltaY,
+          deltaZ: e.deltaZ,
+          deltaMode: e.deltaMode,
+          screenX: e.screenX,
+          screenY: e.screenY,
+          clientX: e.clientX,
+          clientY: e.clientY,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          metaKey: e.metaKey,
+          buttons: e.buttons,
+          wheelDelta: (e as any).wheelDelta,
+          wheelDeltaX: (e as any).wheelDeltaX,
+          wheelDeltaY: (e as any).wheelDeltaY,
+          detail: (e as any).detail
+        });
         startDrag(0);
       }
 
@@ -60,10 +83,21 @@ export function useWheelDragNonPassive({
       // Invert direction - scrolling right should go forward in time
       state.accumulatedX -= e.deltaX;
       
+      // Log every wheel event to see the pattern
+      logDragEvent('Wheel event', {
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        screenX: e.screenX,
+        screenY: e.screenY,
+        accumulatedX: state.accumulatedX,
+        timeSinceStart: now - (state.lastUpdateTime || now)
+      });
+      
       // Throttle updates to prevent overwhelming React
       const timeSinceLastUpdate = now - state.lastUpdateTime;
       if (timeSinceLastUpdate >= 16) { // ~60fps max
         state.lastUpdateTime = now;
+        // Pass accumulated value directly - it represents position relative to start
         updateDrag(state.accumulatedX);
       }
     };
@@ -88,7 +122,9 @@ export function useWheelDragNonPassive({
         updateDrag(state.accumulatedX);
         logDragEvent('Wheel drag ended (timeout)');
         endDrag({ applyMomentum: true }); // Enable momentum for wheel
+        // Reset accumulated position after drag ends
         state.accumulatedX = 0;
+        state.lastUpdateTime = 0;
       }
     };
 
