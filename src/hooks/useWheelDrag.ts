@@ -21,7 +21,7 @@ interface WheelState {
  * Hook that converts wheel events (trackpad) to drag operations
  * Returns a ref to attach to the element
  */
-export function useWheelDragNonPassive({
+export function useWheelDrag({
   startDrag,
   updateDrag,
   endDrag,

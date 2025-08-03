@@ -11,7 +11,7 @@ import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '
 import { useUnifiedDrag } from '@/hooks/useUnifiedDrag';
 import { useMouseDrag } from '@/hooks/useMouseDrag';
 import { useTouchDrag } from '@/hooks/useTouchDrag';
-import { useWheelDragNonPassive } from '@/hooks/useWheelDragNonPassive';
+import { useWheelDrag } from '@/hooks/useWheelDrag';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -53,7 +53,7 @@ export function RegionSection({
   // Set up input-specific handlers
   const mouseDragHandlers = useMouseDrag(unifiedDrag);
   const touchDragHandlers = useTouchDrag(unifiedDrag);
-  const wheelDragRef = useWheelDragNonPassive(unifiedDrag);
+  const wheelDragRef = useWheelDrag(unifiedDrag);
   
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {
