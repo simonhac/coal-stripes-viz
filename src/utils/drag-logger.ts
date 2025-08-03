@@ -59,7 +59,11 @@ class DragLogger {
   private dragSessionSeq: number = -1;
 
   constructor() {
-    this.reset();
+    // Initialize without incrementing session
+    this.globalStartTime = performance.now();
+    this.lastFrameTime = this.globalStartTime;
+    this.frameCounters.clear();
+    this.phaseStartTimes.clear();
   }
 
   reset() {
@@ -139,8 +143,8 @@ class DragLogger {
   logFrame(data: FrameData) {
     if (!this.enabled) return;
     
-    const frameCount = (this.frameCounters.get(data.phase) || 0) + 1;
-    this.frameCounters.set(data.phase, frameCount);
+    const frameCount = this.frameCounters.get(data.phase) || 0;
+    this.frameCounters.set(data.phase, frameCount + 1);
     
     const elapsed = this.getElapsedTime();
     const frameDelta = this.getFrameDelta();

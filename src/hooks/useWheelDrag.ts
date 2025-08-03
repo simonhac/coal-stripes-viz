@@ -65,8 +65,7 @@ export function useWheelDrag({
         state.accumulatedX = 0;
         state.lastUpdateTime = 0;
         state.isActive = true;
-        logDragEvent('Wheel drag started', { 
-          sessionSeq: state.sessionSeq,
+        logDragEvent(`Wheel drag started [session ${state.sessionSeq}]`, { 
           deltaX: e.deltaX, 
           deltaZ: e.deltaZ,
           deltaMode: e.deltaMode,
