@@ -15,6 +15,7 @@ interface WheelState {
   startX: number;
   sessionSeq: number;
   eventSeq: number;
+  sessionStartTime: number;
 }
 
 /**
@@ -34,6 +35,7 @@ export function useWheelDrag({
     startX: 0,
     sessionSeq: -1,
     eventSeq: 0,
+    sessionStartTime: 0,
   });
   
   const elementRef = useRef<HTMLDivElement>(null);
@@ -65,7 +67,16 @@ export function useWheelDrag({
         state.accumulatedX = 0;
         state.lastUpdateTime = 0;
         state.isActive = true;
-        logDragEvent(`Wheel drag started [session ${state.sessionSeq}]`, { 
+        // Track session start time
+        if (state.sessionStartTime === 0) {
+          state.sessionStartTime = performance.now();
+        }
+        const sessionNow = performance.now();
+        const elapsedMs = Math.round(sessionNow - state.sessionStartTime);
+        
+        // Log wheel start in similar format to drag phases
+        console.group(`%c▶ WHEEL START @ ${elapsedMs}ms [session ${state.sessionSeq}]`, 'color: #00C853; font-weight: bold');
+        console.log('Data:', { 
           deltaX: e.deltaX, 
           deltaZ: e.deltaZ,
           deltaMode: e.deltaMode,
@@ -74,6 +85,7 @@ export function useWheelDrag({
           altKey: e.altKey,
           metaKey: e.metaKey,
         });
+        console.groupEnd();
         startDrag(0);
       }
 
@@ -116,10 +128,18 @@ export function useWheelDrag({
         state.isActive = false;
         // Ensure final position is updated
         updateDrag(state.accumulatedX);
-        logDragEvent('Wheel drag ended (timeout)', {
-          sessionSeq: state.sessionSeq,
-          totalEvents: state.eventSeq
+        // Log wheel end in similar format to drag phases
+        const endTime = performance.now();
+        const elapsedMs = Math.round(endTime - state.sessionStartTime);
+        const duration = endTime - state.sessionStartTime;
+        
+        console.group(`%c■ WHEEL END @ ${elapsedMs}ms [session ${state.sessionSeq}]`, 'color: #D32F2F; font-weight: bold');
+        console.log('Duration:', (duration / 1000).toFixed(3), 's');
+        console.log('Events:', state.eventSeq);
+        console.log('Data:', {
+          endReason: 'timeout'
         });
+        console.groupEnd();
         endDrag({ applyMomentum: true }); // Enable momentum for wheel
         // Reset accumulated position after drag ends
         state.accumulatedX = 0;

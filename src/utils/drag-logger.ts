@@ -106,10 +106,11 @@ class DragLogger {
     if (!this.enabled) return;
     
     const elapsed = this.getElapsedTime();
+    const elapsedMs = Math.round(elapsed * 1000);
     this.phaseStartTimes.set(phase, performance.now());
     this.frameCounters.set(phase, 0);
     
-    console.group(`%c▶ ${phase} START @ ${elapsed.toFixed(1)}s [session ${this.dragSessionSeq}]`, LogColors.PHASE_START);
+    console.group(`%c▶ ${phase} START @ ${elapsedMs}ms [session ${this.dragSessionSeq}]`, LogColors.PHASE_START);
     if (data) {
       console.log('Data:', data);
     }
@@ -120,11 +121,12 @@ class DragLogger {
     if (!this.enabled) return;
     
     const elapsed = this.getElapsedTime();
+    const elapsedMs = Math.round(elapsed * 1000);
     const startTime = this.phaseStartTimes.get(phase);
     const duration = startTime ? performance.now() - startTime : 0;
     const frameCount = this.frameCounters.get(phase) || 0;
     
-    console.group(`%c■ ${phase} END @ ${elapsed.toFixed(1)}s [session ${this.dragSessionSeq}]`, LogColors.PHASE_END);
+    console.group(`%c■ ${phase} END @ ${elapsedMs}ms [session ${this.dragSessionSeq}]`, LogColors.PHASE_END);
     console.log('Duration:', (duration / 1000).toFixed(3), 's');
     console.log('Frames:', frameCount);
     if (frameCount > 0 && duration > 0) {
@@ -271,8 +273,9 @@ class DragLogger {
       }
     } else {
       // Add session info to drag events
+      const elapsedMs = Math.round(elapsed * 1000);
       const eventWithSession = event.includes('[session') ? event : `${event} [session ${this.dragSessionSeq}]`;
-      console.log(`%c⚡ ${eventWithSession} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
+      console.log(`%c⚡ ${eventWithSession} @ ${elapsedMs}ms`, LogColors.EVENT, data || '');
     }
   }
 
