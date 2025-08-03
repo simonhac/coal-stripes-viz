@@ -269,14 +269,14 @@ export function useDateRangeAnimator({
       const displacement = daysBetween(currentDate, targetDate);
       
       // Log rounding details when velocity is low
-      if (Math.abs(velocity) < 20) {
-        logDragEvent('Rounding details', {
-          fractionalDays: fractionalDays.toFixed(6),
-          wholeDays,
-          velocity: velocity.toFixed(6),
-          displacement: displacement.toFixed(6)
-        });
-      }
+      // if (Math.abs(velocity) < 20) {
+      //   logDragEvent('Rounding details', {
+      //     fractionalDays: fractionalDays.toFixed(6),
+      //     wholeDays,
+      //     velocity: velocity.toFixed(6),
+      //     displacement: displacement.toFixed(6)
+      //   });
+      // }
       
       // Check if we're close enough to stop
       // If we've rounded to the exact target position, stop immediately

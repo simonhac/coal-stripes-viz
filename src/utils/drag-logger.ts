@@ -138,7 +138,10 @@ class DragLogger {
     const elapsed = this.getElapsedTime();
     const frameDelta = this.getFrameDelta();
     
-    const header = `%c${data.phase} f${frameCount}@${elapsed.toFixed(3)}s:`;
+    // Special formatting for RUBBER_BAND phase
+    const elapsedMs = Math.round(elapsed * 1000);
+    const phaseLabel = data.phase === DragPhase.RUBBER_BAND ? 'RUBBER' : data.phase;
+    const header = `%c${phaseLabel} f${frameCount}@${elapsedMs}ms:`;
     
     const parts: string[] = [];
     
@@ -220,10 +223,17 @@ class DragLogger {
     
     const elapsed = this.getElapsedTime();
     
-    // For WHEEL events, format time as milliseconds
+    // For WHEEL events, format time as milliseconds with special format
     if (event.startsWith('WHEEL ')) {
       const elapsedMs = Math.round(elapsed * 1000);
-      console.log(`%c⚡ ${event} ${elapsedMs}ms`, LogColors.EVENT, data || '');
+      // Extract session.event from "WHEEL X.Y" format and reformat as "WHEEL eX.Y@Zms"
+      const wheelMatch = event.match(/^WHEEL (\d+\.\d+)$/);
+      if (wheelMatch) {
+        const sessionEvent = wheelMatch[1];
+        console.log(`%c⚡ WHEEL e${sessionEvent}@${elapsedMs}ms`, LogColors.EVENT, data || '');
+      } else {
+        console.log(`%c⚡ ${event}@${elapsedMs}ms`, LogColors.EVENT, data || '');
+      }
     } else {
       console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
     }
