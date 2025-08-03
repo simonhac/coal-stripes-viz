@@ -124,7 +124,7 @@ class DragLogger {
     const duration = startTime ? performance.now() - startTime : 0;
     const frameCount = this.frameCounters.get(phase) || 0;
     
-    console.group(`%c■ ${phase} END @ ${elapsed.toFixed(1)}s`, LogColors.PHASE_END);
+    console.group(`%c■ ${phase} END @ ${elapsed.toFixed(1)}s [session ${this.dragSessionSeq}]`, LogColors.PHASE_END);
     console.log('Duration:', (duration / 1000).toFixed(3), 's');
     console.log('Frames:', frameCount);
     if (frameCount > 0 && duration > 0) {
@@ -238,7 +238,12 @@ class DragLogger {
       }
     }
     
-    console.log(logString, ...styles, rest);
+    // Only log rest if it has properties
+    if (Object.keys(rest).length > 0) {
+      console.log(logString, ...styles, rest);
+    } else {
+      console.log(logString, ...styles);
+    }
   }
 
   // Event logging
