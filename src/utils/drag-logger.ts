@@ -214,25 +214,19 @@ class DragLogger {
     if (!this.enabled) return;
     
     // Special handling for wheel events
-    if (event === 'Wheel event') {
-      if (!LOG_WHEEL_EVENTS) return;
-      
-      const elapsed = this.getElapsedTime();
-      if (data?.status === "DIDN'T MOVE") {
-        console.log(
-          `%c⚡ ${event} @ ${elapsed.toFixed(1)}s %cDIDN'T MOVE`, 
-          LogColors.EVENT, 
-          'color: #FF0000; font-weight: bold',
-          { ...data, status: undefined }
-        );
-      } else {
-        console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
-      }
+    if (event === 'Wheel event' && !LOG_WHEEL_EVENTS) {
       return;
     }
     
     const elapsed = this.getElapsedTime();
-    console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
+    
+    // For WHEEL events, format time as milliseconds
+    if (event.startsWith('WHEEL ')) {
+      const elapsedMs = Math.round(elapsed * 1000);
+      console.log(`%c⚡ ${event} ${elapsedMs}ms`, LogColors.EVENT, data || '');
+    } else {
+      console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
+    }
   }
 
   // State logging

@@ -13,8 +13,8 @@ interface WheelState {
   isActive: boolean;
   lastUpdateTime: number;
   startX: number;
-  lastScreenX: number;
-  lastScreenY: number;
+  sessionSeq: number;
+  eventSeq: number;
 }
 
 /**
@@ -32,8 +32,8 @@ export function useWheelDrag({
     isActive: false,
     lastUpdateTime: 0,
     startX: 0,
-    lastScreenX: 0,
-    lastScreenY: 0,
+    sessionSeq: -1,
+    eventSeq: 0,
   });
   
   const elementRef = useRef<HTMLDivElement>(null);
@@ -56,29 +56,24 @@ export function useWheelDrag({
 
       // Check if this is a new gesture (more than 150ms since last wheel event)
       if (now - state.lastWheelTime > 150 || !state.isActive) {
+        // New session
+        state.sessionSeq++;
+        state.eventSeq = 0;
+        
         // For wheel events, always use 0 as the reference point
         state.startX = 0;
         state.accumulatedX = 0;
         state.lastUpdateTime = 0;
         state.isActive = true;
         logDragEvent('Wheel drag started', { 
+          sessionSeq: state.sessionSeq,
           deltaX: e.deltaX, 
-          deltaY: e.deltaY,
           deltaZ: e.deltaZ,
           deltaMode: e.deltaMode,
-          screenX: e.screenX,
-          screenY: e.screenY,
-          clientX: e.clientX,
-          clientY: e.clientY,
           ctrlKey: e.ctrlKey,
           shiftKey: e.shiftKey,
           altKey: e.altKey,
           metaKey: e.metaKey,
-          buttons: e.buttons,
-          wheelDelta: (e as any).wheelDelta,
-          wheelDeltaX: (e as any).wheelDeltaX,
-          wheelDeltaY: (e as any).wheelDeltaY,
-          detail: (e as any).detail
         });
         startDrag(0);
       }
@@ -88,19 +83,13 @@ export function useWheelDrag({
       state.accumulatedX -= e.deltaX;
       
       // Log every wheel event to see the pattern
-      const didntMove = e.screenX === state.lastScreenX && e.screenY === state.lastScreenY;
-      logDragEvent('Wheel event', {
-        deltaX: parseFloat(e.deltaX.toFixed(1)),
-        deltaY: parseFloat(e.deltaY.toFixed(1)),
-        screenX: e.screenX,
-        screenY: e.screenY,
-        accumulatedX: Math.round(state.accumulatedX),
-        timeSinceStart: now - (state.lastUpdateTime || now),
-        ...(didntMove && { status: "DIDN'T MOVE" })
-      });
-      
-      state.lastScreenX = e.screenX;
-      state.lastScreenY = e.screenY;
+      const eventSeq = state.eventSeq++;
+      const deltaX = parseFloat(e.deltaX.toFixed(1));
+      const accumulatedX = Math.round(state.accumulatedX);
+      const timeSinceLastReactUpdateSent = now - (state.lastUpdateTime || now);
+      logDragEvent(`WHEEL ${state.sessionSeq}.${eventSeq}`, 
+        `deltaX: ${deltaX} | accumX: ${accumulatedX} | sinceUpdate: ${timeSinceLastReactUpdateSent}`
+      );
       
       // Throttle updates to prevent overwhelming React
       const timeSinceLastUpdate = now - state.lastUpdateTime;
@@ -129,7 +118,10 @@ export function useWheelDrag({
         state.isActive = false;
         // Ensure final position is updated
         updateDrag(state.accumulatedX);
-        logDragEvent('Wheel drag ended (timeout)');
+        logDragEvent('Wheel drag ended (timeout)', {
+          sessionSeq: state.sessionSeq,
+          totalEvents: state.eventSeq
+        });
         endDrag({ applyMomentum: true }); // Enable momentum for wheel
         // Reset accumulated position after drag ends
         state.accumulatedX = 0;
