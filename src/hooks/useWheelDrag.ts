@@ -82,18 +82,18 @@ export function useWheelDrag({
       // Invert direction - scrolling right should go forward in time
       state.accumulatedX -= e.deltaX;
       
-      // Log every wheel event to see the pattern
-      const eventSeq = state.eventSeq++;
-      const deltaX = parseFloat(e.deltaX.toFixed(1));
-      const accumulatedX = Math.round(state.accumulatedX);
-      const timeSinceLastReactUpdateSent = now - (state.lastUpdateTime || now);
-      logDragEvent(`WHEEL ${state.sessionSeq}.${eventSeq}`, 
-        `deltaX: ${deltaX}, accumX: ${accumulatedX}, sinceUpdate: ${timeSinceLastReactUpdateSent}`
-      );
-      
       // Throttle updates to prevent overwhelming React
       const timeSinceLastUpdate = now - state.lastUpdateTime;
       if (timeSinceLastUpdate >= 16) { // ~60fps max
+        // Only log and increment sequence when we're actually sending an update
+        const eventSeq = state.eventSeq++;
+        const deltaX = parseFloat(e.deltaX.toFixed(1));
+        const accumulatedX = Math.round(state.accumulatedX);
+        const timeSinceLastReactUpdateSent = now - (state.lastUpdateTime || now);
+        logDragEvent(`WHEEL ${state.sessionSeq}.${eventSeq}`, 
+          `deltaX: ${deltaX}, accumX: ${accumulatedX}, sinceUpdate: ${timeSinceLastReactUpdateSent}`
+        );
+        
         state.lastUpdateTime = now;
         // Pass accumulated value directly - it represents position relative to start
         updateDrag(state.accumulatedX);
