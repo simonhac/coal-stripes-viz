@@ -56,6 +56,7 @@ class DragLogger {
   private globalStartTime: number = 0;
   private enabled: boolean = DRAG_LOGGING_ENABLED;
   private lastFrameTime: number = 0;
+  private dragSessionSeq: number = -1;
 
   constructor() {
     this.reset();
@@ -66,6 +67,7 @@ class DragLogger {
     this.lastFrameTime = this.globalStartTime;
     this.frameCounters.clear();
     this.phaseStartTimes.clear();
+    this.dragSessionSeq++;
   }
 
   setEnabled(enabled: boolean) {
@@ -90,6 +92,11 @@ class DragLogger {
     return delta;
   }
 
+  // Get current session sequence
+  getSessionSeq(): number {
+    return this.dragSessionSeq;
+  }
+
   // Phase logging
   logPhaseStart(phase: DragPhase, data?: any) {
     if (!this.enabled) return;
@@ -98,7 +105,7 @@ class DragLogger {
     this.phaseStartTimes.set(phase, performance.now());
     this.frameCounters.set(phase, 0);
     
-    console.group(`%c▶ ${phase} START @ ${elapsed.toFixed(1)}s`, LogColors.PHASE_START);
+    console.group(`%c▶ ${phase} START @ ${elapsed.toFixed(1)}s [session ${this.dragSessionSeq}]`, LogColors.PHASE_START);
     if (data) {
       console.log('Data:', data);
     }
@@ -141,7 +148,7 @@ class DragLogger {
     // Special formatting for RUBBER_BAND phase
     const elapsedMs = Math.round(elapsed * 1000);
     const phaseLabel = data.phase === DragPhase.RUBBER_BAND ? 'RUBBER' : data.phase;
-    const header = `%c${phaseLabel} f${frameCount}@${elapsedMs}ms:`;
+    const header = `%c${phaseLabel} s${this.dragSessionSeq}.f${frameCount}@${elapsedMs}ms:`;
     
     const parts: string[] = [];
     
@@ -226,16 +233,19 @@ class DragLogger {
     // For WHEEL events, format time as milliseconds with special format
     if (event.startsWith('WHEEL ')) {
       const elapsedMs = Math.round(elapsed * 1000);
-      // Extract session.event from "WHEEL X.Y" format and reformat as "WHEEL eX.Y@Zms"
-      const wheelMatch = event.match(/^WHEEL (\d+\.\d+)$/);
+      // Extract session.event from "WHEEL X.Y" format and reformat as "WHEEL sX.eY@Zms"
+      const wheelMatch = event.match(/^WHEEL (\d+)\.(\d+)$/);
       if (wheelMatch) {
-        const sessionEvent = wheelMatch[1];
-        console.log(`%c⚡ WHEEL e${sessionEvent}@${elapsedMs}ms ${data || ''}`, LogColors.EVENT);
+        const session = wheelMatch[1];
+        const eventNum = wheelMatch[2];
+        console.log(`%c⚡ WHEEL s${session}.e${eventNum}@${elapsedMs}ms ${data || ''}`, LogColors.EVENT);
       } else {
         console.log(`%c⚡ ${event}@${elapsedMs}ms ${data || ''}`, LogColors.EVENT);
       }
     } else {
-      console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
+      // Add session info to drag events
+      const eventWithSession = event.includes('[session') ? event : `${event} [session ${this.dragSessionSeq}]`;
+      console.log(`%c⚡ ${eventWithSession} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
     }
   }
 
@@ -315,4 +325,8 @@ export function logDragWarning(message: string, data?: any) {
 
 export function logDragError(message: string, error?: any) {
   dragLogger.logError(message, error);
+}
+
+export function getDragSessionSeq(): number {
+  return dragLogger.getSessionSeq();
 }
