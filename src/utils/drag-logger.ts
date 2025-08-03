@@ -39,6 +39,12 @@ export enum DragPhase {
   RUBBER_BAND = 'RUBBER_BAND',
 }
 
+// Session types
+export enum SessionType {
+  DRAG = 'DRAG',
+  WHEEL = 'WHEEL',
+}
+
 // Animation frame data
 interface FrameData {
   phase: DragPhase;
@@ -47,7 +53,16 @@ interface FrameData {
   acceleration?: number;
   displacement?: number;
   targetDate?: CalendarDate;
+  warnings?: string[]; // Warning labels to display in red at the end
   [key: string]: any;
+}
+
+export interface SessionInfo {
+  type: SessionType;
+  seq: number;
+  startTime: number;
+  frameCount: number;
+  eventCount: number;
 }
 
 class DragLogger {
@@ -56,7 +71,8 @@ class DragLogger {
   private globalStartTime: number = 0;
   private enabled: boolean = DRAG_LOGGING_ENABLED;
   private lastFrameTime: number = 0;
-  private dragSessionSeq: number = -1;
+  private sessionSequences: Map<SessionType, number> = new Map();
+  private currentSession: SessionInfo | null = null;
 
   constructor() {
     // Initialize without incrementing session
@@ -64,6 +80,9 @@ class DragLogger {
     this.lastFrameTime = this.globalStartTime;
     this.frameCounters.clear();
     this.phaseStartTimes.clear();
+    // Initialize session sequences
+    this.sessionSequences.set(SessionType.DRAG, -1);
+    this.sessionSequences.set(SessionType.WHEEL, -1);
   }
 
   reset() {
@@ -71,7 +90,42 @@ class DragLogger {
     this.lastFrameTime = this.globalStartTime;
     this.frameCounters.clear();
     this.phaseStartTimes.clear();
-    this.dragSessionSeq++;
+  }
+
+  // Start a new session
+  startSession(type: SessionType): number {
+    const currentSeq = this.sessionSequences.get(type) || -1;
+    const newSeq = currentSeq + 1;
+    this.sessionSequences.set(type, newSeq);
+    
+    this.currentSession = {
+      type,
+      seq: newSeq,
+      startTime: performance.now(),
+      frameCount: 0,
+      eventCount: 0
+    };
+    
+    this.reset();
+    return newSeq;
+  }
+
+  // End current session
+  endSession() {
+    this.currentSession = null;
+  }
+
+  // Get current session info
+  getCurrentSession(): SessionInfo | null {
+    return this.currentSession;
+  }
+
+  // Increment event count for current session
+  incrementEventCount(): number {
+    if (this.currentSession) {
+      return ++this.currentSession.eventCount;
+    }
+    return 0;
   }
 
   setEnabled(enabled: boolean) {
@@ -98,7 +152,7 @@ class DragLogger {
 
   // Get current session sequence
   getSessionSeq(): number {
-    return this.dragSessionSeq;
+    return this.currentSession?.seq ?? -1;
   }
 
   // Phase logging
@@ -110,7 +164,18 @@ class DragLogger {
     this.phaseStartTimes.set(phase, performance.now());
     this.frameCounters.set(phase, 0);
     
-    console.group(`%c▶ ${phase} START @ ${elapsedMs}ms [session ${this.dragSessionSeq}]`, LogColors.PHASE_START);
+    // Use session type to determine the phase name
+    let phaseName: string;
+    if (this.currentSession?.type === SessionType.WHEEL) {
+      phaseName = 'WHEEL';
+    } else if (this.currentSession?.type === SessionType.DRAG) {
+      phaseName = 'DRAG';
+    } else {
+      phaseName = phase;
+    }
+    
+    const sessionInfo = this.currentSession ? `[session ${this.currentSession.seq}]` : '';
+    console.group(`%c▶ ${phaseName} START @ ${elapsedMs}ms ${sessionInfo}`, LogColors.PHASE_START);
     if (data) {
       console.log('Data:', data);
     }
@@ -126,12 +191,30 @@ class DragLogger {
     const duration = startTime ? performance.now() - startTime : 0;
     const frameCount = this.frameCounters.get(phase) || 0;
     
-    console.group(`%c■ ${phase} END @ ${elapsedMs}ms [session ${this.dragSessionSeq}]`, LogColors.PHASE_END);
-    console.log('Duration:', (duration / 1000).toFixed(3), 's');
-    console.log('Frames:', frameCount);
-    if (frameCount > 0 && duration > 0) {
-      console.log('Avg FPS:', (frameCount / (duration / 1000)).toFixed(1));
+    // Use session type to determine the phase name
+    let phaseName: string;
+    if (this.currentSession?.type === SessionType.WHEEL) {
+      phaseName = 'WHEEL';
+    } else if (this.currentSession?.type === SessionType.DRAG) {
+      phaseName = 'DRAG';
+    } else {
+      phaseName = phase;
     }
+    
+    const sessionInfo = this.currentSession ? `[session ${this.currentSession.seq}]` : '';
+    console.group(`%c■ ${phaseName} END @ ${elapsedMs}ms ${sessionInfo}`, LogColors.PHASE_END);
+    console.log('Duration:', (duration / 1000).toFixed(3), 's');
+    
+    // Show different metrics based on session type
+    if (this.currentSession?.type === SessionType.WHEEL) {
+      console.log('Events:', this.currentSession.eventCount);
+    } else {
+      console.log('Frames:', frameCount);
+      if (frameCount > 0 && duration > 0) {
+        console.log('Avg FPS:', (frameCount / (duration / 1000)).toFixed(1));
+      }
+    }
+    
     if (data) {
       console.log('Data:', data);
     }
@@ -151,10 +234,22 @@ class DragLogger {
     const elapsed = this.getElapsedTime();
     const frameDelta = this.getFrameDelta();
     
-    // Special formatting for RUBBER_BAND phase
+    // Special formatting for RUBBER_BAND phase and session types
     const elapsedMs = Math.round(elapsed * 1000);
-    const phaseLabel = data.phase === DragPhase.RUBBER_BAND ? 'RUBBER' : data.phase;
-    const header = `%c${phaseLabel} s${this.dragSessionSeq}.f${frameCount}@${elapsedMs}ms:`;
+    let phaseLabel: string;
+    
+    if (data.phase === DragPhase.RUBBER_BAND) {
+      phaseLabel = 'RUBBER';
+    } else if (this.currentSession?.type === SessionType.WHEEL) {
+      phaseLabel = 'WHEEL';
+    } else if (this.currentSession?.type === SessionType.DRAG && data.phase === DragPhase.DRAGGING) {
+      phaseLabel = 'DRAG';
+    } else {
+      phaseLabel = data.phase;
+    }
+    
+    const sessionSeq = this.currentSession?.seq ?? 0;
+    const header = `%c${phaseLabel} s${sessionSeq}.f${frameCount}@${elapsedMs}ms:`;
     
     const parts: string[] = [];
     
@@ -170,13 +265,8 @@ class DragLogger {
       const outsideDisplayWindow = data.position.compare(boundaries.latestDisplayDay) > 0 || 
                                   startDate.compare(boundaries.earliestDisplayDay) < 0;
       
-      if (outsideDisplayWindow) {
-        parts.push(`%cdisplayEnd=${data.position.toString()}%c`);
-      } else if (outsideDataWindow) {
-        parts.push(`%cdisplayEnd=${data.position.toString()}%c`);
-      } else {
-        parts.push(`displayEnd=${data.position.toString()}`);
-      }
+      // Always use plain displayEnd without styling
+      parts.push(`displayEnd=${data.position.toString()}`);
     }
     
     if (data.targetDate) {
@@ -192,59 +282,30 @@ class DragLogger {
     }
     
     if (data.displacement !== undefined) {
-      if (data.isStuck) {
-        parts.push(`%cd=${data.displacement.toFixed(0)} STUCK%c`);
-      } else {
-        parts.push(`d=${data.displacement.toFixed(0)}`);
-      }
+      parts.push(`d=${data.displacement.toFixed(0)}`);
     }
     
     // Log any additional data
-    const { phase, position, velocity, acceleration, displacement, targetDate, isStuck, ...rest } = data;
+    const { phase, position, velocity, acceleration, displacement, targetDate, warnings, ...rest } = data;
     
-    // Check if we need color styling for displayEnd or STUCK
-    const logString = header + ' ' + parts.join(', ');
+    // Build the log string with warnings
+    let logString = header + ' ' + parts.join(', ');
+    let logArgs: any[] = [LogColors.FRAME]; // Style for main content
     
-    // Build styles array based on conditions
-    const styles: string[] = [LogColors.FRAME];
-    
-    // Check for STUCK styling
-    if (data.isStuck) {
-      // Add red color for STUCK text
-      styles.push('color: #FF0000; font-weight: bold');
-      styles.push(''); // Reset style after STUCK
+    // Add warning labels if present
+    if (warnings && warnings.length > 0) {
+      warnings.forEach(warning => {
+        logString += ' %c' + warning;
+        logArgs.push('color: #FF0000; font-weight: bold'); // Red style for each warning
+      });
     }
     
-    // Check for position-based styling
-    if (data.position) {
-      const boundaries = getDateBoundaries();
-      const startDate = data.position.subtract({ days: 364 });
-      
-      const outsideDataWindow = data.position.compare(boundaries.latestDataDay) > 0 || 
-                               startDate.compare(boundaries.earliestDataDay) < 0;
-      const outsideDisplayWindow = data.position.compare(boundaries.latestDisplayDay) > 0 || 
-                                  startDate.compare(boundaries.earliestDisplayDay) < 0;
-      
-      if (outsideDisplayWindow) {
-        // Apply purple color for outside display window
-        if (!data.isStuck) {
-          styles[1] = 'color: #9C27B0; font-weight: bold';
-          styles[2] = '';
-        }
-      } else if (outsideDataWindow) {
-        // Apply red color for outside data window
-        if (!data.isStuck) {
-          styles[1] = 'color: #FF0000; font-weight: bold';
-          styles[2] = '';
-        }
-      }
-    }
     
     // Only log rest if it has properties
     if (Object.keys(rest).length > 0) {
-      console.log(logString, ...styles, rest);
+      console.log(logString, ...logArgs, rest);
     } else {
-      console.log(logString, ...styles);
+      console.log(logString, ...logArgs);
     }
   }
 
@@ -274,7 +335,8 @@ class DragLogger {
     } else {
       // Add session info to drag events
       const elapsedMs = Math.round(elapsed * 1000);
-      const eventWithSession = event.includes('[session') ? event : `${event} [session ${this.dragSessionSeq}]`;
+      const sessionSeq = this.currentSession?.seq ?? 0;
+      const eventWithSession = event.includes('[session') ? event : `${event} [session ${sessionSeq}]`;
       console.log(`%c⚡ ${eventWithSession} @ ${elapsedMs}ms`, LogColors.EVENT, data || '');
     }
   }
@@ -359,4 +421,25 @@ export function logDragError(message: string, error?: any) {
 
 export function getDragSessionSeq(): number {
   return dragLogger.getSessionSeq();
+}
+
+// Session management functions
+export function startDragSession(): number {
+  return dragLogger.startSession(SessionType.DRAG);
+}
+
+export function startWheelSession(): number {
+  return dragLogger.startSession(SessionType.WHEEL);
+}
+
+export function endSession() {
+  dragLogger.endSession();
+}
+
+export function getCurrentSession(): SessionInfo | null {
+  return dragLogger.getCurrentSession();
+}
+
+export function incrementSessionEventCount(): number {
+  return dragLogger.incrementEventCount();
 }

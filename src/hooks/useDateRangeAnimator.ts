@@ -3,7 +3,7 @@ import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween as daysBetween } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { DATE_NAV_PHYSICS } from '@/shared/config';
-import { dragLogger, DragPhase, logDragPhaseStart, logDragPhaseEnd, logDragFrame, logDragEvent } from '@/utils/drag-logger';
+import { DragPhase, logDragPhaseStart, logDragPhaseEnd, logDragFrame, logDragEvent, startDragSession, endSession } from '@/utils/drag-logger';
 
 export interface AnimatorState {
   velocity: number;
@@ -100,11 +100,6 @@ export function useDateRangeAnimator({
     
     // If we've hit the display boundary, zero out velocity to prevent stuck behavior
     if (rubberBandDate.compare(clampedDate) !== 0) {
-      logDragEvent('Velocity zeroed - hit display boundary', {
-        rubberBandDate: rubberBandDate.toString(),
-        clampedDate: clampedDate.toString(),
-        previousVelocity: stateRef.current.velocity
-      });
       stateRef.current.velocity = 0;
     }
     
@@ -148,14 +143,19 @@ export function useDateRangeAnimator({
         stateRef.current.velocity !== 0;
     
     if (isStuck) {
-      logDragEvent('Velocity zeroed - displacement stuck', {
-        displacement,
-        previousVelocity: stateRef.current.velocity
-      });
       stateRef.current.velocity = 0;
     }
     
     stateRef.current.lastDisplacement = displacement;
+    
+    // Build warnings array
+    const warnings: string[] = [];
+    if (isRubberBanding) {
+      warnings.push('IN_SLOP');
+    }
+    if (isStuck) {
+      warnings.push('STUCK');
+    }
     
     logDragFrame({
       phase: isRubberBanding ? DragPhase.RUBBER_BAND : DragPhase.DRAGGING,
@@ -164,7 +164,7 @@ export function useDateRangeAnimator({
       velocity: stateRef.current.velocity,
       acceleration: acceleration,
       displacement: displacement,
-      isStuck: isStuck
+      warnings: warnings.length > 0 ? warnings : undefined
     });
     
     onDateNavigate(clampedDate, true);
@@ -233,7 +233,7 @@ export function useDateRangeAnimator({
     stateRef.current.isDragging = true;
     stateRef.current.velocity = 0;
     stateRef.current.lastDisplacement = null;
-    dragLogger.reset();
+    startDragSession();
     logDragPhaseStart(DragPhase.DRAG_START, { currentEndDate: currentEndDate.toString() });
   }, [cancelAnimation, currentEndDate]);
 
@@ -359,6 +359,8 @@ export function useDateRangeAnimator({
       outOfBounds,
       applyMomentum
     });
+    
+    endSession();
     
     // Determine target position and initial velocity
     let targetDate = currentEndDate;
