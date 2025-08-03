@@ -88,7 +88,7 @@ export function useWheelDrag({
       const accumulatedX = Math.round(state.accumulatedX);
       const timeSinceLastReactUpdateSent = now - (state.lastUpdateTime || now);
       logDragEvent(`WHEEL ${state.sessionSeq}.${eventSeq}`, 
-        `deltaX: ${deltaX} | accumX: ${accumulatedX} | sinceUpdate: ${timeSinceLastReactUpdateSent}`
+        `deltaX: ${deltaX}, accumX: ${accumulatedX}, sinceUpdate: ${timeSinceLastReactUpdateSent}`
       );
       
       // Throttle updates to prevent overwhelming React

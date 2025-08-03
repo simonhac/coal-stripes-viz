@@ -186,7 +186,7 @@ class DragLogger {
     const { phase, position, velocity, acceleration, displacement, targetDate, ...rest } = data;
     
     // Check if we need color styling for displayEnd
-    const logString = header + ' ' + parts.join(' | ');
+    const logString = header + ' ' + parts.join(', ');
     if (data.position) {
       const boundaries = getDateBoundaries();
       const startDate = data.position.subtract({ days: 364 });
@@ -230,9 +230,9 @@ class DragLogger {
       const wheelMatch = event.match(/^WHEEL (\d+\.\d+)$/);
       if (wheelMatch) {
         const sessionEvent = wheelMatch[1];
-        console.log(`%c⚡ WHEEL e${sessionEvent}@${elapsedMs}ms`, LogColors.EVENT, data || '');
+        console.log(`%c⚡ WHEEL e${sessionEvent}@${elapsedMs}ms ${data || ''}`, LogColors.EVENT);
       } else {
-        console.log(`%c⚡ ${event}@${elapsedMs}ms`, LogColors.EVENT, data || '');
+        console.log(`%c⚡ ${event}@${elapsedMs}ms ${data || ''}`, LogColors.EVENT);
       }
     } else {
       console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
