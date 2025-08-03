@@ -5,6 +5,9 @@ import { getDaysBetween } from '@/shared/date-utils';
 // Global flag to enable/disable drag logging
 const DRAG_LOGGING_ENABLED = true;
 
+// Flag to enable/disable wheel event logging (very verbose)
+const LOG_WHEEL_EVENTS = true;
+
 // Color codes for different log types
 const LogColors = {
   PHASE_START: 'color: #00C853; font-weight: bold',
@@ -161,19 +164,19 @@ class DragLogger {
     }
     
     if (data.targetDate) {
-      parts.push(`target=${data.targetDate.toString()}`);
+      parts.push(`t=${data.targetDate.toString()}`);
     }
     
     if (data.velocity !== undefined) {
-      parts.push(`vel=${data.velocity.toFixed(2)}`);
+      parts.push(`v=${data.velocity.toFixed(1)}`);
     }
     
     if (data.acceleration !== undefined) {
-      parts.push(`acc=${data.acceleration.toFixed(2)}`);
+      parts.push(`a=${data.acceleration.toFixed(1)}`);
     }
     
     if (data.displacement !== undefined) {
-      parts.push(`disp=${data.displacement.toFixed(2)}`);
+      parts.push(`d=${data.displacement.toFixed(0)}`);
     }
     
     // Log any additional data
@@ -209,6 +212,24 @@ class DragLogger {
   // Event logging
   logEvent(event: string, data?: any) {
     if (!this.enabled) return;
+    
+    // Special handling for wheel events
+    if (event === 'Wheel event') {
+      if (!LOG_WHEEL_EVENTS) return;
+      
+      const elapsed = this.getElapsedTime();
+      if (data?.status === "DIDN'T MOVE") {
+        console.log(
+          `%c⚡ ${event} @ ${elapsed.toFixed(1)}s %cDIDN'T MOVE`, 
+          LogColors.EVENT, 
+          'color: #FF0000; font-weight: bold',
+          { ...data, status: undefined }
+        );
+      } else {
+        console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');
+      }
+      return;
+    }
     
     const elapsed = this.getElapsedTime();
     console.log(`%c⚡ ${event} @ ${elapsed.toFixed(1)}s`, LogColors.EVENT, data || '');

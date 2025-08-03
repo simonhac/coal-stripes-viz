@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { useDateRangeAnimator } from './useDateRangeAnimator';
+import { getDateBoundaries } from '@/shared/date-boundaries';
 
 interface UnifiedDragOptions {
   currentEndDate: CalendarDate;
@@ -70,8 +71,12 @@ export function useUnifiedDrag({
     // Calculate target date
     const targetDate = state.startDate.add({ days: Math.round(daysDelta) });
     
+    // Clamp target to display bounds to prevent excessive rubber band stretching
+    const boundaries = getDateBoundaries();
+    const clampedTarget = boundaries.clampEndDateToDisplayBounds(targetDate);
+    
     // Let animator handle rubber band and bounds
-    animator.navigateToDragDate(targetDate);
+    animator.navigateToDragDate(clampedTarget);
     
     // Update velocity for the animator
     if (state.velocitySamples.length >= 2) {

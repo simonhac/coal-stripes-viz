@@ -13,6 +13,8 @@ interface WheelState {
   isActive: boolean;
   lastUpdateTime: number;
   startX: number;
+  lastScreenX: number;
+  lastScreenY: number;
 }
 
 /**
@@ -30,6 +32,8 @@ export function useWheelDragNonPassive({
     isActive: false,
     lastUpdateTime: 0,
     startX: 0,
+    lastScreenX: 0,
+    lastScreenY: 0,
   });
   
   const elementRef = useRef<HTMLDivElement>(null);
@@ -84,14 +88,19 @@ export function useWheelDragNonPassive({
       state.accumulatedX -= e.deltaX;
       
       // Log every wheel event to see the pattern
+      const didntMove = e.screenX === state.lastScreenX && e.screenY === state.lastScreenY;
       logDragEvent('Wheel event', {
-        deltaX: e.deltaX,
-        deltaY: e.deltaY,
+        deltaX: parseFloat(e.deltaX.toFixed(1)),
+        deltaY: parseFloat(e.deltaY.toFixed(1)),
         screenX: e.screenX,
         screenY: e.screenY,
-        accumulatedX: state.accumulatedX,
-        timeSinceStart: now - (state.lastUpdateTime || now)
+        accumulatedX: Math.round(state.accumulatedX),
+        timeSinceStart: now - (state.lastUpdateTime || now),
+        ...(didntMove && { status: "DIDN'T MOVE" })
       });
+      
+      state.lastScreenX = e.screenX;
+      state.lastScreenY = e.screenY;
       
       // Throttle updates to prevent overwhelming React
       const timeSinceLastUpdate = now - state.lastUpdateTime;

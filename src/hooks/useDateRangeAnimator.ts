@@ -10,6 +10,7 @@ export interface AnimatorState {
   animationId: number | null;
   isDragging: boolean;
   currentPosition: CalendarDate | null;
+  lastDisplacement: number | null;
 }
 
 interface DateRangeAnimatorOptions {
@@ -30,6 +31,7 @@ export function useDateRangeAnimator({
     animationId: null,
     isDragging: false,
     currentPosition: null,
+    lastDisplacement: null,
   });
 
   // Cancel any running animation
@@ -96,11 +98,70 @@ export function useDateRangeAnimator({
     // Check if rubber band is active
     const isRubberBanding = targetDate.compare(clampedDate) !== 0;
     
+    // If we've hit the display boundary, zero out velocity to prevent stuck behavior
+    if (rubberBandDate.compare(clampedDate) !== 0) {
+      logDragEvent('Velocity zeroed - hit display boundary', {
+        rubberBandDate: rubberBandDate.toString(),
+        clampedDate: clampedDate.toString(),
+        previousVelocity: stateRef.current.velocity
+      });
+      stateRef.current.velocity = 0;
+    }
+    
+    // Apply velocity damping when rubber banding
+    if (isRubberBanding) {
+      // Calculate how far we are into the rubber band zone
+      const startDate = targetDate.subtract({ days: 364 });
+      const beyondRightBoundary = targetDate.compare(boundaries.latestDataDay) > 0;
+      const beyondLeftBoundary = startDate.compare(boundaries.earliestDataDay) < 0;
+      
+      let overshootRatio = 0;
+      if (beyondRightBoundary) {
+        const overshoot = daysBetween(boundaries.latestDataDay, targetDate);
+        const maxStretch = daysBetween(boundaries.latestDataDay, boundaries.latestDisplayDay);
+        overshootRatio = Math.min(overshoot / maxStretch, 1);
+      } else if (beyondLeftBoundary) {
+        const overshoot = Math.abs(daysBetween(boundaries.earliestDataEndDay, targetDate));
+        const maxStretch = daysBetween(boundaries.earliestDisplayDay, boundaries.earliestDataDay) + 364;
+        overshootRatio = Math.min(overshoot / maxStretch, 1);
+      }
+      
+      // Apply damping based on how far into the rubber band we are
+      // Use a gentler curve to avoid getting stuck with low velocity
+      // At boundary (ratio=0): dampingFactor = 1 (no damping)
+      // Deep in rubber band (ratio=1): dampingFactor = 0.3 (70% reduction)
+      const dampingFactor = 1 - (0.7 * overshootRatio);
+      stateRef.current.velocity *= dampingFactor;
+    }
+    
+    // Calculate displacement for logging
+    // For rubber band: show stretch beyond data boundary
+    // For normal drag: 0 (we're at target)
+    const displacement = isRubberBanding ? 
+      Math.abs(daysBetween(rubberBandDate, targetDate)) : 0;
+    const acceleration = 0; // No acceleration during drag - it's direct control
+    
+    // Check if displacement is stuck (same as last frame)
+    if (isRubberBanding && 
+        stateRef.current.lastDisplacement !== null && 
+        displacement === stateRef.current.lastDisplacement &&
+        stateRef.current.velocity !== 0) {
+      logDragEvent('Velocity zeroed - displacement stuck', {
+        displacement,
+        previousVelocity: stateRef.current.velocity
+      });
+      stateRef.current.velocity = 0;
+    }
+    
+    stateRef.current.lastDisplacement = displacement;
+    
     logDragFrame({
       phase: isRubberBanding ? DragPhase.RUBBER_BAND : DragPhase.DRAGGING,
       position: clampedDate,
       targetDate: targetDate,
       velocity: stateRef.current.velocity,
+      acceleration: acceleration,
+      displacement: displacement,
       rubberBanding: isRubberBanding
     });
     
@@ -169,6 +230,7 @@ export function useDateRangeAnimator({
     cancelAnimation();
     stateRef.current.isDragging = true;
     stateRef.current.velocity = 0;
+    stateRef.current.lastDisplacement = null;
     dragLogger.reset();
     logDragPhaseStart(DragPhase.DRAG_START, { currentEndDate: currentEndDate.toString() });
   }, [cancelAnimation, currentEndDate]);
@@ -217,8 +279,10 @@ export function useDateRangeAnimator({
       }
       
       // Check if we're close enough to stop
-      if (Math.abs(displacement) < DATE_NAV_PHYSICS.SPRING.MIN_DISTANCE && 
-          Math.abs(velocity) < DATE_NAV_PHYSICS.SPRING.MIN_VELOCITY) {
+      // If we've rounded to the exact target position, stop immediately
+      if (currentDate.compare(targetDate) === 0 || 
+          (Math.abs(displacement) < DATE_NAV_PHYSICS.SPRING.MIN_DISTANCE && 
+           Math.abs(velocity) < DATE_NAV_PHYSICS.SPRING.MIN_VELOCITY)) {
         logDragPhaseEnd(DragPhase.SPRING, {
           finalPosition: targetDate.toString(),
           finalDisplacement: displacement,
