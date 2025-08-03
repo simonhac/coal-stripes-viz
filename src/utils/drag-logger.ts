@@ -1,6 +1,7 @@
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { getDaysBetween } from '@/shared/date-utils';
+import { SessionType, SessionInfo, getCurrentSession } from './interaction-session';
 
 // Global flag to enable/disable drag logging
 const DRAG_LOGGING_ENABLED = true;
@@ -39,11 +40,9 @@ export enum DragPhase {
   RUBBER_BAND = 'RUBBER_BAND',
 }
 
-// Session types
-export enum SessionType {
-  DRAG = 'DRAG',
-  WHEEL = 'WHEEL',
-}
+// Re-export session types for backward compatibility
+export { SessionType } from './interaction-session';
+export type { SessionInfo } from './interaction-session';
 
 // Animation frame data
 interface FrameData {
@@ -57,76 +56,28 @@ interface FrameData {
   [key: string]: any;
 }
 
-export interface SessionInfo {
-  type: SessionType;
-  seq: number;
-  startTime: number;
-  frameCount: number;
-  eventCount: number;
-}
-
 class DragLogger {
-  private frameCounters: Map<DragPhase, number> = new Map();
+  private eventCounters: Map<DragPhase, number> = new Map();
   private phaseStartTimes: Map<DragPhase, number> = new Map();
   private globalStartTime: number = 0;
   private enabled: boolean = DRAG_LOGGING_ENABLED;
   private lastFrameTime: number = 0;
-  private sessionSequences: Map<SessionType, number> = new Map();
-  private currentSession: SessionInfo | null = null;
 
   constructor() {
     // Initialize without incrementing session
     this.globalStartTime = performance.now();
     this.lastFrameTime = this.globalStartTime;
-    this.frameCounters.clear();
+    this.eventCounters.clear();
     this.phaseStartTimes.clear();
-    // Initialize session sequences
-    this.sessionSequences.set(SessionType.DRAG, -1);
-    this.sessionSequences.set(SessionType.WHEEL, -1);
   }
 
   reset() {
     this.globalStartTime = performance.now();
     this.lastFrameTime = this.globalStartTime;
-    this.frameCounters.clear();
+    this.eventCounters.clear();
     this.phaseStartTimes.clear();
   }
 
-  // Start a new session
-  startSession(type: SessionType): number {
-    const currentSeq = this.sessionSequences.get(type) || -1;
-    const newSeq = currentSeq + 1;
-    this.sessionSequences.set(type, newSeq);
-    
-    this.currentSession = {
-      type,
-      seq: newSeq,
-      startTime: performance.now(),
-      frameCount: 0,
-      eventCount: 0
-    };
-    
-    this.reset();
-    return newSeq;
-  }
-
-  // End current session
-  endSession() {
-    this.currentSession = null;
-  }
-
-  // Get current session info
-  getCurrentSession(): SessionInfo | null {
-    return this.currentSession;
-  }
-
-  // Increment event count for current session
-  incrementEventCount(): number {
-    if (this.currentSession) {
-      return ++this.currentSession.eventCount;
-    }
-    return 0;
-  }
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
@@ -150,9 +101,10 @@ class DragLogger {
     return delta;
   }
 
-  // Get current session sequence
+  // Get current session sequence (delegates to interaction-session)
   getSessionSeq(): number {
-    return this.currentSession?.seq ?? -1;
+    const session = getCurrentSession();
+    return session?.seq ?? -1;
   }
 
   // Phase logging
@@ -162,19 +114,20 @@ class DragLogger {
     const elapsed = this.getElapsedTime();
     const elapsedMs = Math.round(elapsed * 1000);
     this.phaseStartTimes.set(phase, performance.now());
-    this.frameCounters.set(phase, 0);
+    this.eventCounters.set(phase, 0);
     
     // Use session type to determine the phase name
+    const session = getCurrentSession();
     let phaseName: string;
-    if (this.currentSession?.type === SessionType.WHEEL) {
+    if (session?.type === SessionType.WHEEL) {
       phaseName = 'WHEEL';
-    } else if (this.currentSession?.type === SessionType.DRAG) {
+    } else if (session?.type === SessionType.DRAG) {
       phaseName = 'DRAG';
     } else {
       phaseName = phase;
     }
     
-    const sessionInfo = this.currentSession ? `[session ${this.currentSession.seq}]` : '';
+    const sessionInfo = session ? `[session ${session.seq}]` : '';
     console.group(`%c▶ ${phaseName} START @ ${elapsedMs}ms ${sessionInfo}`, LogColors.PHASE_START);
     if (data) {
       console.log('Data:', data);
@@ -189,30 +142,27 @@ class DragLogger {
     const elapsedMs = Math.round(elapsed * 1000);
     const startTime = this.phaseStartTimes.get(phase);
     const duration = startTime ? performance.now() - startTime : 0;
-    const frameCount = this.frameCounters.get(phase) || 0;
+    const eventCount = this.eventCounters.get(phase) || 0;
     
     // Use session type to determine the phase name
+    const session = getCurrentSession();
     let phaseName: string;
-    if (this.currentSession?.type === SessionType.WHEEL) {
+    if (session?.type === SessionType.WHEEL) {
       phaseName = 'WHEEL';
-    } else if (this.currentSession?.type === SessionType.DRAG) {
+    } else if (session?.type === SessionType.DRAG) {
       phaseName = 'DRAG';
     } else {
       phaseName = phase;
     }
     
-    const sessionInfo = this.currentSession ? `[session ${this.currentSession.seq}]` : '';
+    const sessionInfo = session ? `[session ${session.seq}]` : '';
     console.group(`%c■ ${phaseName} END @ ${elapsedMs}ms ${sessionInfo}`, LogColors.PHASE_END);
     console.log('Duration:', (duration / 1000).toFixed(3), 's');
     
-    // Show different metrics based on session type
-    if (this.currentSession?.type === SessionType.WHEEL) {
-      console.log('Events:', this.currentSession.eventCount);
-    } else {
-      console.log('Frames:', frameCount);
-      if (frameCount > 0 && duration > 0) {
-        console.log('Avg FPS:', (frameCount / (duration / 1000)).toFixed(1));
-      }
+    // Always show event count
+    console.log('Events:', eventCount);
+    if (eventCount > 0 && duration > 0) {
+      console.log('Avg EPS:', (eventCount / (duration / 1000)).toFixed(1));
     }
     
     if (data) {
@@ -221,15 +171,15 @@ class DragLogger {
     console.groupEnd();
     
     this.phaseStartTimes.delete(phase);
-    this.frameCounters.delete(phase);
+    this.eventCounters.delete(phase);
   }
 
   // Frame logging
   logFrame(data: FrameData) {
     if (!this.enabled) return;
     
-    const frameCount = this.frameCounters.get(data.phase) || 0;
-    this.frameCounters.set(data.phase, frameCount + 1);
+    const eventCount = this.eventCounters.get(data.phase) || 0;
+    this.eventCounters.set(data.phase, eventCount + 1);
     
     const elapsed = this.getElapsedTime();
     const frameDelta = this.getFrameDelta();
@@ -238,18 +188,20 @@ class DragLogger {
     const elapsedMs = Math.round(elapsed * 1000);
     let phaseLabel: string;
     
+    const session = getCurrentSession();
+    
     if (data.phase === DragPhase.RUBBER_BAND) {
       phaseLabel = 'RUBBER';
-    } else if (this.currentSession?.type === SessionType.WHEEL) {
+    } else if (session?.type === SessionType.WHEEL) {
       phaseLabel = 'WHEEL';
-    } else if (this.currentSession?.type === SessionType.DRAG && data.phase === DragPhase.DRAGGING) {
+    } else if (session?.type === SessionType.DRAG && data.phase === DragPhase.DRAGGING) {
       phaseLabel = 'DRAG';
     } else {
       phaseLabel = data.phase;
     }
     
-    const sessionSeq = this.currentSession?.seq ?? 0;
-    const header = `%c${phaseLabel} s${sessionSeq}.f${frameCount}@${elapsedMs}ms:`;
+    const sessionSeq = session?.seq ?? 0;
+    const header = `%c${phaseLabel} s${sessionSeq}.e${eventCount}@${elapsedMs}ms:`;
     
     const parts: string[] = [];
     
@@ -335,7 +287,8 @@ class DragLogger {
     } else {
       // Add session info to drag events
       const elapsedMs = Math.round(elapsed * 1000);
-      const sessionSeq = this.currentSession?.seq ?? 0;
+      const session = getCurrentSession();
+      const sessionSeq = session?.seq ?? 0;
       const eventWithSession = event.includes('[session') ? event : `${event} [session ${sessionSeq}]`;
       console.log(`%c⚡ ${eventWithSession} @ ${elapsedMs}ms`, LogColors.EVENT, data || '');
     }
@@ -423,23 +376,11 @@ export function getDragSessionSeq(): number {
   return dragLogger.getSessionSeq();
 }
 
-// Session management functions
-export function startDragSession(): number {
-  return dragLogger.startSession(SessionType.DRAG);
-}
-
-export function startWheelSession(): number {
-  return dragLogger.startSession(SessionType.WHEEL);
-}
-
-export function endSession() {
-  dragLogger.endSession();
-}
-
-export function getCurrentSession(): SessionInfo | null {
-  return dragLogger.getCurrentSession();
-}
-
-export function incrementSessionEventCount(): number {
-  return dragLogger.incrementEventCount();
-}
+// Re-export session management functions from interaction-session
+export { 
+  startDragSession, 
+  startWheelSession, 
+  endSession, 
+  getCurrentSession as getLoggerCurrentSession,
+  incrementEventCount as incrementSessionEventCount 
+} from './interaction-session';

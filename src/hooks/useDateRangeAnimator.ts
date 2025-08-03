@@ -3,7 +3,8 @@ import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween as daysBetween } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { DATE_NAV_PHYSICS } from '@/shared/config';
-import { DragPhase, logDragPhaseStart, logDragPhaseEnd, logDragFrame, logDragEvent, startDragSession, endSession } from '@/utils/drag-logger';
+import { DragPhase, logDragPhaseStart, logDragPhaseEnd, logDragFrame, logDragEvent, dragLogger } from '@/utils/drag-logger';
+import { startDragSession, endSession } from '@/utils/interaction-session';
 
 export interface AnimatorState {
   velocity: number;
@@ -234,6 +235,7 @@ export function useDateRangeAnimator({
     stateRef.current.velocity = 0;
     stateRef.current.lastDisplacement = null;
     startDragSession();
+    dragLogger.reset(); // Reset timing for new session
     logDragPhaseStart(DragPhase.DRAG_START, { currentEndDate: currentEndDate.toString() });
   }, [cancelAnimation, currentEndDate]);
 

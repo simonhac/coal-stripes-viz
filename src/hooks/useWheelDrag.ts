@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { logDragEvent, logDragWarning, logDragPhaseStart, logDragPhaseEnd, DragPhase, startWheelSession, endSession, incrementSessionEventCount, getCurrentSession } from '@/utils/drag-logger';
+import { logDragEvent, logDragWarning, logDragPhaseStart, logDragPhaseEnd, DragPhase, dragLogger } from '@/utils/drag-logger';
+import { startWheelSession, endSession, incrementEventCount, getCurrentSession } from '@/utils/interaction-session';
 
 interface WheelDragOptions {
   startDrag: (x: number) => void;
@@ -54,6 +55,7 @@ export function useWheelDrag({
       if (now - state.lastWheelTime > 150 || !state.isActive) {
         // New session
         startWheelSession();
+        dragLogger.reset(); // Reset timing for new session
         
         // For wheel events, always use 0 as the reference point
         state.startX = 0;
@@ -82,7 +84,7 @@ export function useWheelDrag({
       const timeSinceLastUpdate = now - state.lastUpdateTime;
       if (timeSinceLastUpdate >= 16) { // ~60fps max
         // Only log and increment sequence when we're actually sending an update
-        const eventSeq = incrementSessionEventCount() - 1;
+        const eventSeq = incrementEventCount() - 1;
         const sessionInfo = getCurrentSession();
         const sessionSeq = sessionInfo?.seq ?? 0;
         const deltaX = parseFloat(e.deltaX.toFixed(1));
