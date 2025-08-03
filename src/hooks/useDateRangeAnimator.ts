@@ -142,10 +142,12 @@ export function useDateRangeAnimator({
     const acceleration = 0; // No acceleration during drag - it's direct control
     
     // Check if displacement is stuck (same as last frame)
-    if (isRubberBanding && 
+    const isStuck = isRubberBanding && 
         stateRef.current.lastDisplacement !== null && 
         displacement === stateRef.current.lastDisplacement &&
-        stateRef.current.velocity !== 0) {
+        stateRef.current.velocity !== 0;
+    
+    if (isStuck) {
       logDragEvent('Velocity zeroed - displacement stuck', {
         displacement,
         previousVelocity: stateRef.current.velocity
@@ -162,7 +164,7 @@ export function useDateRangeAnimator({
       velocity: stateRef.current.velocity,
       acceleration: acceleration,
       displacement: displacement,
-      rubberBanding: isRubberBanding
+      isStuck: isStuck
     });
     
     onDateNavigate(clampedDate, true);

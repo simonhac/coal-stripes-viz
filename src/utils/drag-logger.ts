@@ -190,14 +190,30 @@ class DragLogger {
     }
     
     if (data.displacement !== undefined) {
-      parts.push(`d=${data.displacement.toFixed(0)}`);
+      if (data.isStuck) {
+        parts.push(`%cd=${data.displacement.toFixed(0)} STUCK%c`);
+      } else {
+        parts.push(`d=${data.displacement.toFixed(0)}`);
+      }
     }
     
     // Log any additional data
-    const { phase, position, velocity, acceleration, displacement, targetDate, ...rest } = data;
+    const { phase, position, velocity, acceleration, displacement, targetDate, isStuck, ...rest } = data;
     
-    // Check if we need color styling for displayEnd
+    // Check if we need color styling for displayEnd or STUCK
     const logString = header + ' ' + parts.join(', ');
+    
+    // Build styles array based on conditions
+    const styles: string[] = [LogColors.FRAME];
+    
+    // Check for STUCK styling
+    if (data.isStuck) {
+      // Add red color for STUCK text
+      styles.push('color: #FF0000; font-weight: bold');
+      styles.push(''); // Reset style after STUCK
+    }
+    
+    // Check for position-based styling
     if (data.position) {
       const boundaries = getDateBoundaries();
       const startDate = data.position.subtract({ days: 364 });
@@ -209,18 +225,20 @@ class DragLogger {
       
       if (outsideDisplayWindow) {
         // Apply purple color for outside display window
-        const styles = [LogColors.FRAME, 'color: #9C27B0; font-weight: bold', ''];
-        console.log(logString, ...styles, rest);
+        if (!data.isStuck) {
+          styles[1] = 'color: #9C27B0; font-weight: bold';
+          styles[2] = '';
+        }
       } else if (outsideDataWindow) {
         // Apply red color for outside data window
-        const styles = [LogColors.FRAME, 'color: #FF0000; font-weight: bold', ''];
-        console.log(logString, ...styles, rest);
-      } else {
-        console.log(logString, LogColors.FRAME, rest);
+        if (!data.isStuck) {
+          styles[1] = 'color: #FF0000; font-weight: bold';
+          styles[2] = '';
+        }
       }
-    } else {
-      console.log(logString, LogColors.FRAME, rest);
     }
+    
+    console.log(logString, ...styles, rest);
   }
 
   // Event logging
