@@ -3,6 +3,7 @@
  */
 
 export enum SessionType {
-  MOVE = 'MOVE',   // For drag/touch movements
+  MOVE = 'MOVE',   // For mouse drag movements
   WHEEL = 'WHEEL', // For wheel/trackpad scrolling
+  TOUCH = 'TOUCH', // For two-finger touch gestures
 }

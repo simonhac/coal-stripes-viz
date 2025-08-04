@@ -109,7 +109,7 @@ export abstract class InteractionSession {
   protected lastFrameTime: number;
   protected active: boolean = true;
   protected sessionTimeoutId: NodeJS.Timeout | null = null;
-  protected currentPhase: string = 'IDLE';
+  protected currentPhase: string = 'INIT';
   protected eventSeq: number = 0;
 
   constructor(seq: number) {

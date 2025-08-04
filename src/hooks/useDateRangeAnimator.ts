@@ -151,10 +151,14 @@ export function useDateRangeAnimator({
     stateRef.current.lastDisplacement = displacement;
     
     // Set phase if it changed
-    if (isRubberBanding && stateRef.current.session!.getCurrentPhase() !== 'RUBBER') {
+    const currentPhase = stateRef.current.session!.getCurrentPhase();
+    if (currentPhase === 'INIT') {
+      // First movement after init - transition to appropriate phase
+      stateRef.current.session!.startPhase(isRubberBanding ? 'RUBBER' : 'DRAG');
+    } else if (isRubberBanding && currentPhase !== 'RUBBER') {
       stateRef.current.session!.startPhase('RUBBER');
-    } else if (!isRubberBanding && stateRef.current.session!.getCurrentPhase() === 'RUBBER') {
-      stateRef.current.session!.startPhase('DRAGGING');
+    } else if (!isRubberBanding && currentPhase === 'RUBBER') {
+      stateRef.current.session!.startPhase('DRAG');
     }
     
     const event = stateRef.current.session!.createMoveEvent(
@@ -243,13 +247,81 @@ export function useDateRangeAnimator({
     stateRef.current.velocity = 0;
     stateRef.current.lastDisplacement = null;
     stateRef.current.session = SessionManager.getInstance().createSession(SessionType.MOVE) as MoveSession;
-    stateRef.current.session.startPhase('DRAG', { currentEndDate: currentEndDate.toString() });
+    // Session starts in INIT phase by default, no need to set it
   }, [cancelAnimation, currentEndDate]);
 
   // Update velocity during drag
   const updateVelocity = useCallback((velocity: number) => {
     stateRef.current.velocity = velocity;
   }, []);
+
+  // Momentum animation (for in-bounds coasting)
+  const animateMomentum = useCallback((initialVelocity: number) => {
+    cancelAnimation();
+    
+    let velocity = initialVelocity;
+    let fractionalDays = 0;
+    const startDate = currentEndDate;
+    
+    // Start MOMENTUM phase
+    if (stateRef.current.session) {
+      stateRef.current.session.startPhase('MOMENTUM', {
+        initialVelocity: velocity.toFixed(1),
+        startDate: startDate.toString()
+      });
+    }
+    
+    const animate = () => {
+      // Apply friction
+      velocity *= DATE_NAV_PHYSICS.MOMENTUM.FRICTION;
+      
+      // Stop if velocity is too low
+      if (Math.abs(velocity) < DATE_NAV_PHYSICS.MOMENTUM.MIN_VELOCITY) {
+        if (stateRef.current.session) {
+          stateRef.current.session.endPhase('MOMENTUM', 'velocity_too_low');
+        }
+        return;
+      }
+      
+      // Update position
+      fractionalDays += velocity * (1/60); // Assuming 60fps
+      const newDate = startDate.add({ days: Math.round(fractionalDays) });
+      
+      // Check bounds
+      const boundaries = getDateBoundaries();
+      const endDate = newDate;
+      const displayStartDate = endDate.subtract({ days: 364 });
+      
+      if (endDate.compare(boundaries.latestDataDay) > 0 || 
+          displayStartDate.compare(boundaries.earliestDataDay) < 0) {
+        // Hit boundary - stop momentum
+        if (stateRef.current.session) {
+          stateRef.current.session.endPhase('MOMENTUM', 'hit_boundary');
+        }
+        // Snap to boundary
+        const clampedDate = boundaries.clampEndDateToDisplayBounds(newDate);
+        onDateNavigate(clampedDate, false);
+        return;
+      }
+      
+      // Log momentum frame
+      if (stateRef.current.session && stateRef.current.session.isActive()) {
+        const event = stateRef.current.session.createMoveMessage(
+          'MOMENTUM',
+          `v=${velocity.toFixed(1)}, pos=${newDate.toString()}`
+        );
+        event.log();
+      }
+      
+      // Update display
+      onDateNavigate(newDate, false);
+      
+      // Continue animation
+      stateRef.current.animationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }, [currentEndDate, onDateNavigate, cancelAnimation]);
 
   // Spring physics animation (handles momentum and snap-back)
   const animateSpring = useCallback((targetDate: CalendarDate, initialVelocity: number = 0) => {
@@ -397,7 +469,7 @@ export function useDateRangeAnimator({
       }
     }
     
-    stateRef.current.session!.endPhase('DRAGGING', 'user_released', {
+    stateRef.current.session!.endPhase(stateRef.current.session!.getCurrentPhase(), 'user_released', {
       currentEndDate: currentEndDate.toString(),
       velocity: stateRef.current.velocity,
       outOfBounds,
@@ -408,10 +480,13 @@ export function useDateRangeAnimator({
     
     if (outOfBounds) {
       animateSpring(targetDate, initialVelocity);
+    } else if (Math.abs(initialVelocity) > DATE_NAV_PHYSICS.MOMENTUM.MIN_VELOCITY) {
+      // Apply momentum animation when in bounds
+      animateMomentum(initialVelocity);
     } else {
       onDateNavigate(currentEndDate, false);
     }
-  }, [currentEndDate, onDateNavigate, animateSpring]);
+  }, [currentEndDate, onDateNavigate, animateSpring, animateMomentum]);
 
   return {
     navigateToDragDate,

@@ -24,7 +24,13 @@ export const DATE_NAV_PHYSICS = {
   MOMENTUM: {
     FRICTION: 0.92,                 // Deceleration factor (8% velocity loss per frame)
     MIN_VELOCITY: 0.5,              // Minimum velocity to continue momentum
-    VELOCITY_SCALE: 15,             // Scale up velocity for momentum effect
+    VELOCITY_SCALE: 3,              // Scale up velocity for momentum effect
+  },
+  
+  // Touch-specific settings
+  TOUCH: {
+    MOVEMENT_SCALE: 1.0,            // No scaling - full touch responsiveness
+    MOMENTUM_SCALE: 1.5,            // Touch-specific momentum multiplier (reduced by 50%)
   },
   
   // Drag interaction thresholds

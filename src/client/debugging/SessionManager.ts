@@ -6,6 +6,7 @@ import { SessionType } from './types';
 import { InteractionSession } from './InteractionSession';
 import { MoveSession } from './MoveSession';
 import { WheelSession } from './WheelSession';
+import { TouchSession } from './TouchSession';
 
 export class SessionManager {
   private static instance: SessionManager;
@@ -43,6 +44,10 @@ export class SessionManager {
 
       case SessionType.MOVE:
         session = new MoveSession(this.sessionSequence);
+        break;
+        
+      case SessionType.TOUCH:
+        session = new TouchSession(this.sessionSequence);
         break;
         
       default:

@@ -63,10 +63,12 @@ export function useWheelDrag({
         state.lastUpdateTime = 0;
         state.isActive = true;
         
-        // Log wheel start using session
-        state.session.startPhase('SCROLL', { 
-          deltaX: e.deltaX, 
-        });
+        // Transition from INIT to SCROLL on first wheel event
+        if (state.session.getCurrentPhase() === 'INIT') {
+          state.session.startPhase('SCROLL', { 
+            deltaX: e.deltaX, 
+          });
+        }
         startDrag(0);
       }
 
@@ -113,7 +115,8 @@ export function useWheelDrag({
         updateDrag(state.accumulatedX);
         // Log wheel end using session
         state.session!.endPhase('SCROLL', 'timeout');
-        // Session will auto-end after 1s timeout
+        // End the session properly
+        state.session!.end();
         state.session = null;
         endDrag({ applyMomentum: true }); // Enable momentum for wheel
         // Reset accumulated position after drag ends

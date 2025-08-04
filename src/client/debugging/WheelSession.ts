@@ -6,11 +6,6 @@ import { InteractionSession, InteractionEvent } from './InteractionSession';
 import { SessionType } from './types';
 
 export class WheelSession extends InteractionSession {
-  constructor(seq: number) {
-    super(seq);
-    this.currentPhase = 'SCROLL';  // Default phase for wheel sessions
-  }
-
   getType(): SessionType {
     return SessionType.WHEEL;
   }
