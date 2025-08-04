@@ -113,12 +113,18 @@ export function useWheelDrag({
         state.isActive = false;
         // Ensure final position is updated
         updateDrag(state.accumulatedX);
-        // Log wheel end using session
-        state.session!.endPhase('SCROLL', 'timeout');
-        // End the session properly
-        state.session!.end();
+        
+        // End the session if it's still active
+        // Note: We have two competing timeouts:
+        // 1. Session's own timeout (1 second) - auto-ends if no events
+        // 2. Wheel's timeout (150ms) - ends when scrolling stops
+        // If user pauses scrolling for >1s, session auto-ends first
+        if (state.session && state.session.isActive()) {
+          state.session.endPhase('SCROLL', 'timeout');
+          state.session.end();
+        }
         state.session = null;
-        endDrag({ applyMomentum: true }); // Enable momentum for wheel
+        endDrag({ applyMomentum: false }); // Wheel has its own OS momentum
         // Reset accumulated position after drag ends
         state.accumulatedX = 0;
         state.lastUpdateTime = 0;

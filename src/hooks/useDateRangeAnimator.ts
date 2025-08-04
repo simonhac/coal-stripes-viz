@@ -90,6 +90,11 @@ export function useDateRangeAnimator({
 
   // Navigate to a specific date during drag (with rubber band effect)
   const navigateToDragDate = useCallback((targetDate: CalendarDate) => {
+    // Ensure we have an active session (creates new one if current has timed out)
+    if (!stateRef.current.session || !stateRef.current.session.isActive()) {
+      stateRef.current.session = SessionManager.getInstance().createSession(SessionType.MOVE) as MoveSession;
+    }
+    
     // Apply rubber band effect and clamp to display boundaries
     const rubberBandDate = applyRubberBandEffect(targetDate);
     const boundaries = getDateBoundaries();
@@ -430,6 +435,13 @@ export function useDateRangeAnimator({
   const endDrag = useCallback((applyMomentum: boolean = true) => {
     stateRef.current.isDragging = false;
     
+    // Check if we have an active session
+    if (!stateRef.current.session || !stateRef.current.session.isActive()) {
+      // No active session - just update the position and return
+      onDateNavigate(currentEndDate, false);
+      return;
+    }
+    
     const boundaries = getDateBoundaries();
     const startDate = currentEndDate.subtract({ days: 364 });
     const pastMaxBoundary = currentEndDate.compare(boundaries.latestDataDay) > 0;
@@ -447,29 +459,29 @@ export function useDateRangeAnimator({
       } else {
         targetDate = boundaries.earliestDataEndDay;
       }
-      const springStartEvent = stateRef.current.session!.createMoveMessage(
-        stateRef.current.session!.getCurrentPhase(),
+      const springStartEvent = stateRef.current.session.createMoveMessage(
+        stateRef.current.session.getCurrentPhase(),
         `Starting spring animation to boundary, target=${targetDate.toString()}, v=${initialVelocity.toFixed(1)}`
       );
       springStartEvent.log();
     } else {
       // In bounds - no spring animation needed, just let momentum coast to a stop
       if (Math.abs(initialVelocity) > 2) {
-        const momentumEvent = stateRef.current.session!.createMoveMessage(
-          stateRef.current.session!.getCurrentPhase(),
+        const momentumEvent = stateRef.current.session.createMoveMessage(
+          stateRef.current.session.getCurrentPhase(),
           `Drag ended with momentum (no spring needed), v=${initialVelocity.toFixed(1)}`
         );
         momentumEvent.log();
       } else {
-        const noAnimEvent = stateRef.current.session!.createMoveMessage(
-          stateRef.current.session!.getCurrentPhase(),
+        const noAnimEvent = stateRef.current.session.createMoveMessage(
+          stateRef.current.session.getCurrentPhase(),
           'Drag ended without animation'
         );
         noAnimEvent.log();
       }
     }
     
-    stateRef.current.session!.endPhase(stateRef.current.session!.getCurrentPhase(), 'user_released', {
+    stateRef.current.session.endPhase(stateRef.current.session.getCurrentPhase(), 'user_released', {
       currentEndDate: currentEndDate.toString(),
       velocity: stateRef.current.velocity,
       outOfBounds,
