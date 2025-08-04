@@ -3,8 +3,7 @@ import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween as daysBetween } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { DATE_NAV_PHYSICS } from '@/shared/config';
-import { DragPhase, logDragPhaseStart, logDragPhaseEnd, logDragFrame, logDragEvent, dragLogger } from '@/utils/drag-logger';
-import { startDragSession, endSession } from '@/utils/interaction-session';
+import { SessionManager, SessionType, MoveSession } from '@/client/debugging';
 
 export interface AnimatorState {
   velocity: number;
@@ -12,6 +11,7 @@ export interface AnimatorState {
   isDragging: boolean;
   currentPosition: CalendarDate | null;
   lastDisplacement: number | null;
+  session: MoveSession | null;
 }
 
 interface DateRangeAnimatorOptions {
@@ -33,6 +33,7 @@ export function useDateRangeAnimator({
     isDragging: false,
     currentPosition: null,
     lastDisplacement: null,
+    session: null,
   });
 
   // Cancel any running animation
@@ -149,24 +150,31 @@ export function useDateRangeAnimator({
     
     stateRef.current.lastDisplacement = displacement;
     
-    // Build warnings array
-    const warnings: string[] = [];
-    if (isRubberBanding) {
-      warnings.push('IN_SLOP');
-    }
-    if (isStuck) {
-      warnings.push('STUCK');
+    // Set phase if it changed
+    if (isRubberBanding && stateRef.current.session!.getCurrentPhase() !== 'RUBBER') {
+      stateRef.current.session!.startPhase('RUBBER');
+    } else if (!isRubberBanding && stateRef.current.session!.getCurrentPhase() === 'RUBBER') {
+      stateRef.current.session!.startPhase('DRAGGING');
     }
     
-    logDragFrame({
-      phase: isRubberBanding ? DragPhase.RUBBER_BAND : DragPhase.DRAGGING,
-      position: clampedDate,
-      targetDate: targetDate,
-      velocity: stateRef.current.velocity,
-      acceleration: acceleration,
-      displacement: displacement,
-      warnings: warnings.length > 0 ? warnings : undefined
-    });
+    const event = stateRef.current.session!.createMoveEvent(
+      stateRef.current.session!.getCurrentPhase(),
+      clampedDate,
+      targetDate,
+      stateRef.current.velocity,
+      acceleration,
+      displacement
+    );
+    
+    // Add warnings if needed
+    if (isRubberBanding) {
+      event.addWarning('IN_SLOP');
+    }
+    if (isStuck) {
+      event.addWarning('STUCK');
+    }
+    
+    event.log();
     
     onDateNavigate(clampedDate, true);
   }, [applyRubberBandEffect, onDateNavigate]);
@@ -234,9 +242,8 @@ export function useDateRangeAnimator({
     stateRef.current.isDragging = true;
     stateRef.current.velocity = 0;
     stateRef.current.lastDisplacement = null;
-    startDragSession();
-    dragLogger.reset(); // Reset timing for new session
-    logDragPhaseStart(DragPhase.DRAG_START, { currentEndDate: currentEndDate.toString() });
+    stateRef.current.session = SessionManager.getInstance().createSession(SessionType.MOVE) as MoveSession;
+    stateRef.current.session.startPhase('DRAG', { currentEndDate: currentEndDate.toString() });
   }, [cancelAnimation, currentEndDate]);
 
   // Update velocity during drag
@@ -252,7 +259,7 @@ export function useDateRangeAnimator({
     let lastTime = performance.now();
     let fractionalDays = 0; // Accumulate fractional days
     
-    logDragPhaseStart(DragPhase.SPRING, {
+    stateRef.current.session!.startPhase('SPRING', {
       animationStartDate: animationStartDate.toString(),
       targetDate: targetDate.toString(),
       initialVelocity: velocity,
@@ -287,11 +294,12 @@ export function useDateRangeAnimator({
       if (currentDate.compare(targetDate) === 0 || 
           (Math.abs(displacement) < DATE_NAV_PHYSICS.SPRING.MIN_DISTANCE && 
            Math.abs(velocity) < DATE_NAV_PHYSICS.SPRING.MIN_VELOCITY)) {
-        logDragPhaseEnd(DragPhase.SPRING, {
+        stateRef.current.session!.endPhase('SPRING', 'reached_target', {
           finalPosition: targetDate.toString(),
           finalDisplacement: displacement,
           finalVelocity: velocity
         });
+        // Session will auto-end after 1s timeout
         stateRef.current.animationId = null;
         onDateNavigate(targetDate, false);
         return;
@@ -319,14 +327,15 @@ export function useDateRangeAnimator({
       const newDate = animationStartDate.add({ days: newWholeDays });
       
       // Log frame
-      logDragFrame({
-        phase: DragPhase.SPRING,
-        position: newDate,
-        targetDate: targetDate,
-        velocity: velocity,
-        acceleration: acceleration,
-        displacement: displacement
-      });
+      const moveEvent = stateRef.current.session!.createMoveEvent(
+        stateRef.current.session!.getCurrentPhase(),
+        newDate,
+        targetDate,
+        velocity,
+        acceleration,
+        displacement
+      );
+      moveEvent.log();
       
       // Emit animation event for visual update
       const event = new CustomEvent('date-animate', { 
@@ -355,18 +364,9 @@ export function useDateRangeAnimator({
     const beforeMinBoundary = startDate.compare(boundaries.earliestDataDay) < 0;
     const outOfBounds = pastMaxBoundary || beforeMinBoundary;
     
-    logDragPhaseEnd(DragPhase.DRAGGING, {
-      currentEndDate: currentEndDate.toString(),
-      velocity: stateRef.current.velocity,
-      outOfBounds,
-      applyMomentum
-    });
-    
-    endSession();
-    
     // Determine target position and initial velocity
     let targetDate = currentEndDate;
-    let initialVelocity = applyMomentum ? stateRef.current.velocity * DATE_NAV_PHYSICS.MOMENTUM.VELOCITY_SCALE : 0;
+    const initialVelocity = applyMomentum ? stateRef.current.velocity * DATE_NAV_PHYSICS.MOMENTUM.VELOCITY_SCALE : 0;
     
     if (outOfBounds) {
       // If out of bounds, target is the boundary
@@ -375,20 +375,40 @@ export function useDateRangeAnimator({
       } else {
         targetDate = boundaries.earliestDataEndDay;
       }
-      logDragEvent('Starting spring animation to boundary', { 
-        target: targetDate.toString(), 
-        initialVelocity 
-      });
-      animateSpring(targetDate, initialVelocity);
+      const springStartEvent = stateRef.current.session!.createMoveMessage(
+        stateRef.current.session!.getCurrentPhase(),
+        `Starting spring animation to boundary, target=${targetDate.toString()}, v=${initialVelocity.toFixed(1)}`
+      );
+      springStartEvent.log();
     } else {
       // In bounds - no spring animation needed, just let momentum coast to a stop
       if (Math.abs(initialVelocity) > 2) {
-        logDragEvent('Drag ended with momentum (no spring needed)', { 
-          velocity: initialVelocity 
-        });
+        const momentumEvent = stateRef.current.session!.createMoveMessage(
+          stateRef.current.session!.getCurrentPhase(),
+          `Drag ended with momentum (no spring needed), v=${initialVelocity.toFixed(1)}`
+        );
+        momentumEvent.log();
       } else {
-        logDragEvent('Drag ended without animation');
+        const noAnimEvent = stateRef.current.session!.createMoveMessage(
+          stateRef.current.session!.getCurrentPhase(),
+          'Drag ended without animation'
+        );
+        noAnimEvent.log();
       }
+    }
+    
+    stateRef.current.session!.endPhase('DRAGGING', 'user_released', {
+      currentEndDate: currentEndDate.toString(),
+      velocity: stateRef.current.velocity,
+      outOfBounds,
+      applyMomentum
+    });
+    
+    // Don't end session here - let timeout handle it after all animations complete
+    
+    if (outOfBounds) {
+      animateSpring(targetDate, initialVelocity);
+    } else {
       onDateNavigate(currentEndDate, false);
     }
   }, [currentEndDate, onDateNavigate, animateSpring]);

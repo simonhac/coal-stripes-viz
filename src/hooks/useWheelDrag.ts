@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { logDragEvent, logDragWarning, logDragPhaseStart, logDragPhaseEnd, DragPhase, dragLogger } from '@/utils/drag-logger';
-import { startWheelSession, endSession, incrementEventCount, getCurrentSession } from '@/utils/interaction-session';
+import { SessionManager, SessionType, WheelSession } from '@/client/debugging';
 
 interface WheelDragOptions {
   startDrag: (x: number) => void;
@@ -14,6 +13,7 @@ interface WheelState {
   isActive: boolean;
   lastUpdateTime: number;
   startX: number;
+  session: WheelSession | null;
 }
 
 /**
@@ -31,6 +31,7 @@ export function useWheelDrag({
     isActive: false,
     lastUpdateTime: 0,
     startX: 0,
+    session: null,
   });
   
   const elementRef = useRef<HTMLDivElement>(null);
@@ -54,8 +55,7 @@ export function useWheelDrag({
       // Check if this is a new gesture (more than 150ms since last wheel event)
       if (now - state.lastWheelTime > 150 || !state.isActive) {
         // New session
-        startWheelSession();
-        dragLogger.reset(); // Reset timing for new session
+        state.session = SessionManager.getInstance().createSession(SessionType.WHEEL) as WheelSession;
         
         // For wheel events, always use 0 as the reference point
         state.startX = 0;
@@ -63,15 +63,9 @@ export function useWheelDrag({
         state.lastUpdateTime = 0;
         state.isActive = true;
         
-        // Log wheel start using shared phase logging
-        logDragPhaseStart(DragPhase.DRAG_START, { 
+        // Log wheel start using session
+        state.session.startPhase('SCROLL', { 
           deltaX: e.deltaX, 
-          deltaZ: e.deltaZ,
-          deltaMode: e.deltaMode,
-          ctrlKey: e.ctrlKey,
-          shiftKey: e.shiftKey,
-          altKey: e.altKey,
-          metaKey: e.metaKey,
         });
         startDrag(0);
       }
@@ -83,15 +77,15 @@ export function useWheelDrag({
       // Throttle updates to prevent overwhelming React
       const timeSinceLastUpdate = now - state.lastUpdateTime;
       if (timeSinceLastUpdate >= 16) { // ~60fps max
-        // Only log and increment sequence when we're actually sending an update
-        const eventSeq = incrementEventCount() - 1;
-        const sessionInfo = getCurrentSession();
-        const sessionSeq = sessionInfo?.seq ?? 0;
+        // Create and log wheel event
         const deltaX = parseFloat(e.deltaX.toFixed(1));
         const accumulatedX = Math.round(state.accumulatedX);
-        logDragEvent(`WHEEL ${sessionSeq}.${eventSeq}`, 
-          `deltaX: ${deltaX}, accumX: ${accumulatedX}`
+        const wheelEvent = state.session!.createWheelEvent(
+          state.session!.getCurrentPhase(),
+          deltaX,
+          accumulatedX
         );
+        wheelEvent.log();
         
         state.lastUpdateTime = now;
         // Pass accumulated value directly - it represents position relative to start
@@ -117,11 +111,10 @@ export function useWheelDrag({
         state.isActive = false;
         // Ensure final position is updated
         updateDrag(state.accumulatedX);
-        // Log wheel end using shared phase logging
-        logDragPhaseEnd(DragPhase.DRAGGING, {
-          endReason: 'timeout'
-        });
-        endSession();
+        // Log wheel end using session
+        state.session!.endPhase('SCROLL', 'timeout');
+        // Session will auto-end after 1s timeout
+        state.session = null;
         endDrag({ applyMomentum: true }); // Enable momentum for wheel
         // Reset accumulated position after drag ends
         state.accumulatedX = 0;
