@@ -118,11 +118,13 @@ export class YearDataVendor {
     // Check cache first
     const cached = this.cache.get(year.toString());
     if (cached) {
+      // Prefetch adjacent years in background
+      this.prefetchAdjacentYears(year);
       return Promise.resolve(cached);
     }
 
     // Use RequestQueue to handle fetching with retry and rate limiting
-    return this.requestQueue.add({
+    const result = this.requestQueue.add({
       execute: () => this.fetchYear(year),
       priority: 1, // Normal priority
       method: 'GET',
@@ -132,6 +134,58 @@ export class YearDataVendor {
         console.error(`Failed to fetch year ${year}:`, error);
       }
     }, { addToFront: true }); // Client requests go to front of queue
+    
+    // Prefetch adjacent years after this year loads successfully
+    result.then(() => {
+      this.prefetchAdjacentYears(year);
+    }).catch(() => {
+      // Ignore prefetch errors
+    });
+    
+    return result;
+  }
+  
+  /**
+   * Prefetch adjacent years in the background (low priority)
+   * Based on the old preloadAdjacentYears from CapFacCache
+   */
+  private prefetchAdjacentYears(currentYear: number): void {
+    const yearsToPreload: number[] = [];
+    
+    // Preload 1 year before and after
+    const prevYear = currentYear - 1;
+    const nextYear = currentYear + 1;
+    
+    if (YearDataVendor.isValidYear(prevYear) && !this.cache.has(prevYear.toString())) {
+      yearsToPreload.push(prevYear);
+    }
+    
+    if (YearDataVendor.isValidYear(nextYear) && !this.cache.has(nextYear.toString())) {
+      yearsToPreload.push(nextYear);
+    }
+    
+    // Start background prefetching with low priority
+    yearsToPreload.forEach(year => {
+      this.requestQueue.add({
+        execute: () => this.fetchYear(year),
+        priority: 0, // Low priority for prefetch
+        method: 'GET',
+        url: `/api/capacity-factors?year=${year}`,
+        label: `prefetch-${year}`,
+        onError: () => {
+          // Silently ignore prefetch errors
+          console.log(`🔄 Prefetch of year ${year} failed (will retry when needed)`);
+        }
+      }, { addToFront: false }).then(() => {
+        console.log(`✅ Prefetched year ${year}`);
+      }).catch(() => {
+        // Ignore prefetch failures
+      });
+    });
+    
+    if (yearsToPreload.length > 0) {
+      console.log(`🔮 Prefetching adjacent years: ${yearsToPreload.join(', ')}`);
+    }
   }
 
   /**
