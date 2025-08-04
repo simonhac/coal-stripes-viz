@@ -4,6 +4,7 @@ interface MouseDragOptions {
   startDrag: (x: number) => void;
   updateDrag: (x: number) => void;
   endDrag: (options?: { applyMomentum?: boolean }) => void;
+  cancelDrag?: () => void;
   isActive: boolean;
 }
 
@@ -15,6 +16,7 @@ export function useMouseDrag({
   startDrag,
   updateDrag,
   endDrag,
+  cancelDrag,
   isActive,
 }: MouseDragOptions) {
   // Track if mouse button is actually pressed
@@ -52,15 +54,28 @@ export function useMouseDrag({
       document.body.style.cursor = '';
       endDrag({ applyMomentum: false }); // No momentum for mouse
     };
+    
+    // Handle when drag is cancelled by wheel
+    const handleWheelStart = () => {
+      if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        document.body.style.cursor = '';
+        if (cancelDrag) {
+          cancelDrag();
+        }
+      }
+    };
 
     document.addEventListener('mousemove', handleGlobalMouseMove);
     document.addEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('wheel', handleWheelStart, { passive: true });
 
     return () => {
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('wheel', handleWheelStart);
     };
-  }, [isActive, updateDrag, endDrag]);
+  }, [isActive, updateDrag, endDrag, cancelDrag]);
 
   return {
     onMouseDown: handleMouseDown,

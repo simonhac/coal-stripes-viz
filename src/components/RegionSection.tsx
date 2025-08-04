@@ -51,9 +51,20 @@ export function RegionSection({
   });
   
   // Set up input-specific handlers
-  const mouseDragHandlers = useMouseDrag(unifiedDrag);
+  const { elementRef: wheelDragRef, cancelWheelScroll } = useWheelDrag({
+    ...unifiedDrag,
+    cancelDrag: unifiedDrag.cancelDrag,
+  });
+  const mouseDragHandlers = useMouseDrag({
+    ...unifiedDrag,
+    startDrag: (x: number) => {
+      // Cancel any active wheel scrolling when mouse starts
+      cancelWheelScroll.current();
+      unifiedDrag.startDrag(x);
+    },
+    cancelDrag: unifiedDrag.cancelDrag,
+  });
   const touchDragHandlers = useTouchDrag(unifiedDrag);
-  const wheelDragRef = useWheelDrag(unifiedDrag);
   
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {

@@ -5,6 +5,7 @@ interface WheelDragOptions {
   startDrag: (x: number) => void;
   updateDrag: (x: number) => void;
   endDrag: (options?: { applyMomentum?: boolean }) => void;
+  cancelDrag?: () => void;
 }
 
 interface WheelState {
@@ -24,6 +25,7 @@ export function useWheelDrag({
   startDrag,
   updateDrag,
   endDrag,
+  cancelDrag,
 }: WheelDragOptions) {
   const wheelStateRef = useRef<WheelState>({
     lastWheelTime: 0,
@@ -35,6 +37,21 @@ export function useWheelDrag({
   });
   
   const elementRef = useRef<HTMLDivElement>(null);
+  
+  // Expose a way to cancel wheel scrolling from outside
+  const cancelWheelScroll = useRef(() => {
+    const state = wheelStateRef.current;
+    if (state.isActive) {
+      state.isActive = false;
+      if (state.session && state.session.isActive()) {
+        state.session.endPhase('SCROLL', 'cancelled_by_mouse');
+        state.session.end();
+      }
+      state.session = null;
+      state.accumulatedX = 0;
+      state.lastUpdateTime = 0;
+    }
+  });
 
   useEffect(() => {
     const element = elementRef.current;
@@ -54,6 +71,11 @@ export function useWheelDrag({
 
       // Check if this is a new gesture (more than 150ms since last wheel event)
       if (now - state.lastWheelTime > 150 || !state.isActive) {
+        // Cancel any active drag before starting wheel session
+        if (cancelDrag) {
+          cancelDrag();
+        }
+        
         // New session
         state.session = SessionManager.getInstance().createSession(SessionType.WHEEL) as WheelSession;
         
@@ -101,7 +123,7 @@ export function useWheelDrag({
     return () => {
       element.removeEventListener('wheel', handleWheel);
     };
-  }, [startDrag, updateDrag]);
+  }, [startDrag, updateDrag, cancelDrag]);
 
   // Check for wheel gesture end
   useEffect(() => {
@@ -135,5 +157,5 @@ export function useWheelDrag({
     return () => clearInterval(interval);
   }, [endDrag]);
 
-  return elementRef;
+  return { elementRef, cancelWheelScroll };
 }
