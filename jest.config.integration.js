@@ -4,10 +4,7 @@ module.exports = {
   ...baseConfig,
   displayName: 'Integration Tests',
   testMatch: [
-    '**/coal-facilities.test.ts',
-    '**/real-api-year.integration.test.ts',
-    '**/future-dates-null.integration.test.ts',
-    '**/unit-sorting.integration.test.ts'
+    '**/*.integration.test.ts'
   ],
   testTimeout: 15000, // 15 seconds for API calls
   reporters: [

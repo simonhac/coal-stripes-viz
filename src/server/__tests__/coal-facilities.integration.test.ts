@@ -1,5 +1,6 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { setupTestLogger } from '../test-helpers';
+import { cleanupRequestLogger } from '@/server/request-logger';
 
 describe('CapFacDataService - Facility Filtering', () => {
   let service: CapFacDataService;
@@ -21,6 +22,8 @@ describe('CapFacDataService - Facility Filtering', () => {
     if (service) {
       await service.cleanup();
     }
+    // Clean up the request logger to stop the interval
+    cleanupRequestLogger();
   });
 
   test('should only return facilities with coal units', async () => {

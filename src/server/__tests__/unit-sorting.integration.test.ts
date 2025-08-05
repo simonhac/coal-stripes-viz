@@ -1,5 +1,6 @@
 import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { setupTestLogger } from '../test-helpers';
+import { cleanupRequestLogger } from '@/server/request-logger';
 
 describe('Unit Sorting Integration Test', () => {
   let coalDataService: CapFacDataService;
@@ -19,6 +20,8 @@ describe('Unit Sorting Integration Test', () => {
     if (coalDataService) {
       await coalDataService.cleanup();
     }
+    // Clean up the request logger to stop the interval
+    cleanupRequestLogger();
   });
 
   test('should sort units by network, region, facility, then duid', async () => {

@@ -2,6 +2,7 @@ import { CapFacDataService } from '@/server/cap-fac-data-service';
 import { parseDate } from '@internationalized/date';
 import { getDayIndex, getTodayAEST } from '@/shared/date-utils';
 import { setupTestLogger } from '../test-helpers';
+import { cleanupRequestLogger } from '@/server/request-logger';
 
 describe('Null vs Zero Data Handling', () => {
   let service: CapFacDataService;
@@ -22,6 +23,8 @@ describe('Null vs Zero Data Handling', () => {
     if (service) {
       await service.cleanup();
     }
+    // Clean up the request logger to stop the interval
+    cleanupRequestLogger();
   });
 
   test('should return null for today (partial data) and all future dates', async () => {
