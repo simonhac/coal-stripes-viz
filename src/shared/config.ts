@@ -109,3 +109,9 @@ export const CLIENT_REQUEST_QUEUE_CONFIG = {
   circuitBreakerThreshold: 5,       // Open circuit after 5 consecutive failures
   circuitBreakerResetTime: 60000    // Reset circuit after 1 minute
 } as const;
+
+// Cache configuration
+export const CACHE_CONFIG = {
+  CLIENT_MAX_YEARS: 30,             // Maximum years to cache in client (browser memory)
+  SERVER_MAX_YEARS: 30,            // Maximum years to cache in server
+} as const;

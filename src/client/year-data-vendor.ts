@@ -6,7 +6,7 @@ import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 import { CalendarDate } from '@internationalized/date';
 import { getDayIndex } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
-import { CLIENT_REQUEST_QUEUE_CONFIG } from '@/shared/config';
+import { CLIENT_REQUEST_QUEUE_CONFIG, CACHE_CONFIG } from '@/shared/config';
 
 export interface GenerationStats {
   totalWeightedCapacityFactor: number;
@@ -378,4 +378,4 @@ export class YearDataVendor {
 }
 
 // Export singleton instance
-export const yearDataVendor = new YearDataVendor(15);
+export const yearDataVendor = new YearDataVendor(CACHE_CONFIG.CLIENT_MAX_YEARS);

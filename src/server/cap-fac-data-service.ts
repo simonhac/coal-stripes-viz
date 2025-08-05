@@ -6,6 +6,7 @@ import {
 import { CalendarDate, parseDate } from '@internationalized/date';
 import { getAESTDateTimeString, isLeapYear, parseAESTDateString, getTodayAEST } from '@/shared/date-utils';
 import { LRUCache } from '@/shared/lru-cache';
+import { CACHE_CONFIG } from '@/shared/config';
 
 // Define types for the new API
 interface UnitRecord {
@@ -34,7 +35,7 @@ export class CapFacDataService {
 
   constructor(apiKey: string, _maxCachedYears: number = 5) {
     this.client = new OEClientQueued(apiKey);
-    this.yearDataCache = new LRUCache<string>(100);
+    this.yearDataCache = new LRUCache<string>(CACHE_CONFIG.SERVER_MAX_YEARS);
   }
 
   /**
