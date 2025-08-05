@@ -1,6 +1,8 @@
 import { GeneratingUnitCapFacHistoryDTO, GeneratingUnitDTO } from '@/shared/types';
 import { FacilityYearTile } from './facility-year-tile';
 import { createFacilitiesFromUnits } from './facility-factory';
+import { CalendarDate, startOfMonth, endOfMonth } from '@internationalized/date';
+import { getDayIndex } from '@/shared/date-utils';
 
 export interface CapFacYear {
   year: number;
@@ -14,7 +16,7 @@ export interface CapFacYear {
 /**
  * Build monthly capacity-weighted capacity factors for each region
  */
-function buildMonthlyCapacityFactorsForEachRegion(units: GeneratingUnitDTO[]): Map<string, (number | null)[]> {
+function buildMonthlyCapacityFactorsForEachRegion(units: GeneratingUnitDTO[], year: number): Map<string, (number | null)[]> {
   const regionCapacityFactors = new Map<string, (number | null)[]>();
   
   // Group units by region
@@ -42,15 +44,37 @@ function buildMonthlyCapacityFactorsForEachRegion(units: GeneratingUnitDTO[]): M
       
       // Calculate capacity-weighted average for this month
       for (const unit of regionUnits) {
-        // Check if this unit has data for this month
-        if (unit.history.data && month < unit.history.data.length) {
-          const capacityFactor = unit.history.data[month];
-          
-          if (capacityFactor !== null) {
-            totalCapacityFactorWeighted += capacityFactor * unit.capacity;
-            totalCapacity += unit.capacity;
-            hasData = true;
+        // Get the first and last day of the month
+        const monthDate = new CalendarDate(year, month + 1, 1);
+        const monthStart = startOfMonth(monthDate);
+        const monthEnd = endOfMonth(monthDate);
+        
+        // Get day indices for the month boundaries
+        const startDayIndex = getDayIndex(monthStart);
+        const endDayIndex = getDayIndex(monthEnd);
+        
+        // Calculate monthly average from daily data
+        let monthTotal = 0;
+        let monthDays = 0;
+        let monthHasData = false;
+        
+        for (let dayIndex = startDayIndex; dayIndex <= endDayIndex; dayIndex++) {
+          if (unit.history.data && dayIndex < unit.history.data.length) {
+            const dailyCapacityFactor = unit.history.data[dayIndex];
+            if (dailyCapacityFactor !== null) {
+              monthTotal += dailyCapacityFactor;
+              monthDays++;
+              monthHasData = true;
+            }
           }
+        }
+        
+        // Only include this unit if it has data for this month
+        if (monthHasData && monthDays > 0) {
+          const monthlyAverage = monthTotal / monthDays;
+          totalCapacityFactorWeighted += monthlyAverage * unit.capacity;
+          totalCapacity += unit.capacity;
+          hasData = true;
         }
       }
       
@@ -85,7 +109,7 @@ export function createCapFacYear(
   }
   
   // Build monthly capacity-weighted capacity factors for each region
-  const regionCapacityFactors = buildMonthlyCapacityFactorsForEachRegion(data.data);
+  const regionCapacityFactors = buildMonthlyCapacityFactorsForEachRegion(data.data, year);
   
   // Calculate total size: JSON data + canvas memory
   const jsonSizeBytes = JSON.stringify(data).length;

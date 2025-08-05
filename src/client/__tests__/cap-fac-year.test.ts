@@ -8,6 +8,43 @@ global.OffscreenCanvas = MockCanvas as any;
 describe('cap-fac-year', () => {
   describe('createCapFacYear', () => {
     it('should create region capacity factors for NEM units', () => {
+      // Create daily data for 365 days
+      // For unit 1: Monthly averages should be 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0, 0.1, 0.2, 0.3
+      const unit1DailyData = new Array(365).fill(null).map((_, dayIndex) => {
+        const monthValues = [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0, 0.1, 0.2, 0.3];
+        const daysPerMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        let currentMonth = 0;
+        let daysSoFar = 0;
+        
+        for (let m = 0; m < 12; m++) {
+          if (dayIndex < daysSoFar + daysPerMonth[m]) {
+            currentMonth = m;
+            break;
+          }
+          daysSoFar += daysPerMonth[m];
+        }
+        
+        return monthValues[currentMonth];
+      });
+      
+      // For unit 2: Monthly averages should be 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2, 0.3, 0.4  
+      const unit2DailyData = new Array(365).fill(null).map((_, dayIndex) => {
+        const monthValues = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2, 0.3, 0.4];
+        const daysPerMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        let currentMonth = 0;
+        let daysSoFar = 0;
+        
+        for (let m = 0; m < 12; m++) {
+          if (dayIndex < daysSoFar + daysPerMonth[m]) {
+            currentMonth = m;
+            break;
+          }
+          daysSoFar += daysPerMonth[m];
+        }
+        
+        return monthValues[currentMonth];
+      });
+
       const mockData: GeneratingUnitCapFacHistoryDTO = {
         type: 'capacity_factors',
         version: '1.0',
@@ -26,8 +63,8 @@ describe('cap-fac-year', () => {
             history: {
               start: '2024-01-01',
               last: '2024-12-31',
-              interval: 'month',
-              data: [0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0, 0.1, 0.2, 0.3]
+              interval: 'day',
+              data: unit1DailyData
             }
           },
           {
@@ -43,8 +80,8 @@ describe('cap-fac-year', () => {
             history: {
               start: '2024-01-01',
               last: '2024-12-31',
-              interval: 'month',
-              data: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.2, 0.3, 0.4]
+              interval: 'day',
+              data: unit2DailyData
             }
           }
         ]
