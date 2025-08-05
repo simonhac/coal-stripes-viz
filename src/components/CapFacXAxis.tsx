@@ -165,6 +165,9 @@ export function CapFacXAxis({
   }
   
   const handleMouseEnter = (month: typeof monthBars[0]) => {
+    // Clear any hover line from stripes
+    document.documentElement.style.removeProperty('--hover-x');
+    
     const tooltipData = {
       startDate: month.date,
       endDate: null,
@@ -240,7 +243,6 @@ export function CapFacXAxis({
                   backgroundColor: month.color,
                   width: idx === monthBars.length - 1 ? 'auto' : `${month.widthPercent}%`,
                   flex: idx === monthBars.length - 1 ? '1' : 'none',
-                  position: 'relative',
                   cursor: onMonthClick ? 'pointer' : 'default'
                 }}
                 onMouseEnter={() => handleMouseEnter(month)}

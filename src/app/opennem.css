@@ -285,7 +285,6 @@ header a {
 }
 
 .opennem-month-label {
-  position: absolute;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -297,6 +296,17 @@ header a {
   padding-left: 4px;
   cursor: pointer;
   z-index: 10;
+  box-sizing: border-box;
+  transition: box-shadow 0.15s ease-in-out;
+  margin-right: -1px; /* Overlap to prevent hairline gaps */
+}
+
+.opennem-month-label:last-child {
+  margin-right: 0; /* No negative margin on last month */
+}
+
+.opennem-month-label:hover {
+  box-shadow: inset 0 0 0 3px rgba(239, 68, 68, 0.5); /* Same red as hover line */
 }
 
 .opennem-month-label:last-child {
