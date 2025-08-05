@@ -23,6 +23,7 @@ export function CapFacXAxis({
   const tooltipRegionName = isMobile ? regionNames.short : regionNames.long;
   const [yearDataMap, setYearDataMap] = useState<Map<number, CapFacYear>>(new Map());
   const [useShortLabels, setUseShortLabels] = useState(false);
+  const [hoveredMonth, setHoveredMonth] = useState<{ year: number; month: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const monthRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -116,6 +117,27 @@ export function CapFacXAxis({
     };
   }, []);
 
+  // Listen for month hover events from other regions
+  useEffect(() => {
+    const handleMonthHover = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const data = customEvent.detail as { year: number; month: number };
+      setHoveredMonth(data);
+    };
+
+    const handleMonthHoverEnd = () => {
+      setHoveredMonth(null);
+    };
+
+    window.addEventListener('month-hover', handleMonthHover);
+    window.addEventListener('month-hover-end', handleMonthHoverEnd);
+
+    return () => {
+      window.removeEventListener('month-hover', handleMonthHover);
+      window.removeEventListener('month-hover-end', handleMonthHoverEnd);
+    };
+  }, []);
+
   const monthBars: { labelShort: string; labelLong: string; color: string; widthPercent: number; date: CalendarDate; capacityFactor: number | null }[] = [];
   
   // Total days in the date range (should be 365)
@@ -182,6 +204,15 @@ export function CapFacXAxis({
       detail: tooltipData
     });
     window.dispatchEvent(event);
+    
+    // Broadcast month hover for visual synchronization
+    const monthHoverEvent = new CustomEvent('month-hover', {
+      detail: {
+        year: month.date.year,
+        month: month.date.month
+      }
+    });
+    window.dispatchEvent(monthHoverEvent);
   };
 
   const handleMonthClick = (month: typeof monthBars[0]) => {
@@ -224,6 +255,9 @@ export function CapFacXAxis({
     onHoverEnd: () => {
       const event = new CustomEvent('tooltip-data-hover-end');
       window.dispatchEvent(event);
+      
+      const monthHoverEndEvent = new CustomEvent('month-hover-end');
+      window.dispatchEvent(monthHoverEndEvent);
     }
   });
 
@@ -238,7 +272,7 @@ export function CapFacXAxis({
               <div
                 key={idx}
                 ref={(el) => { monthRefs.current[idx] = el; }}
-                className="opennem-month-label"
+                className={`opennem-month-label ${hoveredMonth && hoveredMonth.year === month.date.year && hoveredMonth.month === month.date.month ? 'hovered' : ''}`}
                 style={{ 
                   backgroundColor: month.color,
                   width: idx === monthBars.length - 1 ? 'auto' : `${month.widthPercent}%`,
@@ -250,6 +284,10 @@ export function CapFacXAxis({
                   // Broadcast hover end
                   const event = new CustomEvent('tooltip-data-hover-end');
                   window.dispatchEvent(event);
+                  
+                  // Broadcast month hover end
+                  const monthHoverEndEvent = new CustomEvent('month-hover-end');
+                  window.dispatchEvent(monthHoverEndEvent);
                 }}
                 onClick={() => handleMonthClick(month)}
               >
