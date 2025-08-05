@@ -51,7 +51,6 @@ export function OpenElectricityHeader() {
                   key={item.label}
                   href={item.href}
                   className={`opennem-nav-link ${isActive(item.href) ? 'opennem-nav-link-active' : ''}`}
-                  onClick={handleNavClick}
                 >
                   {item.label}
                 </Link>
