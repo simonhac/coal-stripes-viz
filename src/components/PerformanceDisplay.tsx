@@ -89,6 +89,8 @@ export const PerformanceDisplay: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [hasDragged, setHasDragged] = useState(false);
+  const [expandStage, setExpandStage] = useState<'none' | 'horizontal' | 'vertical' | 'collapsing'>('none');
+  const [isAnimating, setIsAnimating] = useState(false);
   const allFeatureFlags = useAllFeatureFlags();
   const [flagsChanged, setFlagsChanged] = useState(false);
 
@@ -183,6 +185,31 @@ export const PerformanceDisplay: React.FC = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Handle staged expansion/collapse animation
+  useEffect(() => {
+    if (disclosureState === 'detailed' && expandStage === 'none' && !isAnimating) {
+      // Expansion: horizontal -> pause -> vertical
+      setIsAnimating(true);
+      setExpandStage('horizontal');
+      setTimeout(() => {
+        setExpandStage('vertical');
+        setTimeout(() => setIsAnimating(false), 200);
+      }, 400); // 200ms horizontal + 200ms pause
+    } else if (disclosureState === 'collapsed' && expandStage === 'vertical' && !isAnimating) {
+      // Collapse from vertical
+      setIsAnimating(true);
+      setExpandStage('collapsing'); // New state that animates height down
+      setTimeout(() => {
+        setExpandStage('horizontal');
+        // Pause
+        setTimeout(() => {
+          setExpandStage('none');
+          setTimeout(() => setIsAnimating(false), 200);
+        }, 200); // 200ms pause
+      }, 200); // 200ms vertical collapse
+    }
+  }, [disclosureState, expandStage, isAnimating]);
+
   // Don't render if not visible
   if (!isVisible) {
     return null;
@@ -192,26 +219,29 @@ export const PerformanceDisplay: React.FC = () => {
     <div 
       onMouseDown={handleMouseDown}
       style={{
+        maxHeight: expandStage === 'vertical' ? '500px' : 
+                   expandStage === 'collapsing' ? '40px' : '40px',
+        transition: 'width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, max-height 0.2s ease, opacity 0.2s ease, border-radius 0.2s ease, padding 0.2s ease',
         position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
         background: 'rgba(0, 0, 0, 0.8)',
         color: '#0f0',
         padding: disclosureState === 'collapsed' ? '8px' : '10px',
-        borderRadius: disclosureState === 'collapsed' ? '50%' : '5px',
+        borderRadius: (disclosureState === 'collapsed' && expandStage === 'none') ? '50%' : 
+          (expandStage === 'none' ? '50%' : '5px'),
         fontFamily: 'monospace',
         fontSize: '12px',
-        width: disclosureState === 'collapsed' ? '40px' : '250px',
-        minWidth: disclosureState === 'collapsed' ? '40px' : '250px',
-        maxWidth: disclosureState === 'collapsed' ? '40px' : '250px',
-        height: disclosureState === 'collapsed' ? '40px' : 'auto',
+        width: disclosureState === 'collapsed' && expandStage === 'none' ? '40px' : '250px',
+        minWidth: disclosureState === 'collapsed' && expandStage === 'none' ? '40px' : '250px',
+        maxWidth: disclosureState === 'collapsed' && expandStage === 'none' ? '40px' : '250px',
+        height: 'auto',
         zIndex: 10000,
         overflow: 'hidden',
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         boxSizing: 'border-box',
-        opacity: disclosureState === 'collapsed' ? 0.2 : 1,
-        transition: 'width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, height 0.3s ease, opacity 0.3s ease, border-radius 0.3s ease',
+        opacity: disclosureState === 'collapsed' && expandStage === 'none' ? 0.2 : 1,
         display: 'flex',
         flexDirection: 'column',
         alignItems: disclosureState === 'collapsed' ? 'center' : 'stretch',

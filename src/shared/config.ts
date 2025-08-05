@@ -72,7 +72,7 @@ export const DATE_BOUNDARIES = {
   EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
 
   // Buffer months to allow beyond data boundaries for UI flexibility
-  DISPLAY_SLOP_MONTHS: 4,
+  DISPLAY_SLOP_MONTHS: 9,
 } as const;
 
 
