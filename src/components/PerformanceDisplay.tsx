@@ -232,7 +232,7 @@ export const PerformanceDisplay: React.FC = () => {
                 fontSize: '18px',
                 fontFamily: 'Arial',
                 display: 'inline-block',
-                transform: disclosureState === 'collapsed' ? 'rotate(0deg)' : 'rotate(90deg)',
+                transform: 'rotate(90deg)', // Always rotated when expanded
                 transition: 'transform 0.3s ease',
                 userSelect: 'none'
               }}

@@ -18,7 +18,7 @@ describe('Capacity Factors API HTTP Integration Tests', () => {
       try {
         const response = await fetch(`http://localhost:${PORT}`);
         if (response.ok) return;
-      } catch (e) {
+      } catch {
         // Server not ready yet
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -58,7 +58,7 @@ describe('Capacity Factors API HTTP Integration Tests', () => {
       try {
         // Use process group kill on Unix systems
         process.kill(-serverProcess.pid!, 'SIGTERM');
-      } catch (e) {
+      } catch (_e) {
         // Fallback to regular kill
         serverProcess.kill('SIGTERM');
       }
@@ -70,7 +70,7 @@ describe('Capacity Factors API HTTP Integration Tests', () => {
       if (!serverProcess.killed) {
         try {
           process.kill(-serverProcess.pid!, 'SIGKILL');
-        } catch (e) {
+        } catch (_e) {
           serverProcess.kill('SIGKILL');
         }
       }
