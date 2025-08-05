@@ -9,6 +9,13 @@ import { useAllFeatureFlags } from '@/hooks/useFeatureFlag';
 type DisplayMode = 'performance' | 'caches' | 'features';
 type DisclosureState = 'collapsed' | 'detailed';
 
+interface PerformanceMonitorState {
+  visible: boolean;
+  position: { x: number; y: number };
+  disclosureState: DisclosureState;
+  displayMode: DisplayMode;
+}
+
 const greenButtonStyle = {
   background: '#333',
   color: '#0f0',
@@ -29,52 +36,56 @@ const redButtonStyle = {
   fontSize: '10px'
 };
 
+const loadPerformanceMonitorState = (): PerformanceMonitorState => {
+  const defaultState: PerformanceMonitorState = {
+    visible: false,
+    position: { x: typeof window !== 'undefined' ? window.innerWidth / 2 - 50 : 100, y: 10 },
+    disclosureState: 'collapsed',
+    displayMode: 'caches'
+  };
+
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return defaultState;
+  }
+
+  try {
+    const saved = localStorage.getItem('performance-monitor-state');
+    if (saved) {
+      const state = JSON.parse(saved) as Partial<PerformanceMonitorState>;
+      
+      // Validate and merge with defaults
+      return {
+        visible: state.visible === true,
+        position: state.position && 
+          state.position.x >= 0 && 
+          state.position.x <= window.innerWidth - 100 &&
+          state.position.y >= 0 && 
+          state.position.y <= window.innerHeight - 100 
+          ? state.position 
+          : defaultState.position,
+        disclosureState: state.disclosureState || defaultState.disclosureState,
+        displayMode: state.displayMode || defaultState.displayMode
+      };
+    }
+  } catch (e) {
+    console.error('Failed to parse saved performance monitor state:', e);
+  }
+
+  return defaultState;
+};
+
 export const PerformanceDisplay: React.FC = () => {
   const [fps, setFps] = useState(0);
   const [memory, setMemory] = useState<{ heapUsed: number; heapTotal: number } | null>(null);
   const [metrics, setMetrics] = useState<Record<string, { count: number; avgDuration: number; totalDuration: number }>>({});
-  const [disclosureState, setDisclosureState] = useState<DisclosureState>('collapsed');
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('caches');
   const [cacheStats, setCacheStats] = useState<(CacheStats & QueueStats) | null>(null);
-  const [isVisible, setIsVisible] = useState(() => {
-    // Load saved visibility state from localStorage
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = localStorage.getItem('performance-monitor-state');
-      if (saved) {
-        try {
-          const state = JSON.parse(saved);
-          return state.visible === true; // Default to false if not explicitly true
-        } catch (e) {
-          console.error('Failed to parse saved performance monitor state:', e);
-        }
-      }
-    }
-    // Default to hidden
-    return false;
-  });
-  const [position, setPosition] = useState(() => {
-    // Load saved position from localStorage
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = localStorage.getItem('performance-monitor-state');
-      if (saved) {
-        try {
-          const state = JSON.parse(saved);
-          if (state.position) {
-            const coords = state.position;
-            // Validate coordinates are within viewport
-            if (coords.x >= 0 && coords.x <= window.innerWidth - 100 &&
-                coords.y >= 0 && coords.y <= window.innerHeight - 100) {
-              return coords;
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse saved performance monitor position:', e);
-        }
-      }
-    }
-    // Default position
-    return { x: window.innerWidth / 2 - 50, y: 10 };
-  });
+  
+  // Load all persisted state at once
+  const initialState = loadPerformanceMonitorState();
+  const [isVisible, setIsVisible] = useState(initialState.visible);
+  const [position, setPosition] = useState(initialState.position);
+  const [disclosureState, setDisclosureState] = useState(initialState.disclosureState);
+  const [displayMode, setDisplayMode] = useState(initialState.displayMode);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const allFeatureFlags = useAllFeatureFlags();
@@ -137,21 +148,23 @@ export const PerformanceDisplay: React.FC = () => {
     };
   }, [isDragging, dragStart]);
 
-  // Save position and visibility to localStorage
+  // Save all state to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       // Debounce to avoid saving during drag
       const timeoutId = setTimeout(() => {
-        const state = {
+        const state: PerformanceMonitorState = {
+          visible: isVisible,
           position,
-          visible: isVisible
+          disclosureState,
+          displayMode
         };
         localStorage.setItem('performance-monitor-state', JSON.stringify(state));
       }, 100);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [position, isVisible, isDragging]);
+  }, [position, isVisible, disclosureState, displayMode, isDragging]);
 
   // Handle keyboard shortcut (Shift+P)
   useEffect(() => {
