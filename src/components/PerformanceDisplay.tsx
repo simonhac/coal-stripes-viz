@@ -88,6 +88,7 @@ export const PerformanceDisplay: React.FC = () => {
   const [displayMode, setDisplayMode] = useState(initialState.displayMode);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [hasDragged, setHasDragged] = useState(false);
   const allFeatureFlags = useAllFeatureFlags();
   const [flagsChanged, setFlagsChanged] = useState(false);
 
@@ -117,6 +118,7 @@ export const PerformanceDisplay: React.FC = () => {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
+    setHasDragged(false);
     setDragStart({
       x: e.clientX - position.x,
       y: e.clientY - position.y
@@ -127,6 +129,7 @@ export const PerformanceDisplay: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
       
+      setHasDragged(true);
       setPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -135,6 +138,8 @@ export const PerformanceDisplay: React.FC = () => {
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      // Reset hasDragged after a short delay to prevent click events
+      setTimeout(() => setHasDragged(false), 100);
     };
 
     if (isDragging) {
@@ -192,42 +197,62 @@ export const PerformanceDisplay: React.FC = () => {
         top: `${position.y}px`,
         background: 'rgba(0, 0, 0, 0.8)',
         color: '#0f0',
-        padding: '10px',
-        borderRadius: '5px',
+        padding: disclosureState === 'collapsed' ? '8px' : '10px',
+        borderRadius: disclosureState === 'collapsed' ? '50%' : '5px',
         fontFamily: 'monospace',
         fontSize: '12px',
-        width: disclosureState === 'collapsed' ? 'auto' : '250px',
-        minWidth: disclosureState === 'collapsed' ? 'auto' : '250px',
-        maxWidth: disclosureState === 'collapsed' ? 'none' : '250px',
+        width: disclosureState === 'collapsed' ? '40px' : '250px',
+        minWidth: disclosureState === 'collapsed' ? '40px' : '250px',
+        maxWidth: disclosureState === 'collapsed' ? '40px' : '250px',
+        height: disclosureState === 'collapsed' ? '40px' : 'auto',
         zIndex: 10000,
         overflow: 'hidden',
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: 'none',
         boxSizing: 'border-box',
         opacity: disclosureState === 'collapsed' ? 0.2 : 1,
-        transition: 'width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, opacity 0.3s ease'
+        transition: 'width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, height 0.3s ease, opacity 0.3s ease, border-radius 0.3s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: disclosureState === 'collapsed' ? 'center' : 'stretch',
+        justifyContent: disclosureState === 'collapsed' ? 'center' : 'flex-start'
       }}>
-      <div style={{ marginBottom: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ marginBottom: disclosureState === 'collapsed' ? '0' : '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
+          {disclosureState !== 'collapsed' && (
+            <span 
+              onClick={() => {
+                if (!hasDragged) {
+                  setDisclosureState(prev => prev === 'collapsed' ? 'detailed' : 'collapsed');
+                }
+              }}
+              style={{ 
+                cursor: 'pointer',
+                marginRight: '5px',
+                fontSize: '18px',
+                fontFamily: 'Arial',
+                display: 'inline-block',
+                transform: disclosureState === 'collapsed' ? 'rotate(0deg)' : 'rotate(90deg)',
+                transition: 'transform 0.3s ease',
+                userSelect: 'none'
+              }}
+            >
+              ▸
+            </span>
+          )}
           <span 
             onClick={() => {
-              setDisclosureState(prev => prev === 'collapsed' ? 'detailed' : 'collapsed');
+              if (disclosureState === 'collapsed' && !hasDragged) {
+                setDisclosureState('detailed');
+              }
             }}
             style={{ 
-              cursor: 'pointer',
-              marginRight: '5px',
-              fontSize: '18px',
-              fontFamily: 'Arial',
-              display: 'inline-block',
-              transform: disclosureState === 'collapsed' ? 'rotate(0deg)' : 'rotate(90deg)',
-              transition: 'transform 0.3s ease',
-              userSelect: 'none'
+              color: fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0',
+              cursor: disclosureState === 'collapsed' ? 'pointer' : 'inherit',
+              fontSize: disclosureState === 'collapsed' ? '14px' : '12px'
             }}
           >
-            ▸
-          </span>
-          <span style={{ color: fps < 30 ? '#f00' : fps < 50 ? '#ff0' : '#0f0' }}>
-            {fps.toFixed(0)}fps
+            {fps.toFixed(0)}{disclosureState === 'collapsed' ? '' : 'fps'}
           </span>
         </div>
         {memory && disclosureState !== 'collapsed' && (
