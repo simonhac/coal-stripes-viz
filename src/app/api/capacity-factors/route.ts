@@ -1,58 +1,119 @@
-import { NextResponse } from 'next/server';
-import { CapFacDataService } from '@/server/cap-fac-data-service';
-import { initializeRequestLogger } from '@/server/request-logger';
+import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
+import { CapFacDataService } from "@/server/cap-fac-data-service";
+import { initializeRequestLogger } from "@/server/request-logger";
+import { getTodayAEST } from "@/shared/date-utils";
+
+// Force dynamic mode to ensure our cache headers are respected
+export const dynamic = "force-dynamic";
 
 // Initialize logger for API routes
-const port = parseInt(process.env.PORT || '3000');
+const port = Number.parseInt(process.env.PORT || "3000");
 initializeRequestLogger(port);
 
 // Create a singleton instance of the service to avoid creating multiple API clients
 let serviceInstance: CapFacDataService | null = null;
 
 function getService(): CapFacDataService {
-  if (!serviceInstance) {
-    const apiKey = process.env.OPENELECTRICITY_API_KEY;
-    if (!apiKey) {
-      throw new Error('API key not configured');
-    }
-    serviceInstance = new CapFacDataService(apiKey);
-  }
-  return serviceInstance;
+	if (!serviceInstance) {
+		const apiKey = process.env.OPENELECTRICITY_API_KEY;
+		if (!apiKey) {
+			throw new Error("API key not configured");
+		}
+		serviceInstance = new CapFacDataService(apiKey);
+	}
+	return serviceInstance;
 }
 
+// Create cached versions for different revalidation periods
+const getCachedCapacityFactorsCurrentYear = unstable_cache(
+	async (year: number) => {
+		console.log(`🔄 Cache miss - fetching data for current year ${year}`);
+		const service = getService();
+		return await service.getCapacityFactors(year);
+	},
+	["capacity-factors", "current-year"],
+	{
+		revalidate: 3600, // 1 hour
+		tags: ["capacity-factors", "current-year"],
+	},
+);
+
+const getCachedCapacityFactorsPreviousYears = unstable_cache(
+	async (year: number) => {
+		console.log(`🔄 Cache miss - fetching data for previous year ${year}`);
+		const service = getService();
+		return await service.getCapacityFactors(year);
+	},
+	["capacity-factors", "previous-years"],
+	{
+		revalidate: 604800, // 1 week
+		tags: ["capacity-factors", "previous-years"],
+	},
+);
+
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const yearParam = searchParams.get('year');
-    
-    if (!yearParam) {
-      return NextResponse.json(
-        { error: 'year parameter is required' },
-        { status: 400 }
-      );
-    }
-    
-    const year = parseInt(yearParam);
-    if (isNaN(year) || year < 1900 || year > 2100) {
-      return NextResponse.json(
-        { error: 'Invalid year parameter' },
-        { status: 400 }
-      );
-    }
-    
-    console.log(`🌐 API: Fetching capacity factors for year ${year}`);
-    
-    const service = getService();
-    const data = await service.getCapacityFactors(year);
-    
-    console.log(`🌐 API: Returning data for year ${year}`);
-    
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('API Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
+	try {
+		const { searchParams } = new URL(request.url);
+		const yearParam = searchParams.get("year");
+
+		if (!yearParam) {
+			return NextResponse.json(
+				{ error: "Year parameter is required" },
+				{ status: 400 },
+			);
+		}
+
+		// sanity check year
+		const year = Number.parseInt(yearParam);
+		if (Number.isNaN(year) || year < 1900 || year > 2100) {
+			return NextResponse.json(
+				{ error: "Invalid year parameter" },
+				{ status: 400 },
+			);
+		}
+
+		console.log(`🌐 API: Fetching capacity factors for year ${year}`);
+
+		// Use the appropriate cached version based on the year
+		const currentYear = getTodayAEST().year;
+		const data =
+			year === currentYear
+				? await getCachedCapacityFactorsCurrentYear(year)
+				: await getCachedCapacityFactorsPreviousYears(year);
+
+		console.log(`🌐 API: Returning data for year ${year}`);
+
+		// Prepare response with cache headers
+		const response = NextResponse.json(data);
+
+		if (year === currentYear) {
+			// Current year: cache for 1 hour
+			response.headers.set(
+				"Cache-Control",
+				"public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
+			);
+		} else if (year < currentYear) {
+			// Previous years: cache for 1 week
+			response.headers.set(
+				"Cache-Control",
+				"public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
+			);
+		} else {
+			// Future years: no cache
+			response.headers.set("Cache-Control", "no-store");
+		}
+
+		response.headers.set("Vary", "Accept-Encoding");
+
+		return response;
+	} catch (error) {
+		console.error("API Error:", error);
+		return NextResponse.json(
+			{
+				error: error instanceof Error ? error.message : "Internal server error",
+			},
+			{ status: 500 },
+		);
+	}
 }
