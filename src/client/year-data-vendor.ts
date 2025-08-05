@@ -6,6 +6,7 @@ import { NoOpRequestQueueLogger } from '@/shared/request-queue-logger';
 import { CalendarDate } from '@internationalized/date';
 import { getDayIndex } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
+import { CLIENT_REQUEST_QUEUE_CONFIG } from '@/shared/config';
 
 export interface GenerationStats {
   totalWeightedCapacityFactor: number;
@@ -69,19 +70,12 @@ export class YearDataVendor {
     return year >= YearDataVendor.getEarliestYear() && year <= YearDataVendor.getLatestYear();
   }
 
-  constructor(maxYears: number = 10, queueConfig?: Partial<RequestQueueConfig>) {
+  constructor(maxYears: number = 30, queueConfig?: Partial<RequestQueueConfig>) {
     this.cache = new LRUCache<CapFacYear>(maxYears);
-    this.requestQueue = new RequestQueue<CapFacYear>({
-      maxConcurrent: 2, // Allow 2 concurrent year fetches
-      minInterval: 100, // 100ms between requests
-      maxRetries: 3,
-      retryDelayBase: 1000,
-      retryDelayMax: 30000,
-      timeout: 60000, // 60 second timeout for year data
-      circuitBreakerThreshold: 5,
-      circuitBreakerResetTime: 60000,
-      ...queueConfig // Allow overriding for tests
-    }, new NoOpRequestQueueLogger());
+    this.requestQueue = new RequestQueue<CapFacYear>(
+      { ...CLIENT_REQUEST_QUEUE_CONFIG, ...queueConfig }, // Allow overriding for tests
+      new NoOpRequestQueueLogger()
+    );
   }
 
   /**

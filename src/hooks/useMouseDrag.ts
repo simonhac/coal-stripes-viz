@@ -33,7 +33,7 @@ export function useMouseDrag({
     document.body.style.cursor = 'grabbing';
   }, [startDrag]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  const handleMouseMove = useCallback((_e: React.MouseEvent) => {
     // Only handle if not dragging (dragging is handled globally)
     if (!isActive) return;
   }, [isActive]);

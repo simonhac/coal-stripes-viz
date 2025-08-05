@@ -253,7 +253,7 @@ export function useDateRangeAnimator({
     stateRef.current.lastDisplacement = null;
     stateRef.current.session = SessionManager.getInstance().createSession(SessionType.MOVE) as MoveSession;
     // Session starts in INIT phase by default, no need to set it
-  }, [cancelAnimation, currentEndDate]);
+  }, [cancelAnimation]);
 
   // Update velocity during drag
   const updateVelocity = useCallback((velocity: number) => {

@@ -1,4 +1,3 @@
-import { REQUEST_QUEUE_CONFIG } from '@/shared/config';
 import { 
   RequestQueueLogger, 
   ConsoleRequestQueueLogger
@@ -54,16 +53,7 @@ export class RequestQueue<T = any> {
   private activeTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(
-    private config: RequestQueueConfig = {
-      maxConcurrent: REQUEST_QUEUE_CONFIG.MAX_CONCURRENT_REQUESTS,
-      minInterval: REQUEST_QUEUE_CONFIG.DEFAULT_MIN_INTERVAL,
-      maxRetries: REQUEST_QUEUE_CONFIG.MAX_RETRIES,
-      retryDelayBase: REQUEST_QUEUE_CONFIG.RETRY_DELAY_BASE,
-      retryDelayMax: REQUEST_QUEUE_CONFIG.RETRY_DELAY_MAX,
-      timeout: REQUEST_QUEUE_CONFIG.REQUEST_TIMEOUT,
-      circuitBreakerThreshold: REQUEST_QUEUE_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
-      circuitBreakerResetTime: REQUEST_QUEUE_CONFIG.CIRCUIT_BREAKER_RESET_TIME
-    },
+    private config: RequestQueueConfig,
     logger?: RequestQueueLogger
   ) {
     this.logger = logger || new ConsoleRequestQueueLogger();

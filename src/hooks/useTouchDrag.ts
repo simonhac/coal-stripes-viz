@@ -155,7 +155,7 @@ export function useTouchDrag({
     }
   }, [updateDrag, cancelDrag]);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  const handleTouchEnd = useCallback((_e: React.TouchEvent) => {
     const state = touchStateRef.current;
     
     if (state.wasHorizontalDrag && state.session) {

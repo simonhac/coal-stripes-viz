@@ -1,6 +1,6 @@
 import { OpenElectricityClient } from 'openelectricity';
 import { RequestQueue } from '@/shared/request-queue';
-import { REQUEST_QUEUE_CONFIG } from '@/shared/config';
+import { SERVER_REQUEST_QUEUE_CONFIG } from '@/shared/config';
 import { FileRequestQueueLogger } from './file-request-queue-logger';
 
 /**
@@ -13,16 +13,10 @@ export class OEClientQueued {
 
   constructor(apiKey: string) {
     this.client = new OpenElectricityClient({ apiKey });
-    this.requestQueue = new RequestQueue({
-      maxConcurrent: REQUEST_QUEUE_CONFIG.MAX_CONCURRENT_REQUESTS,
-      minInterval: REQUEST_QUEUE_CONFIG.DEFAULT_MIN_INTERVAL,
-      maxRetries: REQUEST_QUEUE_CONFIG.MAX_RETRIES,
-      retryDelayBase: REQUEST_QUEUE_CONFIG.RETRY_DELAY_BASE,
-      retryDelayMax: REQUEST_QUEUE_CONFIG.RETRY_DELAY_MAX,
-      timeout: REQUEST_QUEUE_CONFIG.REQUEST_TIMEOUT,
-      circuitBreakerThreshold: REQUEST_QUEUE_CONFIG.CIRCUIT_BREAKER_THRESHOLD,
-      circuitBreakerResetTime: REQUEST_QUEUE_CONFIG.CIRCUIT_BREAKER_RESET_TIME
-    }, new FileRequestQueueLogger());
+    this.requestQueue = new RequestQueue(
+      SERVER_REQUEST_QUEUE_CONFIG,
+      new FileRequestQueueLogger()
+    );
   }
 
   /**

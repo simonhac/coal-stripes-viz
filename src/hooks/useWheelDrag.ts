@@ -155,7 +155,7 @@ export function useWheelDrag({
 
     const interval = setInterval(checkWheelEnd, 50);
     return () => clearInterval(interval);
-  }, [endDrag]);
+  }, [endDrag, updateDrag]);
 
   return { elementRef, cancelWheelScroll };
 }

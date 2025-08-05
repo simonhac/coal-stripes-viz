@@ -49,6 +49,7 @@ export const PERF_CONFIG = {
   FPS_BUFFER_SIZE: 60,              // Number of frames to keep for FPS calculation
 } as const;
 
+
 // UI Configuration
 export const UI_CONFIG = {
   MOBILE_BREAKPOINT: 768,           // Pixels - below this is mobile
@@ -59,10 +60,10 @@ export const UI_CONFIG = {
   CAPACITY_TO_HEIGHT_RATIO: 30,     // Divide capacity by this to get height
 } as const;
 
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: '/api/coal-stripes',    // Base URL for API calls
-  DEFAULT_TIMEZONE: 'Australia/Brisbane',
 } as const;
 
 // Date boundaries
@@ -74,6 +75,7 @@ export const DATE_BOUNDARIES = {
   DISPLAY_SLOP_MONTHS: 4,
 } as const;
 
+
 // Tile rendering configuration
 export const TILE_CONFIG = {
   SHOW_DEBUG_OVERLAY: true,         // Show yellow border and year text on tiles
@@ -83,21 +85,27 @@ export const TILE_CONFIG = {
   DEBUG_TEXT_COLOR: '#9333ea',      // Purple color for year text
 } as const;
 
-// Request queue configuration
-export const REQUEST_QUEUE_CONFIG = {
-  // Rate limiting
-  DEFAULT_MIN_INTERVAL: 100,        // Minimum 100ms between requests
-  MAX_CONCURRENT_REQUESTS: 10,      // Max parallel requests
-  
-  // Retry policy
-  MAX_RETRIES: 4,                   // Maximum retry attempts
-  RETRY_DELAY_BASE: 1000,           // Base retry delay (1s)
-  RETRY_DELAY_MAX: 30000,           // Maximum retry delay (30s)
-  
-  // Timeouts
-  REQUEST_TIMEOUT: 20000,           // 15 second timeout per request
-  
-  // Circuit breaker
-  CIRCUIT_BREAKER_THRESHOLD: 5,     // Open circuit after 5 consecutive failures
-  CIRCUIT_BREAKER_RESET_TIME: 60000 // Reset circuit after 1 minute
+
+// Server request queue configuration
+export const SERVER_REQUEST_QUEUE_CONFIG = {
+  maxConcurrent: 10,                // Max parallel requests
+  minInterval: 100,                 // Minimum 100ms between requests
+  maxRetries: 4,                    // Maximum retry attempts
+  retryDelayBase: 1000,             // Base retry delay (1s)
+  retryDelayMax: 30000,             // Maximum retry delay (30s)
+  timeout: 20000,                   // 20 second timeout per request
+  circuitBreakerThreshold: 5,       // Open circuit after 5 consecutive failures
+  circuitBreakerResetTime: 60000    // Reset circuit after 1 minute
+} as const;
+
+// Client request queue configuration (for year data vendor)
+export const CLIENT_REQUEST_QUEUE_CONFIG = {
+  maxConcurrent: 4,                 // Allow 2 concurrent year fetches
+  minInterval: 50,                 // 100ms between requests
+  maxRetries: 3,                    // Maximum retry attempts
+  retryDelayBase: 1000,             // Base retry delay (1s)
+  retryDelayMax: 30000,             // Maximum retry delay (30s)
+  timeout: 60000,                   // 60 second timeout for year data
+  circuitBreakerThreshold: 5,       // Open circuit after 5 consecutive failures
+  circuitBreakerResetTime: 60000    // Reset circuit after 1 minute
 } as const;
