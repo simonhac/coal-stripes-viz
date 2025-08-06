@@ -4,8 +4,13 @@
 
 import { InteractionSession, InteractionEvent } from './InteractionSession';
 import { SessionType } from './types';
+import { MasterSession } from './MasterSession';
 
 export class WheelSession extends InteractionSession {
+  constructor(masterSession: MasterSession, sessionIdentifier: string, masterSessionDeltaMs: number) {
+    super(masterSession, sessionIdentifier, masterSessionDeltaMs);
+  }
+
   getType(): SessionType {
     return SessionType.WHEEL;
   }
@@ -23,7 +28,7 @@ export class WheelSession extends InteractionSession {
     return new InteractionEvent(
       this, 
       phase,
-      this.getSeq(),
+      this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
       this.getDeltaMs(),
@@ -43,7 +48,7 @@ export class WheelSession extends InteractionSession {
     return new InteractionEvent(
       this, 
       phase,
-      this.getSeq(),
+      this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
       this.getDeltaMs(),

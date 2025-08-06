@@ -3,6 +3,7 @@
  */
 
 import { SessionType } from './types';
+import { MasterSession } from './MasterSession';
 
 // Color codes for different log types
 export const LogColors = {
@@ -15,7 +16,7 @@ export const LogColors = {
 // Base interaction event class
 export class InteractionEvent {
   protected session: InteractionSession;
-  protected sessionSeq: number;
+  protected sessionId: string;
   protected phase: string;
   protected eventSeq: number;
   protected elapsedMs: number;  // Time since session start
@@ -26,14 +27,14 @@ export class InteractionEvent {
   constructor(
     session: InteractionSession, 
     phase: string,
-    sessionSeq: number,
+    sessionId: string,
     eventSeq: number,
     elapsedMs: number,
     deltaMs: number,
     message: string
   ) {
     if (!session.isActive()) {
-      throw new Error(`Cannot create event for inactive session ${sessionSeq}. Session must be active to log events.`);
+      throw new Error(`Cannot create event for inactive session ${sessionId}. Session must be active to log events.`);
     }
     
     // Verify phase matches session's current phase
@@ -46,7 +47,7 @@ export class InteractionEvent {
     
     this.session = session;
     this.phase = phase;
-    this.sessionSeq = sessionSeq;
+    this.sessionId = sessionId;
     this.eventSeq = eventSeq;
     this.elapsedMs = elapsedMs;
     this.deltaMs = deltaMs;
@@ -56,7 +57,7 @@ export class InteractionEvent {
   // Format the event header
   protected getHeader(): string {
     const prefix = this.session.getPrefix();
-    return `%c${prefix} %c${this.phase} s${this.sessionSeq}.e${this.eventSeq}@${this.elapsedMs}ms:`;
+    return `%c${prefix} %c${this.phase} ${this.session.getSessionId()}.e${this.eventSeq}@${this.elapsedMs}ms:`;
   }
 
   // Build the complete log message
@@ -80,7 +81,7 @@ export class InteractionEvent {
   // Log the event
   log(): void {
     if (!this.session.isActive()) {
-      throw new Error(`Cannot log to inactive session ${this.sessionSeq}. Session ended or was terminated.`);
+      throw new Error(`Cannot log to inactive session ${this.sessionId}. Session ended or was terminated.`);
     }
     
     const header = this.getHeader();
@@ -104,24 +105,35 @@ export class InteractionEvent {
 }
 
 export abstract class InteractionSession {
-  protected seq: number;
   protected startTime: number;
   protected lastFrameTime: number;
   protected active: boolean = true;
   protected sessionTimeoutId: NodeJS.Timeout | null = null;
   protected currentPhase: string = 'INIT';
   protected eventSeq: number = 0;
+  protected masterSession: MasterSession;
+  protected sessionIdentifier: string;
+  protected masterSessionDeltaMs: number;
+  protected sessionId: string;
 
-  constructor(seq: number) {
-    this.seq = seq;
+  constructor(masterSession: MasterSession, sessionIdentifier: string, masterSessionDeltaMs: number) {
+    this.masterSession = masterSession;
+    this.sessionIdentifier = sessionIdentifier;
+    this.masterSessionDeltaMs = masterSessionDeltaMs;
+    this.sessionId = `${masterSession.getId()}${sessionIdentifier}-${this.getType()}`;
     this.startTime = performance.now();
     this.lastFrameTime = this.startTime;
     this.resetTimeout();
   }
 
-  // Get session sequence number
-  getSeq(): number {
-    return this.seq;
+  // Get session ID (e.g., '1a-WHEEL')
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  // Get session identifier (e.g., 'a', 'b', 'c')
+  getSessionIdentifier(): string {
+    return this.sessionIdentifier;
   }
 
   // Check if session is active
@@ -176,7 +188,7 @@ export abstract class InteractionSession {
     }
     this.sessionTimeoutId = setTimeout(() => {
       if (this.active) {
-        console.log(`%c⏱ Session ${this.seq} auto-ending after 1s timeout`, 'color: #FF9800');
+        console.log(`%c⏱ Session ${this.sessionId} auto-ending after 1s timeout`, 'color: #FF9800');
         this.end();
       }
     }, 1000);
@@ -185,7 +197,7 @@ export abstract class InteractionSession {
   // Start a new phase
   startPhase(phase: string, data?: any): void {
     if (!this.active) {
-      throw new Error(`Cannot start phase '${phase}' on inactive session ${this.seq}. Session has ended.`);
+      throw new Error(`Cannot start phase '${phase}' on inactive session ${this.sessionId}. Session has ended.`);
     }
     this.resetTimeout();
     
@@ -195,13 +207,13 @@ export abstract class InteractionSession {
     const prefix = this.getPrefix();
     const prefixColor = this.getPrefixColor();
     const dataStr = data ? ` data=${JSON.stringify(data)}` : '';
-    console.log(`%c${prefix} %c${phase} s${this.seq}@${elapsedMs}ms: %cSTART${dataStr}`, prefixColor, '', LogColors.PHASE_START);
+    console.log(`%c${prefix} %c${phase} ${this.sessionId}@${elapsedMs}ms: %cSTART${dataStr}`, prefixColor, '', LogColors.PHASE_START);
   }
 
   // End a phase
   endPhase(phase: string, reason: string, data?: any): void {
     if (!this.active) {
-      throw new Error(`Cannot end phase '${phase}' on inactive session ${this.seq}. Session has ended.`);
+      throw new Error(`Cannot end phase '${phase}' on inactive session ${this.sessionId}. Session has ended.`);
     }
     this.resetTimeout();
     
@@ -215,7 +227,7 @@ export abstract class InteractionSession {
     const prefix = this.getPrefix();
     const prefixColor = this.getPrefixColor();
     const dataStr = data ? ` data=${JSON.stringify(data)}` : '';
-    console.log(`%c${prefix} %c${phase} s${this.seq}@${elapsedMs}ms: %cEND reason=${reason}${dataStr}`, prefixColor, '', LogColors.PHASE_END);
+    console.log(`%c${prefix} %c${phase} ${this.sessionId}@${elapsedMs}ms: %cEND reason=${reason}${dataStr}`, prefixColor, '', LogColors.PHASE_END);
   }
 
 
