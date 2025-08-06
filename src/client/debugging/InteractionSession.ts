@@ -178,7 +178,8 @@ export abstract class InteractionSession {
   }
 
   protected getElapsedTime(): number {
-    return performance.now() - this.startTime;
+    // Return time relative to MasterSession start, not this session's start
+    return this.masterSession.getDeltaMs();
   }
 
   protected getFrameDelta(): number {

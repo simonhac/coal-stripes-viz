@@ -414,6 +414,16 @@ export default function DashboardPage() {
                           }
                           // For regular line datasets, show label and value
                           return context.dataset.label + ': ' + context.formattedValue;
+                        },
+                        afterBody: function(tooltipItems) {
+                          // Add warnings if present at this data point
+                          if (tooltipItems.length > 0) {
+                            const dataIndex = tooltipItems[0].dataIndex;
+                            const event = session.events[dataIndex];
+                            if (event && event.warnings && event.warnings.length > 0) {
+                              return '\\n⚠️ Warnings:\\n' + event.warnings.join('\\n');
+                            }
+                          }
                         }
                       }
                     },

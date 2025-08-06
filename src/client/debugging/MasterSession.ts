@@ -4,6 +4,7 @@
 
 import { SessionType } from './types';
 import { InteractionSession } from './InteractionSession';
+import { featureFlags } from '@/shared/feature-flags';
 
 export class MasterSession {
   private id: number;
@@ -72,20 +73,16 @@ export class MasterSession {
     const duration = Math.round(this.getDeltaMs());
     console.log(`%c🏁 MasterSession #${this.id} ended after ${duration}ms`, 'color: #F44336; font-weight: bold');
     
-    // Dump the entire MasterSession as JSON
-    const dump = this.toJSON();
-    console.log('%c📊 MasterSession #' + this.id + ' Data Dump:', 'color: #9C27B0; font-weight: bold');
-    console.log(JSON.stringify(dump, null, 2));
-    
-    // Send to dashboard if in browser environment
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+    // Send to dashboard if feature flag is enabled and in browser environment
+    if (featureFlags.get('postInteractionEvents') && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      const dump = this.toJSON();
       fetch('http://localhost:3000/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dump)
       }).then(() => {
         console.log('%c📡 Sent to dashboard', 'color: #4CAF50');
-      }).catch(err => {
+      }).catch(_err => {
         console.log('%c📡 Dashboard not available', 'color: #FF9800');
       });
     }
