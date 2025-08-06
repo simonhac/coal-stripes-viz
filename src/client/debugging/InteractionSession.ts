@@ -56,7 +56,14 @@ export class InteractionEvent {
 
   // Format the event header
   protected getHeader(): string {
-    return `%c${this.session.getSessionId()}.e${this.eventSeq}@${this.elapsedMs}ms ${this.phase}`;
+    // Pad the header to align columns
+    // Format: sessionId.eXXX@XXXXXms PHASE
+    // Max widths: sessionId (10), eventSeq (3), time (5), phase (10)
+    const sessionEvent = `${this.session.getSessionId()}.e${this.eventSeq}`;
+    const timeStr = `@${this.elapsedMs}ms`;
+    const header = (sessionEvent + timeStr).padEnd(24, ' ');
+    const phase = this.phase.padEnd(10, ' ');
+    return `%c${header}${phase}`;
   }
 
   // Build the complete log message
@@ -197,7 +204,9 @@ export abstract class InteractionSession {
     
     const prefixColor = this.getPrefixColor();
     const dataStr = data ? ` data=${JSON.stringify(data)}` : '';
-    console.log(`%c${this.sessionId}@${elapsedMs}ms ${phase} START${dataStr}`, prefixColor);
+    const header = `${this.sessionId}@${elapsedMs}ms`.padEnd(24, ' ');
+    const phaseStr = phase.padEnd(10, ' ');
+    console.log(`%c${header}${phaseStr}START${dataStr}`, prefixColor);
   }
 
   // End a phase
@@ -216,7 +225,9 @@ export abstract class InteractionSession {
     const elapsedMs = Math.round(this.getElapsedTime());
     const prefixColor = this.getPrefixColor();
     const dataStr = data ? ` data=${JSON.stringify(data)}` : '';
-    console.log(`%c${this.sessionId}@${elapsedMs}ms ${phase} END reason=${reason}${dataStr}`, prefixColor);
+    const header = `${this.sessionId}@${elapsedMs}ms`.padEnd(24, ' ');
+    const phaseStr = phase.padEnd(10, ' ');
+    console.log(`%c${header}${phaseStr}END reason=${reason}${dataStr}`, prefixColor);
   }
 
 
