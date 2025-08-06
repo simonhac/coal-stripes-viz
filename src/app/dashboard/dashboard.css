@@ -18,20 +18,21 @@ body {
   color: var(--text-primary);
   margin: 0;
   padding: 0;
+  scroll-behavior: smooth;
 }
 
 .dashboard-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 15px;
 }
 
 .dashboard-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
   border-bottom: 1px solid var(--border-colour);
 }
 
@@ -94,10 +95,10 @@ body {
 }
 
 .master-session {
-  margin-bottom: 40px;
+  margin-bottom: 20px;
   background: white;
   border-radius: 8px;
-  padding: 20px;
+  padding: 15px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
@@ -105,15 +106,20 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid var(--primary);
+  margin-bottom: 15px;
 }
 
 .master-session-title {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.master-session-duration {
+  font-weight: 400;
+  color: #a0a0a0;
+  margin-left: 8px;
+  font-size: 60%;
 }
 
 .master-session-controls {
@@ -137,16 +143,39 @@ body {
   background: var(--beige-light);
 }
 
+.btn-icon {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: var(--buttons-background);
+  color: var(--text-primary);
+}
+
+.btn-icon i {
+  font-size: 16px;
+}
+
 .session-chart {
-  margin-bottom: 30px;
+  margin-bottom: 15px;
 }
 
 .session-info {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding: 10px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
   background: var(--buttons-background);
   border-radius: 4px;
 }
@@ -172,14 +201,9 @@ body {
 .chart-container {
   position: relative;
   height: 200px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
-.divider {
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--border-colour), transparent);
-  margin: 40px 0;
-}
 
 /* Loading state */
 .dashboard-loading {
@@ -188,4 +212,15 @@ body {
   align-items: center;
   min-height: 200px;
   color: var(--text-secondary);
+}
+
+/* Awaiting data message */
+.awaiting-data {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-style: italic;
 }
