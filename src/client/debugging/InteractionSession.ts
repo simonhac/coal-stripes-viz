@@ -56,21 +56,12 @@ export class InteractionEvent {
 
   // Format the event header
   protected getHeader(): string {
-    const prefix = this.session.getPrefix();
-    return `%c${prefix} %c${this.phase} ${this.session.getSessionId()}.e${this.eventSeq}@${this.elapsedMs}ms:`;
+    return `%c${this.session.getSessionId()}.e${this.eventSeq}@${this.elapsedMs}ms ${this.phase}`;
   }
 
   // Build the complete log message
   protected buildLogMessage(): string {
-    const parts: string[] = [];
-    
-    // Add delta time
-    parts.push(`Δt=${this.deltaMs.toFixed(1)}ms`);
-    
-    // Add the message
-    parts.push(this.message);
-    
-    return parts.join(', ');
+    return this.message;
   }
 
   // Add a warning to this event
@@ -90,7 +81,7 @@ export class InteractionEvent {
     // Build the log string with warnings
     let logString = header + ' ' + message;
     const prefixColor = this.session.getPrefixColor();
-    const logArgs: any[] = [prefixColor, LogColors.FRAME]; // Style for prefix and main content
+    const logArgs: any[] = [prefixColor]; // Apply color to entire line
     
     // Add warning labels if present
     if (this.warnings.length > 0) {
@@ -204,10 +195,9 @@ export abstract class InteractionSession {
     this.currentPhase = phase;
     const elapsedMs = Math.round(this.getElapsedTime());
     
-    const prefix = this.getPrefix();
     const prefixColor = this.getPrefixColor();
     const dataStr = data ? ` data=${JSON.stringify(data)}` : '';
-    console.log(`%c${prefix} %c${phase} ${this.sessionId}@${elapsedMs}ms: %cSTART${dataStr}`, prefixColor, '', LogColors.PHASE_START);
+    console.log(`%c${this.sessionId}@${elapsedMs}ms ${phase} START${dataStr}`, prefixColor);
   }
 
   // End a phase
@@ -224,10 +214,9 @@ export abstract class InteractionSession {
     }
     
     const elapsedMs = Math.round(this.getElapsedTime());
-    const prefix = this.getPrefix();
     const prefixColor = this.getPrefixColor();
     const dataStr = data ? ` data=${JSON.stringify(data)}` : '';
-    console.log(`%c${prefix} %c${phase} ${this.sessionId}@${elapsedMs}ms: %cEND reason=${reason}${dataStr}`, prefixColor, '', LogColors.PHASE_END);
+    console.log(`%c${this.sessionId}@${elapsedMs}ms ${phase} END reason=${reason}${dataStr}`, prefixColor);
   }
 
 
