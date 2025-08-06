@@ -20,6 +20,29 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.svg',
   },
+  metadataBase: new URL('https://stripes.energy'),
+  openGraph: {
+    title: 'Coal Availability',
+    description: 'Real-time visualisation of Australian coal power plant capacity factors',
+    url: 'https://stripes.energy',
+    siteName: 'Coal Stripes',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 516,
+        alt: 'Australian coal power plant availability stripes visualisation',
+      }
+    ],
+    locale: 'en_AU',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Coal Availability',
+    description: 'Real-time visualisation of Australian coal power plant capacity factors',
+    images: ['/og-image.png'],
+  },
 };
 
 export default function RootLayout({
