@@ -31,7 +31,6 @@ export class WheelSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
       message
     );
   }
@@ -42,8 +41,14 @@ export class WheelSession extends InteractionSession {
     deltaX: number,
     accumulatedX: number
   ): InteractionEvent {
-    // Format parameters into a message string
-    const message = `deltaX=${deltaX.toFixed(1)}, accumX=${accumulatedX.toFixed(0)}`;
+    // Create data object with rounded values
+    const data = {
+      deltaX: parseFloat(deltaX.toFixed(1)),
+      accumulatedX: Math.round(accumulatedX)
+    };
+    
+    // Format message from data
+    const message = `deltaX=${data.deltaX}, accumX=${data.accumulatedX}`;
     
     return new InteractionEvent(
       this, 
@@ -51,8 +56,8 @@ export class WheelSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
-      message
+      message,
+      data
     );
   }
 }

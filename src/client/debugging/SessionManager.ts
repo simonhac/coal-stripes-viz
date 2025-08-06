@@ -82,8 +82,6 @@ export class SessionManager {
       
       // Check if MasterSession should end
       if (this.currentMasterSession) {
-        this.currentMasterSession.unbindSession(session);
-        
         if (!this.currentMasterSession.hasActiveSessions()) {
           this.currentMasterSession.end();
           this.currentMasterSession = null;

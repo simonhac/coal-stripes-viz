@@ -31,7 +31,6 @@ export class TouchSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
       message
     );
   }
@@ -45,8 +44,18 @@ export class TouchSession extends InteractionSession {
     deltaY: number,
     touchCount: number
   ): InteractionEvent {
-    const message = `center=(${centerX.toFixed(0)},${centerY.toFixed(0)}), ` +
-                   `Δ=(${deltaX.toFixed(1)},${deltaY.toFixed(1)}), touches=${touchCount}`;
+    // Create data object with rounded values
+    const data = {
+      centerX: Math.round(centerX),
+      centerY: Math.round(centerY),
+      deltaX: parseFloat(deltaX.toFixed(1)),
+      deltaY: parseFloat(deltaY.toFixed(1)),
+      touchCount
+    };
+    
+    // Format message from data
+    const message = `center=(${data.centerX},${data.centerY}), ` +
+                   `Δ=(${data.deltaX},${data.deltaY}), touches=${data.touchCount}`;
     
     return new InteractionEvent(
       this, 
@@ -54,8 +63,8 @@ export class TouchSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
-      message
+      message,
+      data
     );
   }
   
@@ -67,8 +76,17 @@ export class TouchSession extends InteractionSession {
     samples: number,
     timeDelta: number
   ): InteractionEvent {
-    const message = `velocity: pixelV=${pixelVelocity.toFixed(1)}px/s, dayV=${dayVelocity.toFixed(1)}d/s, ` +
-                   `samples=${samples}, Δt=${timeDelta.toFixed(0)}ms`;
+    // Create data object with rounded values
+    const data = {
+      pixelVelocity: parseFloat(pixelVelocity.toFixed(1)),
+      dayVelocity: parseFloat(dayVelocity.toFixed(1)),
+      samples,
+      timeDelta: Math.round(timeDelta)
+    };
+    
+    // Format message from data
+    const message = `velocity: pixelV=${data.pixelVelocity}px/s, dayV=${data.dayVelocity}d/s, ` +
+                   `samples=${data.samples}, Δt=${data.timeDelta}ms`;
     
     return new InteractionEvent(
       this, 
@@ -76,8 +94,8 @@ export class TouchSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
-      message
+      message,
+      data
     );
   }
 }

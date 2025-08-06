@@ -9,6 +9,7 @@ export class MasterSession {
   private id: number;
   private startTime: number;
   private boundSessions: Map<string, InteractionSession> = new Map();
+  private allSessions: InteractionSession[] = [];  // Keep all sessions for JSON dump
   private sessionTypeCounters: Map<SessionType, number> = new Map();
 
   constructor(id: number) {
@@ -46,28 +47,17 @@ export class MasterSession {
     // Store the session with a unique key
     const sessionKey = `${type}_${identifier}`;
     this.boundSessions.set(sessionKey, session);
+    this.allSessions.push(session);  // Keep reference for JSON dump
     
     console.log(`%c  → Bound ${type} session ${identifier} to MasterSession #${this.id}`, 'color: #2196F3');
   }
 
-  /**
-   * Remove a session from the bound sessions
-   */
-  unbindSession(session: InteractionSession): void {
-    // Find and remove the session
-    for (const [key, boundSession] of this.boundSessions) {
-      if (boundSession === session) {
-        this.boundSessions.delete(key);
-        break;
-      }
-    }
-  }
 
   /**
-   * Check if any bound sessions are still active
+   * Check if any sessions are still active
    */
   hasActiveSessions(): boolean {
-    for (const session of this.boundSessions.values()) {
+    for (const session of this.allSessions) {
       if (session.isActive()) {
         return true;
       }
@@ -81,5 +71,25 @@ export class MasterSession {
   end(): void {
     const duration = Math.round(this.getDeltaMs());
     console.log(`%c🏁 MasterSession #${this.id} ended after ${duration}ms`, 'color: #F44336; font-weight: bold');
+    
+    // Dump the entire MasterSession as JSON
+    const dump = this.toJSON();
+    console.log('%c📊 MasterSession #' + this.id + ' Data Dump:', 'color: #9C27B0; font-weight: bold');
+    console.log(JSON.stringify(dump, null, 2));
+  }
+  
+  /**
+   * Convert MasterSession to JSON-serializable object
+   */
+  toJSON(): any {
+    const endTime = performance.now();
+    return {
+      masterSessionId: this.id,
+      startTime: Math.round(this.startTime),
+      endTime: Math.round(endTime),
+      duration: Math.round(this.getDeltaMs()),
+      totalSessions: this.allSessions.length,
+      sessions: this.allSessions.map(s => s.toJSON())
+    };
   }
 }

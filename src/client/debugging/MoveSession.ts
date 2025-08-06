@@ -32,7 +32,6 @@ export class MoveSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
       message
     );
   }
@@ -46,8 +45,18 @@ export class MoveSession extends InteractionSession {
     acceleration: number,
     displacement: number
   ): InteractionEvent {
-    const message = `pos=${position.toString()}, target=${targetDate.toString()}, ` +
-                   `v=${velocity.toFixed(1)}, a=${acceleration.toFixed(1)}, d=${displacement.toFixed(0)}`;
+    // Create data object with rounded values
+    const data = {
+      position: position.toString(),
+      targetDate: targetDate.toString(),
+      velocity: parseFloat(velocity.toFixed(1)),
+      acceleration: parseFloat(acceleration.toFixed(1)),
+      displacement: Math.round(displacement)
+    };
+    
+    // Format message from data
+    const message = `pos=${data.position}, target=${data.targetDate}, ` +
+                   `v=${data.velocity}, a=${data.acceleration}, d=${data.displacement}`;
     
     return new InteractionEvent(
       this, 
@@ -55,8 +64,8 @@ export class MoveSession extends InteractionSession {
       this.getSessionId(),
       this.getNextEventSeq(),
       this.getElapsedMs(),
-      this.getDeltaMs(),
-      message
+      message,
+      data
     );
   }
 }

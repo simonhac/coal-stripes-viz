@@ -20,8 +20,8 @@ export class InteractionEvent {
   protected phase: string;
   protected eventSeq: number;
   protected elapsedMs: number;  // Time since session start
-  protected deltaMs: number;     // Time since last event
   protected message: string;     // Event message
+  protected data: any;           // Raw data for JSON export
   protected warnings: string[] = [];  // Warnings to display
 
   constructor(
@@ -30,8 +30,8 @@ export class InteractionEvent {
     sessionId: string,
     eventSeq: number,
     elapsedMs: number,
-    deltaMs: number,
-    message: string
+    message: string,
+    data?: any
   ) {
     if (!session.isActive()) {
       throw new Error(`Cannot create event for inactive session ${sessionId}. Session must be active to log events.`);
@@ -50,8 +50,8 @@ export class InteractionEvent {
     this.sessionId = sessionId;
     this.eventSeq = eventSeq;
     this.elapsedMs = elapsedMs;
-    this.deltaMs = deltaMs;
     this.message = message;
+    this.data = data;
   }
 
   // Format the event header
@@ -99,6 +99,31 @@ export class InteractionEvent {
     }
     
     console.log(logString, ...logArgs);
+    
+    // Record this event in the session
+    this.session.recordEvent(this);
+  }
+  
+  // Convert event to JSON-serializable object
+  toJSON(): any {
+    const json: any = {
+      sessionId: this.sessionId,
+      phase: this.phase,
+      eventSeq: this.eventSeq,
+      elapsedMs: Math.round(this.elapsedMs)
+    };
+    
+    // Add data if present
+    if (this.data !== undefined) {
+      json.data = this.data;
+    }
+    
+    // Add warnings if present
+    if (this.warnings.length > 0) {
+      json.warnings = this.warnings;
+    }
+    
+    return json;
   }
 }
 
@@ -113,6 +138,7 @@ export abstract class InteractionSession {
   protected sessionIdentifier: string;
   protected masterSessionDeltaMs: number;
   protected sessionId: string;
+  protected events: InteractionEvent[] = [];
 
   constructor(masterSession: MasterSession, sessionIdentifier: string, masterSessionDeltaMs: number) {
     this.masterSession = masterSession;
@@ -168,9 +194,6 @@ export abstract class InteractionSession {
   }
   
   // Internal: Get delta time in milliseconds (for events)
-  protected getDeltaMs(): number {
-    return this.getFrameDelta();
-  }
   
   // Internal: Get next event sequence number
   protected getNextEventSeq(): number {
@@ -178,6 +201,10 @@ export abstract class InteractionSession {
     this.eventSeq++;
     this.resetTimeout();
     return seq;
+  }
+  
+  protected getDeltaMs(): number {
+    return this.getFrameDelta();
   }
 
   protected resetTimeout(): void {
@@ -190,6 +217,34 @@ export abstract class InteractionSession {
         this.end();
       }
     }, 1000);
+  }
+  
+  // Record an event
+  recordEvent(event: InteractionEvent): void {
+    this.events.push(event);
+  }
+  
+  // Get all events
+  getEvents(): InteractionEvent[] {
+    return this.events;
+  }
+  
+  // Convert session to JSON-serializable object
+  toJSON(): any {
+    const now = performance.now();
+    const duration = now - this.startTime;
+    return {
+      sessionId: this.sessionId,
+      type: this.getType(),
+      identifier: this.sessionIdentifier,
+      masterSessionDeltaMs: Math.round(this.masterSessionDeltaMs),
+      startTime: Math.round(this.startTime),
+      endTime: this.active ? undefined : Math.round(now),
+      duration: Math.round(duration),
+      active: this.active,
+      eventCount: this.events.length,
+      events: this.events.map(e => e.toJSON())
+    };
   }
 
   // Start a new phase
