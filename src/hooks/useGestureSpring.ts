@@ -260,32 +260,18 @@ export function useGestureSpring({
               targetRange: `${boundaryStartDate.toString()} to ${targetBoundary.toString()}`
             });
             
-            // Manual animation because react-spring has issues with our coordinate system
-            // The spring wants to rest at 0, but we need it to animate to a different target
-            // This bypasses react-spring's physics and uses direct interpolation
+            // Use react-spring properly: animate from rubber-banded position to target
             springApi.stop();
             
             // Calculate the rubber-banded offset (where we visually are)
             const rubberBandedOffset = daysBetween(stateRef.current.startDate, rubberBandedDate);
-            const startValue = rubberBandedOffset; // Where we visually are now (after rubber band)
-            const endValue = springTargetOffset; // Where we want to be
-            const startTime = Date.now();
-            const duration = 400; // 400ms animation
             
-            const animate = () => {
-              const elapsed = Date.now() - startTime;
-              const progress = Math.min(elapsed / duration, 1);
-              
-              // Ease-out cubic for smooth deceleration
-              const eased = 1 - Math.pow(1 - progress, 3);
-              const currentValue = startValue + (endValue - startValue) * eased;
-              
-              // Set the spring value directly
-              springApi.set({ x: currentValue });
-              
-              if (progress < 1 && animatingRef.current) {
-                requestAnimationFrame(animate);
-              } else {
+            // Start spring animation from rubber-banded position to target
+            springApi.start({
+              from: { x: rubberBandedOffset },
+              to: { x: springTargetOffset },
+              config: config.default,
+              onRest: () => {
                 // Animation complete
                 animatingRef.current = false;
                 const finalStartDate = targetBoundary.subtract({ days: 364 });
@@ -299,9 +285,7 @@ export function useGestureSpring({
                 // Reset spring for next gesture
                 springApi.set({ x: 0 });
               }
-            };
-            
-            requestAnimationFrame(animate);
+            });
           } else if (Math.abs(vx) > 0.2) {
             // Apply momentum
             const velocityDays = pixelsToDays(vx * 100); // Scale velocity
