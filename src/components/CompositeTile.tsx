@@ -56,11 +56,18 @@ const CompositeTileComponent = ({
   
   // Use provided animated date range, or calculate from endDate
   const dateRange = useMemo(() => {
-    return animatedDateRange || {
+    const range = animatedDateRange || {
       start: endDate.subtract({ days: 364 }), // 364 days before end = 365 days total (inclusive)
       end: endDate
     };
-  }, [animatedDateRange, endDate]);
+    // Log only when it changes and only for one facility to avoid spam
+    if (facilityCode === 'MW') {
+      console.log(`📅 CompositeTile (${facilityCode}):`, {
+        range: `${range.start.toString()} to ${range.end.toString()}`
+      });
+    }
+    return range;
+  }, [animatedDateRange, endDate, facilityCode]);
   
   // Calculate which tiles we need synchronously
   const startYear = dateRange.start.year;

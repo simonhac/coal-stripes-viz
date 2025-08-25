@@ -8,10 +8,7 @@ import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
 import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
-import { useUnifiedDrag } from '@/hooks/useUnifiedDrag';
-import { useMouseDrag } from '@/hooks/useMouseDrag';
-import { useTouchDrag } from '@/hooks/useTouchDrag';
-import { useWheelDrag } from '@/hooks/useWheelDrag';
+import { useGestureSpring } from '@/hooks/useGestureSpring';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -36,7 +33,7 @@ export function RegionSection({
   const regionNames = getRegionNames(regionCode);
   const tooltipRegionName = isMobile ? regionNames.short : regionNames.long;
   
-  // Handle date navigation from two-finger drag
+  // Handle date navigation
   const handleDateNavigate = useCallback((newEndDate: CalendarDate, isDragging: boolean) => {
     const event = new CustomEvent('date-navigate', { 
       detail: { newEndDate, isDragging } 
@@ -44,27 +41,11 @@ export function RegionSection({
     window.dispatchEvent(event);
   }, []);
   
-  // Set up unified drag handling
-  const unifiedDrag = useUnifiedDrag({
+  // Set up unified gesture handling with spring animations
+  const { bind, elementRef } = useGestureSpring({
     currentEndDate: endDate,
     onDateNavigate: handleDateNavigate,
   });
-  
-  // Set up input-specific handlers
-  const { elementRef: wheelDragRef, cancelWheelScroll } = useWheelDrag({
-    ...unifiedDrag,
-    cancelDrag: unifiedDrag.cancelDrag,
-  });
-  const mouseDragHandlers = useMouseDrag({
-    ...unifiedDrag,
-    startDrag: (x: number) => {
-      // Cancel any active wheel scrolling when mouse starts
-      cancelWheelScroll.current();
-      unifiedDrag.startDrag(x);
-    },
-    cancelDrag: unifiedDrag.cancelDrag,
-  });
-  const touchDragHandlers = useTouchDrag(unifiedDrag);
   
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {
@@ -175,10 +156,10 @@ export function RegionSection({
         <CapFacTooltip data={tooltipData} />
       </div>
       <div 
-        ref={wheelDragRef}
+        ref={elementRef}
         className="opennem-region-content" 
-        {...mouseDragHandlers}
-        {...touchDragHandlers}
+        style={{ touchAction: 'none' }}
+        {...bind()}
       >
         <div className="opennem-facility-group">
           {/* Display all facilities for this region */}
