@@ -48,7 +48,7 @@ export function useGestureSpring({
   }, []);
 
   // Apply rubber band effect for out-of-bounds positions
-  const applyRubberBand = useCallback((targetDate: CalendarDate): CalendarDate => {
+  const applyRubberBand = useCallback((targetDate: CalendarDate, isWheel: boolean = false): CalendarDate => {
     const boundaries = getDateBoundaries();
     const startDate = targetDate.subtract({ days: 364 });
     
@@ -73,8 +73,11 @@ export function useGestureSpring({
       maxStretch = daysBetween(boundaries.earliestDisplayDay, boundaries.earliestDataDay) + 364;
     }
     
+    // Apply stiffness factor for wheel (much stiffer rubber band)
+    const stiffnessFactor = isWheel ? 0.3 : 1.0; // Wheel is 3x stiffer
+    
     // Logarithmic rubber band
-    const rubberBandDays = maxStretch * DATE_NAV_PHYSICS.RUBBER_BAND.SCALE_FACTOR * 
+    const rubberBandDays = maxStretch * DATE_NAV_PHYSICS.RUBBER_BAND.SCALE_FACTOR * stiffnessFactor *
                           Math.log(1 + Math.abs(overshoot) / maxStretch) * 
                           Math.sign(overshoot);
     
@@ -116,14 +119,51 @@ export function useGestureSpring({
       // This callback fires for every frame of animation
       if (value.x !== undefined && animatingRef.current && !stateRef.current.isDragging) {
         frameCountRef.current++;
+        // Floor the value immediately to reduce jitter
+        const flooredValue = Math.floor(value.x);
         // Calculate what date this spring value represents (with rubber band during animation)
-        const targetDate = stateRef.current.startDate.add({ days: Math.round(value.x) });
+        const targetDate = stateRef.current.startDate.add({ days: flooredValue });
+        const boundaries = getDateBoundaries();
         // During spring animation, we're not dragging so no rubber band is applied
-        const clampedDate = getDateBoundaries().clampEndDateToDisplayBounds(targetDate);
+        const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
         const startDate = clampedDate.subtract({ days: 364 });
-        console.log(`🔄 Spring frame ${frameCountRef.current}:`, {
-          x: value.x.toFixed(2),
-          displayRange: `${startDate.toString()} to ${clampedDate.toString()}`
+        
+        // Check if we've reached the boundary or gone back within bounds
+        const nowInBounds = clampedDate.compare(boundaries.latestDataDay) <= 0 &&
+                           startDate.compare(boundaries.earliestDataDay) >= 0;
+        
+        // If we're animating back, check if we've crossed or reached the target
+        if (animatingRef.current && animationTargetRef.current !== undefined) {
+          const currentPos = flooredValue;
+          const target = animationTargetRef.current;
+          const startPos = frameCountRef.current === 1 ? currentPos : Math.floor(springProps.x.get());
+          
+          // Check if we've crossed the target (overshot) or reached it
+          const crossedTarget = (startPos > target && currentPos <= target) || 
+                               (startPos < target && currentPos >= target);
+          const reachedTarget = Math.abs(currentPos - target) < 1;
+          
+          if (crossedTarget || reachedTarget) {
+            console.log('🛑 SPRING STOPPED: Reached target boundary', {
+              current: currentPos.toFixed(2),
+              target: target.toFixed(2)
+            });
+            animatingRef.current = false;
+            springApi.stop();
+            springApi.set({ x: target });
+            // Ensure we're exactly at the boundary
+            const targetDate = stateRef.current.startDate.add({ days: Math.round(target) });
+            onDateNavigate(targetDate, false);
+            return;
+          }
+        }
+        
+        console.log(`🔄 SPRING:`, {
+          offset: Math.round(value.x).toString(),
+          boundary: animationTargetRef.current !== undefined ? Math.floor(animationTargetRef.current).toString() : undefined,
+          rb: '🔴',  // Always show red ball during spring animation as we're returning from out of bounds
+          displayRange: `${startDate.toString()} to ${clampedDate.toString()}`,
+          ts: Date.now()
         });
         updateDateFromSpring(value.x, false);
       }
@@ -134,31 +174,7 @@ export function useGestureSpring({
   const animatingRef = useRef(false);
   const animationTargetRef = useRef(0);
   
-  // Poll spring value during animation
-  useEffect(() => {
-    let lastValue: number | null = null;
-    let pollFrames = 0;
-    const pollInterval = setInterval(() => {
-      if (animatingRef.current && !stateRef.current.isDragging) {
-        const currentValue = springProps.x.get();
-        if (lastValue === null || Math.abs(currentValue - lastValue) > 0.01) {
-          pollFrames++;
-          console.log(`📍 Poll frame ${pollFrames}: spring.x =`, currentValue.toFixed(2), 'target =', animationTargetRef.current);
-          lastValue = currentValue;
-          
-          // Check if we've reached the target
-          if (Math.abs(currentValue - animationTargetRef.current) < 0.1) {
-            console.log('📍 Polling detected target reached');
-          }
-        }
-      } else if (!animatingRef.current) {
-        pollFrames = 0;
-        lastValue = null;
-      }
-    }, 16); // ~60fps
-    
-    return () => clearInterval(pollInterval);
-  }, [springProps.x]);
+  // Poll spring value during animation - removed for clarity
   
   // Prevent browser navigation on horizontal wheel events globally
   useEffect(() => {
@@ -281,24 +297,44 @@ export function useGestureSpring({
             // Calculate the rubber-banded offset (where we visually are)
             const rubberBandedOffset = daysBetween(stateRef.current.startDate, rubberBandedDate);
             
-            // Start spring animation from rubber-banded position to target
+            // Start spring animation to boundary
+            springApi.stop();
+            // First set the current position, then animate to target
+            springApi.set({ x: rubberBandedOffset });
+            
+            console.log('🎯 Spring animation setup (drag):', {
+              currentPos: rubberBandedOffset,
+              targetPos: springTargetOffset,
+              startDate: stateRef.current.startDate.toString(),
+              targetBoundary: targetBoundary.toString(),
+              ts: Date.now()
+            });
+            
             springApi.start({
-              from: { x: rubberBandedOffset },
               to: { x: springTargetOffset },
-              config: config.default,
+              config: {
+                ...config.default,
+                clamp: true  // Clamp to prevent going past target
+              },
               onRest: () => {
                 // Animation complete
                 animatingRef.current = false;
                 const finalStartDate = targetBoundary.subtract({ days: 364 });
+                const finalSpringValue = springProps.x.get();
                 console.log('✅ SPRING COMPLETE:', {
                   finalRange: `${finalStartDate.toString()} to ${targetBoundary.toString()}`,
-                  frames: frameCountRef.current
+                  frames: frameCountRef.current,
+                  finalSpringValue: Math.floor(finalSpringValue),
+                  expectedTarget: springTargetOffset
                 });
-                // Ensure we're exactly at the boundary
-                onDateNavigate(targetBoundary, false);
-                stateRef.current.startDate = targetBoundary;
-                // Reset spring for next gesture
-                springApi.set({ x: 0 });
+                // Only update if we're not already at the right position
+                if (Math.abs(finalSpringValue - springTargetOffset) > 1) {
+                  console.log('⚠️ Spring ended at wrong position, correcting...');
+                  springApi.set({ x: springTargetOffset });
+                  onDateNavigate(targetBoundary, false);
+                }
+                // DON'T reset the coordinate system - keep spring at its current position
+                // The next gesture will reset it when it starts
               }
             });
           } else if (Math.abs(vx) > 0.2) {
@@ -341,6 +377,9 @@ export function useGestureSpring({
       onWheel: ({ active, movement: [mx, my], velocity: [, _vy], last, first, event, delta: [dx, dy] }) => {
         // Initialize startDate and determine scroll direction on first wheel event
         if (first) {
+          // CRITICAL: Kill any animations and reset spring before starting wheel
+          springApi.stop();
+          springApi.set({ x: 0 }); // Reset spring to 0 for this new gesture
           stateRef.current.startDate = currentEndDate;
           // Determine scroll direction based on accumulated movement so far
           // Lock it in for the entire gesture
@@ -349,7 +388,8 @@ export function useGestureSpring({
           const startRange = currentEndDate.subtract({ days: 364 });
           console.log('🎡 WHEEL START:', {
             displayRange: `${startRange.toString()} to ${currentEndDate.toString()}`,
-            direction: stateRef.current.wheelIsHorizontal ? 'horizontal' : 'vertical'
+            direction: stateRef.current.wheelIsHorizontal ? 'horizontal' : 'vertical',
+            ts: Date.now()
           });
         }
         
@@ -366,7 +406,7 @@ export function useGestureSpring({
         // Don't update if the offset is 0 or very small to avoid unnecessary renders
         if (Math.abs(dayOffset) < 0.01) return;
         
-        // Calculate the target date and apply rubber band effect (just like drag)
+        // Calculate the target date and apply rubber band effect (stiffer for wheel)
         const targetDate = stateRef.current.startDate.add({ days: Math.round(dayOffset) });
         const boundaries = getDateBoundaries();
         
@@ -375,7 +415,7 @@ export function useGestureSpring({
         const beyondLeft = targetDate.subtract({ days: 364 }).compare(boundaries.earliestDataDay) < 0;
         const isOutOfBounds = beyondRight || beyondLeft;
         
-        const rubberBandedDate = applyRubberBand(targetDate);
+        const rubberBandedDate = applyRubberBand(targetDate, true); // true for wheel = stiffer
         const rubberBandedStartDate = rubberBandedDate.subtract({ days: 364 });
         const displayRange = `${rubberBandedStartDate.toString()} to ${rubberBandedDate.toString()}`;
         
@@ -395,10 +435,19 @@ export function useGestureSpring({
         
         // Only log significant wheel movements to reduce noise
         if (Math.abs(dayOffset) > 1 || first || last) {
+          // Calculate boundary offset when out of bounds
+          let boundaryOffset: number | undefined;
+          if (isOutOfBounds) {
+            const targetBoundary = beyondRight ? boundaries.latestDataDay : boundaries.earliestDataEndDay;
+            boundaryOffset = daysBetween(stateRef.current.startDate, targetBoundary);
+          }
+          
           console.log('🎡 WHEEL:', {
             offset: rubberBandedOffset.toFixed(0),
+            boundary: boundaryOffset !== undefined ? boundaryOffset.toFixed(0) : undefined,
+            rb: isOutOfBounds ? '🔴' : '',
             displayRange,
-            rb: isOutOfBounds ? '🔴' : ''
+            ts: Date.now()
           });
         }
         
@@ -419,7 +468,8 @@ export function useGestureSpring({
           
           console.log('🏁 WHEEL END:', {
             displayRange,
-            outOfBounds
+            outOfBounds,
+            ts: Date.now()
           });
           
           if (outOfBounds) {
@@ -430,41 +480,65 @@ export function useGestureSpring({
             
             const springTargetOffset = daysBetween(stateRef.current.startDate, targetBoundary);
             
+            // Calculate the rubber-banded offset (where we visually are)
+            const currentRubberBandedOffset = daysBetween(stateRef.current.startDate, rubberBandedDate);
+            
             animatingRef.current = true;
             animationTargetRef.current = springTargetOffset;
             frameCountRef.current = 0;
             
             const boundaryStartDate = targetBoundary.subtract({ days: 364 });
             console.log('🚀 SPRING TO BOUNDARY (wheel):', {
-              targetRange: `${boundaryStartDate.toString()} to ${targetBoundary.toString()}`
+              targetRange: `${boundaryStartDate.toString()} to ${targetBoundary.toString()}`,
+              from: currentRubberBandedOffset,
+              to: springTargetOffset,
+              ts: Date.now()
             });
             
-            // Calculate the rubber-banded offset (where we visually are)
-            const rubberBandedOffset = daysBetween(stateRef.current.startDate, rubberBandedDate);
-            
-            // Use react-spring properly
+            // Use react-spring to animate to boundary
             springApi.stop();
+            // First set the current position, then animate to target
+            springApi.set({ x: currentRubberBandedOffset });
+            
+            console.log('🎯 Spring animation setup:', {
+              currentPos: currentRubberBandedOffset,
+              targetPos: springTargetOffset,
+              startDate: stateRef.current.startDate.toString(),
+              targetBoundary: targetBoundary.toString(),
+              ts: Date.now()
+            });
+            
             springApi.start({
-              from: { x: rubberBandedOffset },
               to: { x: springTargetOffset },
-              config: config.default,
+              config: {
+                ...config.default,
+                clamp: true  // Clamp to prevent going past target
+              },
               onRest: () => {
                 animatingRef.current = false;
                 const finalStartDate = targetBoundary.subtract({ days: 364 });
+                const finalSpringValue = springProps.x.get();
                 console.log('✅ SPRING COMPLETE (wheel):', {
                   finalRange: `${finalStartDate.toString()} to ${targetBoundary.toString()}`,
-                  frames: frameCountRef.current
+                  frames: frameCountRef.current,
+                  finalSpringValue: Math.floor(finalSpringValue),
+                  expectedTarget: springTargetOffset,
+                  ts: Date.now()
                 });
-                onDateNavigate(targetBoundary, false);
-                stateRef.current.startDate = targetBoundary;
-                springApi.set({ x: 0 });
+                // Only update if we're not already at the right position
+                if (Math.abs(finalSpringValue - springTargetOffset) > 1) {
+                  console.log('⚠️ Spring ended at wrong position, correcting...');
+                  springApi.set({ x: springTargetOffset });
+                  onDateNavigate(targetBoundary, false);
+                }
+                // DON'T reset the coordinate system - keep spring at its current position
+                // The next gesture will reset it when it starts
               }
             });
           } else {
             // Within bounds - just update the position
             onDateNavigate(rubberBandedDate, false);
-            stateRef.current.startDate = rubberBandedDate;
-            springApi.set({ x: 0 }); // Reset spring position for next gesture
+            // DON'T reset coordinate system here either - the next gesture will handle it
           }
         }
       },
