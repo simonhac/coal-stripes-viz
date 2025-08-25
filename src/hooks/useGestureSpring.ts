@@ -209,6 +209,18 @@ export function useGestureSpring({
           const rubberBandedStartDate = rubberBandedDate.subtract({ days: 364 });
           const displayRange = `${rubberBandedStartDate.toString()} to ${rubberBandedDate.toString()}`;
           
+          // Check if we're back within bounds after being out
+          const boundaries = getDateBoundaries();
+          const nowInBounds = rubberBandedDate.compare(boundaries.latestDataDay) <= 0 &&
+                             rubberBandedStartDate.compare(boundaries.earliestDataDay) >= 0;
+          
+          // If we were animating (spring back) but now we're in bounds, kill the animation
+          if (animatingRef.current && nowInBounds) {
+            console.log('🛑 SPRING CANCELLED: Back within bounds');
+            animatingRef.current = false;
+            springApi.stop();
+          }
+          
           // Only log if the display range has changed
           if (displayRange !== lastDragDisplayRangeRef.current) {
             console.log('🖱️ DRAG:', {
@@ -335,41 +347,121 @@ export function useGestureSpring({
         // Initialize startDate on first wheel event
         if (first) {
           stateRef.current.startDate = currentEndDate;
+          const startRange = currentEndDate.subtract({ days: 364 });
+          console.log('🎡 WHEEL START:', {
+            displayRange: `${startRange.toString()} to ${currentEndDate.toString()}`
+          });
         }
         
         // Use the movement we calculated above
         const dayOffset = pixelsToDays(movement);
         
+        // Debug: Check for sudden jumps in movement
+        if (Math.abs(dayOffset) > 100 && Math.abs(mx) < 100 && Math.abs(my) < 100) {
+          console.warn('⚠️ WHEEL JUMP DETECTED:', {
+            mx, my, movement, dayOffset,
+            isHorizontal
+          });
+        }
+        
         // Don't update if the offset is 0 or very small to avoid unnecessary renders
         if (Math.abs(dayOffset) < 0.01) return;
         
-        // Calculate the target date to check if we're at boundaries
+        // Calculate the target date and apply rubber band effect (just like drag)
         const targetDate = stateRef.current.startDate.add({ days: Math.round(dayOffset) });
         const boundaries = getDateBoundaries();
         
-        // If we're already at a boundary and trying to go further, don't update
-        if (lastUpdatedDateRef.current) {
-          const isAtRightBoundary = lastUpdatedDateRef.current.compare(boundaries.latestDataDay) >= 0;
-          const isAtLeftBoundary = lastUpdatedDateRef.current.compare(boundaries.earliestDataEndDay) <= 0;
-          
-          if ((isAtRightBoundary && dayOffset > 0) || (isAtLeftBoundary && dayOffset < 0)) {
-            return; // Don't update if we're stuck at a boundary
-          }
+        // Check if target is beyond boundaries for rubber band
+        const beyondRight = targetDate.compare(boundaries.latestDataDay) > 0;
+        const beyondLeft = targetDate.subtract({ days: 364 }).compare(boundaries.earliestDataDay) < 0;
+        const isOutOfBounds = beyondRight || beyondLeft;
+        
+        const rubberBandedDate = applyRubberBand(targetDate);
+        const rubberBandedStartDate = rubberBandedDate.subtract({ days: 364 });
+        const displayRange = `${rubberBandedStartDate.toString()} to ${rubberBandedDate.toString()}`;
+        
+        // Calculate the rubber-banded offset (where we visually are)
+        const rubberBandedOffset = daysBetween(stateRef.current.startDate, rubberBandedDate);
+        
+        // Check if we're back within bounds after being out
+        const nowInBounds = rubberBandedDate.compare(boundaries.latestDataDay) <= 0 &&
+                           rubberBandedStartDate.compare(boundaries.earliestDataDay) >= 0;
+        
+        // If we were animating (spring back) but now we're in bounds, kill the animation
+        if (animatingRef.current && nowInBounds) {
+          console.log('🛑 SPRING CANCELLED: Back within bounds (wheel)');
+          animatingRef.current = false;
+          springApi.stop();
         }
         
-        // Update during wheel scrolling
-        springApi.start({ x: dayOffset, immediate: true }); // Set immediately during wheel scroll
-        updateDateFromSpring(dayOffset, true);
+        // Log the wheel movement with rubber band indicator
+        console.log('🎡 WHEEL:', {
+          rawOffset: dayOffset.toFixed(2),
+          rbOffset: rubberBandedOffset.toFixed(2),
+          displayRange,
+          rb: isOutOfBounds ? '🟢' : ''
+        });
+        
+        // Update during wheel scrolling - use rubber-banded offset!
+        springApi.start({ x: rubberBandedOffset, immediate: true });
+        updateDateFromSpring(rubberBandedOffset, false); // false because we already applied rubber band
         
         if (last) {
-          // Wheel ended
-          const targetDate = stateRef.current.startDate.add({ days: Math.round(dayOffset) });
-          const boundaries = getDateBoundaries();
-          const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
-          onDateNavigate(clampedDate, false);
+          // Wheel ended - check if we need to spring back (just like drag)
+          stateRef.current.isDragging = false;
           
-          // Reset for next wheel gesture
-          stateRef.current.startDate = clampedDate;
+          const outOfBounds = rubberBandedDate.compare(boundaries.latestDataDay) > 0 ||
+                             rubberBandedStartDate.compare(boundaries.earliestDataDay) < 0;
+          
+          console.log('🏁 WHEEL END:', {
+            displayRange,
+            outOfBounds
+          });
+          
+          if (outOfBounds) {
+            // Spring back to boundary (same as drag)
+            const targetBoundary = rubberBandedDate.compare(boundaries.latestDataDay) > 0
+              ? boundaries.latestDataDay
+              : boundaries.earliestDataEndDay;
+            
+            const springTargetOffset = daysBetween(stateRef.current.startDate, targetBoundary);
+            
+            animatingRef.current = true;
+            animationTargetRef.current = springTargetOffset;
+            frameCountRef.current = 0;
+            
+            const boundaryStartDate = targetBoundary.subtract({ days: 364 });
+            console.log('🚀 SPRING TO BOUNDARY (wheel):', {
+              targetRange: `${boundaryStartDate.toString()} to ${targetBoundary.toString()}`
+            });
+            
+            // Calculate the rubber-banded offset (where we visually are)
+            const rubberBandedOffset = daysBetween(stateRef.current.startDate, rubberBandedDate);
+            
+            // Use react-spring properly
+            springApi.stop();
+            springApi.start({
+              from: { x: rubberBandedOffset },
+              to: { x: springTargetOffset },
+              config: config.default,
+              onRest: () => {
+                animatingRef.current = false;
+                const finalStartDate = targetBoundary.subtract({ days: 364 });
+                console.log('✅ SPRING COMPLETE (wheel):', {
+                  finalRange: `${finalStartDate.toString()} to ${targetBoundary.toString()}`,
+                  frames: frameCountRef.current
+                });
+                onDateNavigate(targetBoundary, false);
+                stateRef.current.startDate = targetBoundary;
+                springApi.set({ x: 0 });
+              }
+            });
+          } else {
+            // Within bounds - just update the position
+            onDateNavigate(rubberBandedDate, false);
+            stateRef.current.startDate = rubberBandedDate;
+            springApi.set({ x: 0 }); // Reset spring position for next gesture
+          }
         }
       },
       
