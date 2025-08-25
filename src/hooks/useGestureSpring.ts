@@ -78,10 +78,13 @@ export function useGestureSpring({
                           Math.log(1 + Math.abs(overshoot) / maxStretch) * 
                           Math.sign(overshoot);
     
+    // Round to nearest integer to avoid fractional day jitter
+    const roundedRubberBandDays = Math.round(rubberBandDays);
+    
     if (beyondRight) {
-      return boundaryDate.add({ days: Math.ceil(rubberBandDays) });
+      return boundaryDate.add({ days: roundedRubberBandDays });
     } else {
-      return boundaryDate.subtract({ days: Math.floor(-rubberBandDays) });
+      return boundaryDate.subtract({ days: -roundedRubberBandDays });
     }
   }, []);
   
@@ -336,33 +339,29 @@ export function useGestureSpring({
       },
       
       onWheel: ({ active, movement: [mx, my], velocity: [, _vy], last, first, event, delta: [dx, dy] }) => {
-        // Use delta for more responsive control
-        // Check if this is primarily horizontal scrolling based on the current delta
-        const isHorizontal = Math.abs(dx) > Math.abs(dy) * 0.5;
+        // Initialize startDate and determine scroll direction on first wheel event
+        if (first) {
+          stateRef.current.startDate = currentEndDate;
+          // Determine scroll direction based on accumulated movement so far
+          // Lock it in for the entire gesture
+          stateRef.current.wheelIsHorizontal = Math.abs(mx) > Math.abs(my);
+          stateRef.current.wheelProcessedLast = false; // Reset the flag for new gesture
+          const startRange = currentEndDate.subtract({ days: 364 });
+          console.log('🎡 WHEEL START:', {
+            displayRange: `${startRange.toString()} to ${currentEndDate.toString()}`,
+            direction: stateRef.current.wheelIsHorizontal ? 'horizontal' : 'vertical'
+          });
+        }
+        
+        // Use the locked-in direction for the entire gesture
+        const isHorizontal = stateRef.current.wheelIsHorizontal ?? (Math.abs(mx) > Math.abs(my));
         
         // For horizontal, use accumulated movement but scale it up significantly
         // For vertical, use accumulated movement with moderate scaling
         const movement = isHorizontal ? -mx * 10 : -my * 1; // Halved sensitivity
         
-        // Initialize startDate on first wheel event
-        if (first) {
-          stateRef.current.startDate = currentEndDate;
-          const startRange = currentEndDate.subtract({ days: 364 });
-          console.log('🎡 WHEEL START:', {
-            displayRange: `${startRange.toString()} to ${currentEndDate.toString()}`
-          });
-        }
-        
         // Use the movement we calculated above
         const dayOffset = pixelsToDays(movement);
-        
-        // Debug: Check for sudden jumps in movement
-        if (Math.abs(dayOffset) > 100 && Math.abs(mx) < 100 && Math.abs(my) < 100) {
-          console.warn('⚠️ WHEEL JUMP DETECTED:', {
-            mx, my, movement, dayOffset,
-            isHorizontal
-          });
-        }
         
         // Don't update if the offset is 0 or very small to avoid unnecessary renders
         if (Math.abs(dayOffset) < 0.01) return;
@@ -394,19 +393,24 @@ export function useGestureSpring({
           springApi.stop();
         }
         
-        // Log the wheel movement with rubber band indicator
-        console.log('🎡 WHEEL:', {
-          rawOffset: dayOffset.toFixed(2),
-          rbOffset: rubberBandedOffset.toFixed(2),
-          displayRange,
-          rb: isOutOfBounds ? '🟢' : ''
-        });
+        // Only log significant wheel movements to reduce noise
+        if (Math.abs(dayOffset) > 1 || first || last) {
+          console.log('🎡 WHEEL:', {
+            offset: rubberBandedOffset.toFixed(0),
+            displayRange,
+            rb: isOutOfBounds ? '🔴' : ''
+          });
+        }
         
         // Update during wheel scrolling - use rubber-banded offset!
         springApi.start({ x: rubberBandedOffset, immediate: true });
         updateDateFromSpring(rubberBandedOffset, false); // false because we already applied rubber band
         
         if (last) {
+          // Prevent duplicate processing of last event
+          if (stateRef.current.wheelProcessedLast) return;
+          stateRef.current.wheelProcessedLast = true;
+          
           // Wheel ended - check if we need to spring back (just like drag)
           stateRef.current.isDragging = false;
           
