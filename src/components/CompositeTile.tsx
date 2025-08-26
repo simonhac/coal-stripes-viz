@@ -330,11 +330,24 @@ const CompositeTileComponent = ({
   }, [facilityCode, dateRange.start.year, dateRange.end.year, tiles.leftState, tiles.rightState, tiles.left, neededTiles.leftYear, neededTiles.rightYear]);
 
   useEffect(() => {
-    // Skip rendering if the date range hasn't changed
     const rangeKey = `${dateRange.start.toString()}-${dateRange.end.toString()}`;
-    if (lastRenderedRangeRef.current === rangeKey && tiles.leftState !== 'pendingData' && tiles.rightState !== 'pendingData') {
+    
+    // Check if tiles need loading/shimmer
+    const tilesNeedShimmer = tiles.leftState === 'pendingData' || 
+                            (dateRange.start.year !== dateRange.end.year && tiles.rightState === 'pendingData');
+    
+    // Skip rendering only if:
+    // 1. The date range hasn't changed AND
+    // 2. We don't need shimmer animation AND  
+    // 3. Tiles are already loaded (not idle)
+    if (lastRenderedRangeRef.current === rangeKey && 
+        !tilesNeedShimmer && 
+        tiles.leftState !== 'idle' && 
+        tiles.rightState !== 'idle') {
       return;
     }
+    
+    // Only update the ref after we've actually rendered
     lastRenderedRangeRef.current = rangeKey;
     
     const perfName = 'CompositeTile.render';

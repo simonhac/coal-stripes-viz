@@ -55,8 +55,8 @@ export function useGestureSpring({
     x: 0,
     config: config.default,
     onChange: (result) => {
-      // Only update during spring animation, not during direct sets or dragging
-      if (result.value.x !== undefined && isAnimatingRef.current) {
+      // Only update during spring animation, NOT during dragging or direct sets
+      if (result.value.x !== undefined && isAnimatingRef.current && !isDraggingRef.current) {
         const animatedDays = Math.round(result.value.x);
         const animatedDate = startDateRef.current.add({ days: animatedDays });
         const clampedDate = boundaries.clampEndDateToDisplayBounds(animatedDate);
