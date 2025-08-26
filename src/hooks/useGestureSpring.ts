@@ -264,9 +264,10 @@ export function useGestureSpring({
               });
             }
           } else {
-            // We're within bounds, stay where we are
+            // We're within bounds, stay where we are but update isDragging to false
             const finalDate = startDateRef.current.add({ days: finalOffset });
             const finalClamped = boundaries.clampEndDateToDisplayBounds(finalDate);
+            onDateNavigate(finalClamped, false); // Important: set isDragging to false
             
             if (featureFlags.get('gestureLogging')) {
               console.log('🏁 WHEEL END:', {
