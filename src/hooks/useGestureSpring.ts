@@ -27,11 +27,9 @@ export function useGestureSpring({
   const maxDaysForward = daysBetween(currentEndDate, boundaries.latestDataDay);
   const maxDaysBack = daysBetween(boundaries.earliestDataEndDay, currentEndDate);
   
-  // Track if we're actively dragging or animating to prevent update loops
+  // Track if we're actively dragging
   const isDraggingRef = useRef(false);
-  const isAnimatingRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
-  const wheelAccumulatedRef = useRef<number>(0);
   
   // Prevent browser navigation on horizontal scroll
   useEffect(() => {
@@ -50,29 +48,14 @@ export function useGestureSpring({
     };
   }, []);
   
-  // Spring for smooth animations with onChange to update date during animation
+  // Spring for smooth animations
   const [springProps, springApi] = useSpring(() => ({
     x: 0,
     config: config.default,
-    onChange: (result) => {
-      // Only update during spring animation, NOT during dragging or direct sets
-      if (result.value.x !== undefined && isAnimatingRef.current && !isDraggingRef.current) {
-        const animatedDays = Math.round(result.value.x);
-        const animatedDate = startDateRef.current.add({ days: animatedDays });
-        const clampedDate = boundaries.clampEndDateToDisplayBounds(animatedDate);
-        
-        // Throttle updates during animation
-        const now = Date.now();
-        if (now - lastUpdateRef.current > 16) { // ~60fps
-          lastUpdateRef.current = now;
-          onDateNavigate(clampedDate, false);
-        }
-      }
-    }
   }));
   
   
-  // Convert pixel offset to days
+  // Convert pixel offset to days (rounded immediately)
   const pixelsToDays = useCallback((pixels: number): number => {
     // Get the actual width of the tile canvas
     const tileCanvas = document.querySelector('.opennem-facility-canvas');
@@ -81,16 +64,18 @@ export function useGestureSpring({
       return 0;
     }
     const tileWidth = tileCanvas.getBoundingClientRect().width;
-    return -(pixels / tileWidth) * 365;
+    // Round immediately to avoid fractional days
+    return Math.round(-(pixels / tileWidth) * 365);
   }, []);
   
   // Set up unified gesture handling with built-in bounds and rubberband
   const bind = useGesture(
     {
-      onDrag: ({ offset: [ox], active, last, first, velocity: [vx] }) => {
+      onDrag: ({ offset: [ox], active, last, first, velocity: [vx], movement: [mx] }) => {
         if (first) {
           // Update start position to current position when drag starts
           startDateRef.current = currentEndDate;
+          isDraggingRef.current = true;
           if (featureFlags.get('gestureLogging')) {
             console.log('🎬 DRAG START:', {
               range: `${currentEndDate.subtract({ days: 364 }).toString()} to ${currentEndDate.toString()}`,
@@ -99,51 +84,44 @@ export function useGestureSpring({
           }
         }
         
-        // Convert pixel offset to days and round
-        const dayOffset = Math.round(pixelsToDays(ox));
+        // Convert pixel movement to days (already rounded in pixelsToDays)
+        const dayOffset = pixelsToDays(mx);
         
         if (active) {
-          isDraggingRef.current = true;
-          // During drag, update immediately
-          springApi.set({ x: dayOffset });
-          
+          // During drag, directly update date without spring animation
           // Throttle updates to prevent overwhelming React
           const now = Date.now();
           if (now - lastUpdateRef.current > 16) { // ~60fps
             lastUpdateRef.current = now;
             // Update the date for smooth tracking
-            const targetDate = startDateRef.current.add({ days: Math.round(dayOffset) });
+            const targetDate = startDateRef.current.add({ days: dayOffset });
             const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
             onDateNavigate(clampedDate, true);
           }
           
           // Log drag movement
-          const logTarget = startDateRef.current.add({ days: Math.round(dayOffset) });
+          const logTarget = startDateRef.current.add({ days: dayOffset });
           const logClamped = boundaries.clampEndDateToDisplayBounds(logTarget);
           const startDate = logClamped.subtract({ days: 364 });
           
-          // Determine mode based on position and rubber band state
+          // Calculate overstep (how many days past the boundary we are showing)
+          const maxForward = daysBetween(startDateRef.current, boundaries.latestDataDay);
+          const maxBackward = daysBetween(boundaries.earliestDataEndDay, startDateRef.current);
+          let overstep = 0;
           let mode = 'normal';
-          // Check if raw position would be out of bounds (rubber band is modifying it)
-          const rawDayOffset = Math.round(pixelsToDays(ox));
-          const rawTarget = startDateRef.current.add({ days: rawDayOffset });
-          const isRawOutOfBounds = rawTarget.compare(boundaries.latestDataDay) > 0 || 
-                                   rawTarget.subtract({ days: 364 }).compare(boundaries.earliestDataDay) < 0;
           
-          // If raw is out of bounds but we're getting a different offset, rubber band is active
-          if (isRawOutOfBounds && rawDayOffset !== dayOffset) {
+          if (dayOffset > maxForward) {
+            overstep = dayOffset - maxForward;
+            mode = 'rubber';
+          } else if (dayOffset < -maxBackward) {
+            overstep = Math.abs(dayOffset + maxBackward);
             mode = 'rubber';
           }
-          
-          // Calculate overstep for drag
-          const clampedDayOffset = daysBetween(startDateRef.current, logClamped);
-          const overstep = isRawOutOfBounds ? dayOffset - clampedDayOffset : 0;
           
           if (featureFlags.get('gestureLogging')) {
             console.log('✊ DRAG: ', {
               range: `${startDate.toString()} to ${logClamped.toString()}`,
               offset: dayOffset,
-              raw: rawDayOffset,
               mode,
               overstep,
               ts: Date.now()
@@ -152,165 +130,150 @@ export function useGestureSpring({
         } else if (last) {
           isDraggingRef.current = false;
           
-          // Send final position
-          const finalTarget = startDateRef.current.add({ days: Math.round(dayOffset) });
+          // Final position based on movement (already rounded in pixelsToDays)
+          const finalOffset = pixelsToDays(mx);
+          const finalTarget = startDateRef.current.add({ days: finalOffset });
           const finalClamped = boundaries.clampEndDateToDisplayBounds(finalTarget);
-          onDateNavigate(finalClamped, false);
           
-          // Check if we'll spring back
-          const willSpringBack = finalTarget.compare(boundaries.latestDataDay) > 0 || 
+          // Check if we need to spring back from out of bounds
+          const isOutOfBounds = finalTarget.compare(boundaries.latestDataDay) > 0 || 
                                 finalTarget.subtract({ days: 364 }).compare(boundaries.earliestDataDay) < 0;
           
           if (featureFlags.get('gestureLogging')) {
             console.log('🏁 DRAG END:', {
-              offset: Math.round(dayOffset),
+              offset: finalOffset,
               velocity: vx,
-              springBack: willSpringBack,
+              springBack: isOutOfBounds,
               momentum: Math.abs(vx) > 0.2,
               ts: Date.now()
             });
           }
           
-          // Apply momentum if velocity is significant
-          if (Math.abs(vx) > 0.2) {
-            const velocityDays = pixelsToDays(vx * 100);
-            const momentumTarget = dayOffset + velocityDays;
+          if (isOutOfBounds) {
+            // Spring back to boundary smoothly
+            onDateNavigate(finalClamped, false);
+          } else if (Math.abs(vx) > 0.5) {
+            // Apply momentum if velocity is significant
+            // Velocity is in pixels/second, convert to reasonable day offset
+            const momentumDays = pixelsToDays(vx * 200); // Scale velocity to pixels (already rounded)
+            const momentumTarget = startDateRef.current.add({ days: finalOffset + momentumDays });
+            const clampedMomentum = boundaries.clampEndDateToDisplayBounds(momentumTarget);
             
-            springApi.start({
-              to: { x: momentumTarget },
-              config: { ...config.default, friction: 50 }
-            });
+            if (featureFlags.get('gestureLogging')) {
+              console.log('🚀 MOMENTUM:', {
+                velocity: vx,
+                momentumDays,
+                from: finalOffset,
+                to: daysBetween(startDateRef.current, clampedMomentum),
+                ts: Date.now()
+              });
+            }
+            
+            onDateNavigate(clampedMomentum, false);
+          } else {
+            // Just update to final position
+            onDateNavigate(finalClamped, false);
           }
         }
       },
       
-      onWheel: ({ delta: [dx, dy], active, last, first, direction: [dirX, dirY] }) => {
+      onWheel: ({ delta: [dx, dy], active, last, first, direction: [dirX, dirY], movement: [mx] }) => {
         // Only process and log horizontal scrolling
         if (Math.abs(dirX) <= Math.abs(dirY)) {
           return; // Vertical scroll, ignore
         }
         
         if (first) {
-          // Reset accumulated offset when wheel starts
-          wheelAccumulatedRef.current = 0;
           startDateRef.current = currentEndDate;
-          const tileCanvas = document.querySelector('.opennem-facility-canvas');
-          const tileWidth = tileCanvas ? tileCanvas.getBoundingClientRect().width : 0;
           if (featureFlags.get('gestureLogging')) {
             console.log('🎡 WHEEL START:', {
               range: `${currentEndDate.subtract({ days: 364 }).toString()} to ${currentEndDate.toString()}`,
-              maxDaysForward,
-              maxDaysBack,
-              tileWidth,
-              expectedMaxPixels: maxDaysForward * (tileWidth / 365),
               ts: Date.now()
             });
           }
         }
         
-        // Accumulate the delta ourselves to avoid reset issues
-        // With axis: 'lock', dx should be the locked horizontal value
-        // Reverse it for natural scrolling direction
-        wheelAccumulatedRef.current += -dx;
-        let dayOffset = Math.round(pixelsToDays(wheelAccumulatedRef.current));
+        // Convert movement to days (already rounded in pixelsToDays)
+        const rawDayOffset = pixelsToDays(-mx);
         
-        // Manually apply rubber band effect for wheel since built-in isn't working
-        // Only clamp the portion that's beyond bounds
-        const targetDate = startDateRef.current.add({ days: dayOffset });
+        // Calculate the target date and clamp it immediately
+        const targetDate = startDateRef.current.add({ days: rawDayOffset });
         const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
-        const clampedDayOffset = daysBetween(startDateRef.current, clampedDate);
         
-        // If we're beyond bounds, apply rubber band effect
-        if (dayOffset !== clampedDayOffset) {
-          const excessDays = dayOffset - clampedDayOffset;
-          // Much stiffer rubber band for wheel - only allow 30 days excess
-          const MAX_EXCESS_DAYS = 30;
-          // Apply exponential decay to make it harder to push further
-          const resistance = Math.pow(0.3, Math.abs(excessDays) / 100);
-          const clampedExcess = Math.sign(excessDays) * Math.min(Math.abs(excessDays) * resistance, MAX_EXCESS_DAYS);
-          dayOffset = clampedDayOffset + clampedExcess;
+        // Calculate how many days we can actually move from start
+        const maxDaysForward = daysBetween(startDateRef.current, boundaries.latestDataDay);
+        const maxDaysBackward = daysBetween(boundaries.earliestDataEndDay, startDateRef.current);
+        
+        // Strictly limit the offset to valid bounds plus small rubber band
+        let finalOffset = rawDayOffset;
+        const RUBBER_BAND_DAYS = 10;
+        
+        if (rawDayOffset > maxDaysForward) {
+          // Going too far forward - apply rubber band
+          const excess = rawDayOffset - maxDaysForward;
+          const rubberBand = Math.min(excess * 0.1, RUBBER_BAND_DAYS);
+          finalOffset = maxDaysForward + Math.round(rubberBand);
+        } else if (rawDayOffset < -maxDaysBackward) {
+          // Going too far backward - apply rubber band
+          const excess = Math.abs(rawDayOffset + maxDaysBackward);
+          const rubberBand = Math.min(excess * 0.1, RUBBER_BAND_DAYS);
+          finalOffset = -maxDaysBackward - Math.round(rubberBand);
         }
         
-        // Update spring position
-        springApi.set({ x: dayOffset });
-        
-        // Throttle date updates during wheel
-        const now = Date.now();
-        if (now - lastUpdateRef.current > 16) { // ~60fps throttle
-          lastUpdateRef.current = now;
-          
-          // Update the date  
-          const updateTarget = startDateRef.current.add({ days: Math.round(dayOffset) });
-          const updateClamped = boundaries.clampEndDateToDisplayBounds(updateTarget);
-          onDateNavigate(updateClamped, true);
-        }
-        
-        // Log wheel movement with debug info
-        const logTarget = startDateRef.current.add({ days: Math.round(dayOffset) });
-        const logClamped = boundaries.clampEndDateToDisplayBounds(logTarget);
-        const startDate = logClamped.subtract({ days: 364 });
-        const isOutOfBounds = logTarget.compare(boundaries.latestDataDay) > 0 || 
-                             startDate.compare(boundaries.earliestDataDay) < 0;
-        
-        // Determine mode (normal or rubber)
-        let mode = 'normal';
-        if (dayOffset !== clampedDayOffset) {
-          mode = 'rubber';
-        }
-        
-        // Calculate overstep (how many days beyond bounds)
-        const overstep = isOutOfBounds ? dayOffset - clampedDayOffset : 0;
-        
-        // Debug: log raw offset vs day offset
-        if (featureFlags.get('gestureLogging')) {
-          console.log('🎡 WHEEL: ', {
-            range: `${startDate.toString()} to ${logClamped.toString()}`,
-            offset: dayOffset,
-            raw: Math.round(wheelAccumulatedRef.current),
-            mode,
-            maxDays: maxDaysForward,
-            boundary: isOutOfBounds ? dayOffset : undefined,
-            overstep,
-            ts: Date.now()
-          });
+        // Update during active wheel
+        if (active) {
+          const now = Date.now();
+          if (now - lastUpdateRef.current > 16) { // Throttle to ~60fps
+            lastUpdateRef.current = now;
+            
+            // Calculate display date with rubber band applied
+            const displayDate = startDateRef.current.add({ days: finalOffset });
+            const displayClamped = boundaries.clampEndDateToDisplayBounds(displayDate);
+            onDateNavigate(displayClamped, true);
+            
+            if (featureFlags.get('gestureLogging')) {
+              const range = `${displayClamped.subtract({ days: 364 }).toString()} to ${displayClamped.toString()}`;
+              const overstep = Math.abs(finalOffset) > Math.abs(rawDayOffset) ? 0 :
+                              finalOffset > maxDaysForward ? finalOffset - maxDaysForward :
+                              finalOffset < -maxDaysBackward ? Math.abs(finalOffset + maxDaysBackward) : 0;
+              console.log('🎡 WHEEL: ', {
+                range,
+                offset: finalOffset,
+                overstep,
+                ts: now
+              });
+            }
+          }
         }
         
         if (last) {
-          // When wheel ends, spring back to valid position if we're out of bounds
-          const targetDate = startDateRef.current.add({ days: Math.round(dayOffset) });
-          const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
+          // Snap back to the valid boundary if we were rubber banding
+          const wasRubberBanding = finalOffset > maxDaysForward || finalOffset < -maxDaysBackward;
           
-          // Check if we're out of bounds
-          const isOutOfBounds = targetDate.compare(boundaries.latestDataDay) > 0 || 
-                               targetDate.subtract({ days: 364 }).compare(boundaries.earliestDataDay) < 0;
-          
-          if (isOutOfBounds) {
-            // Calculate the clamped position in days relative to start
-            const clampedDayOffset = daysBetween(startDateRef.current, clampedDate);
+          if (wasRubberBanding) {
+            // Snap back to the actual boundary (not including rubber band)
+            const snapBackOffset = finalOffset > maxDaysForward ? maxDaysForward : -maxDaysBackward;
+            const snapBackDate = startDateRef.current.add({ days: snapBackOffset });
+            const snapBackClamped = boundaries.clampEndDateToDisplayBounds(snapBackDate);
+            onDateNavigate(snapBackClamped, false);
             
-            // Enable animation mode and spring back with heavy damping
-            isAnimatingRef.current = true;
-            springApi.start({
-              to: { x: clampedDayOffset },
-              config: { 
-                tension: 300,  // Stiffer spring
-                friction: 40,  // More friction
-                clamp: true    // Prevent overshoot
-              },
-              onRest: () => {
-                isAnimatingRef.current = false;
-              }
-            });
+            if (featureFlags.get('gestureLogging')) {
+              console.log('🏁 WHEEL END (snapped back):', {
+                range: `${snapBackClamped.subtract({ days: 364 }).toString()} to ${snapBackClamped.toString()}`,
+                ts: Date.now()
+              });
+            }
           } else {
-            // We're in bounds, just update final position
-            onDateNavigate(clampedDate, false);
-          }
-          
-          if (featureFlags.get('gestureLogging')) {
-            console.log('🏁 WHEEL END:', {
-              range: `${clampedDate.subtract({ days: 364 }).toString()} to ${clampedDate.toString()}`,
-              ts: Date.now()
-            });
+            // We're within bounds, stay where we are
+            const finalDate = startDateRef.current.add({ days: finalOffset });
+            const finalClamped = boundaries.clampEndDateToDisplayBounds(finalDate);
+            
+            if (featureFlags.get('gestureLogging')) {
+              console.log('🏁 WHEEL END:', {
+                range: `${finalClamped.subtract({ days: 364 }).toString()} to ${finalClamped.toString()}`,
+                ts: Date.now()
+              });
+            }
           }
         }
       }
