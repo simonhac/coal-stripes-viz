@@ -47,6 +47,7 @@ export function RegionSection({
     onDateNavigate: handleDateNavigate,
   });
   
+  
   // Debug helper to format tooltip data
   const _formatTooltipDebug = (data: TooltipData): string => {
     // Format date

@@ -6,5 +6,7 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* Prevent browser swipe navigation */
+  overscroll-behavior-x: none;
 }
 

@@ -113,6 +113,75 @@ The project includes several utility scripts:
 - `test/` directory — Various API testing and data analysis scripts
 - Built-in error handling for API rate limits and data availability
 
+## Feature Flags System
+
+The application includes a dynamic feature flags system for controlling features and debugging tools without code changes.
+
+### Architecture
+
+The feature flags system consists of:
+
+- **FeatureFlagsStore** (`src/shared/feature-flags.ts`): Singleton store that manages all feature flags
+  - Automatically persists flags to localStorage
+  - Creates flags on first access with default value of `false`
+  - Provides subscription mechanism for React components
+  - Accessible globally via `featureFlags` export
+
+- **React Hooks** (`src/hooks/useFeatureFlag.ts`):
+  - `useFeatureFlag(flag: string)`: Hook for consuming a single flag in components
+  - `useAllFeatureFlags()`: Hook for getting all flags (useful for admin UI)
+  - Automatically re-renders components when flags change
+
+### Usage in Console
+
+You can control feature flags directly from the browser console:
+
+```javascript
+// Import the feature flags store (already available as global in development)
+featureFlags.set('gestureLogging', true)   // Enable gesture logging
+featureFlags.set('gestureLogging', false)  // Disable gesture logging
+featureFlags.get('gestureLogging')         // Check current state
+featureFlags.toggle('gestureLogging')      // Toggle the flag
+featureFlags.getAll()                      // See all flags
+featureFlags.getAllFlags()                 // List all flag names
+```
+
+### Current Feature Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `gestureLogging` | Enables logging for drag, wheel, and paint events in the console | `false` |
+
+### Using Feature Flags in Code
+
+```typescript
+// In a React component
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+
+function MyComponent() {
+  const showDebugInfo = useFeatureFlag('debugInfo');
+  
+  if (showDebugInfo) {
+    // Show debug information
+  }
+}
+
+// In non-React code
+import { featureFlags } from '@/shared/feature-flags';
+
+if (featureFlags.get('gestureLogging')) {
+  console.log('🎨 PAINT: ', { range, ts: Date.now() });
+}
+```
+
+### Benefits
+
+- **No code changes needed**: Toggle features without modifying code
+- **Persistent across sessions**: Flags are saved in localStorage
+- **Real-time updates**: Components automatically re-render when flags change
+- **Developer friendly**: Easy console access for debugging
+- **Type-safe**: TypeScript support throughout
+
 ## Deployment
 
 ### Environment Variables

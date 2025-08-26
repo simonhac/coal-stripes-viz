@@ -3,10 +3,12 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { FacilityYearTile } from '@/client/facility-year-tile';
-import { getDayIndex, isLeapYear } from '@/shared/date-utils';
+import { getDayIndex, isLeapYear, getDaysBetween } from '@/shared/date-utils';
 import { yearDataVendor } from '@/client/year-data-vendor';
 import { perfMonitor } from '@/shared/performance-monitor';
 import { useTouchAsHover } from '@/hooks/useTouchAsHover';
+import { featureFlags } from '@/shared/feature-flags';
+import { getDateBoundaries } from '@/shared/date-boundaries';
 
 interface CompositeTileProps {
   endDate: CalendarDate;
@@ -48,6 +50,7 @@ const CompositeTileComponent = ({
   });
   const lastKnownHeightRef = useRef<number>(12); // Default height
   const animationFrameRef = useRef<number | null>(null);
+  const lastRenderedRangeRef = useRef<string>('');
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
   
@@ -327,6 +330,13 @@ const CompositeTileComponent = ({
   }, [facilityCode, dateRange.start.year, dateRange.end.year, tiles.leftState, tiles.rightState, tiles.left, neededTiles.leftYear, neededTiles.rightYear]);
 
   useEffect(() => {
+    // Skip rendering if the date range hasn't changed
+    const rangeKey = `${dateRange.start.toString()}-${dateRange.end.toString()}`;
+    if (lastRenderedRangeRef.current === rangeKey && tiles.leftState !== 'pendingData' && tiles.rightState !== 'pendingData') {
+      return;
+    }
+    lastRenderedRangeRef.current = rangeKey;
+    
     const perfName = 'CompositeTile.render';
     perfMonitor.start(perfName);
     
@@ -414,6 +424,19 @@ const CompositeTileComponent = ({
     const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
     
     const render = () => {
+      // Log what we're painting (only for Bayswater to reduce noise)
+      if (facilityCode === 'BAYSW' && featureFlags.get('gestureLogging')) {
+        // Calculate overstep (days beyond latest data day)
+        const boundaries = getDateBoundaries();
+        const overstep = Math.max(0, dateRange.end.compare(boundaries.latestDataDay) > 0 ? 
+          getDaysBetween(boundaries.latestDataDay, dateRange.end) : 0);
+        
+        console.log('🎨 PAINT: ', {
+          range: `${dateRange.start.toString()} to ${dateRange.end.toString()}`,
+          overstep,
+          ts: Date.now()
+        });
+      }
 
       // draw left tile
       if (tiles.leftState === 'hasData' && tiles.left) {
