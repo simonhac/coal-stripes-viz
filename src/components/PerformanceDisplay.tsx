@@ -5,8 +5,10 @@ import type { CacheStats } from '@/shared/lru-cache';
 import type { QueueStats } from '@/shared/request-queue';
 import { featureFlags } from '@/shared/feature-flags';
 import { useAllFeatureFlags } from '@/hooks/useFeatureFlag';
+import { tileMonitor } from '@/shared/tile-monitor';
+import type { TileState } from '@/shared/tile-monitor';
 
-type DisplayMode = 'performance' | 'caches' | 'features';
+type DisplayMode = 'performance' | 'caches' | 'features' | 'tile';
 type DisclosureState = 'collapsed' | 'detailed';
 
 interface PerformanceMonitorState {
@@ -79,6 +81,7 @@ export const PerformanceDisplay: React.FC = () => {
   const [memory, setMemory] = useState<{ heapUsed: number; heapTotal: number } | null>(null);
   const [metrics, setMetrics] = useState<Record<string, { count: number; avgDuration: number; totalDuration: number }>>({});
   const [cacheStats, setCacheStats] = useState<(CacheStats & QueueStats) | null>(null);
+  const [tileState, setTileState] = useState<TileState>(tileMonitor.getState());
   
   // Load all persisted state at once
   const initialState = loadPerformanceMonitorState();
@@ -108,6 +111,15 @@ export const PerformanceDisplay: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [displayMode]);
+
+  // Subscribe to tile state changes in a separate effect that doesn't re-run
+  useEffect(() => {
+    const unsubscribe = tileMonitor.subscribe(() => {
+      setTileState(tileMonitor.getState());
+    });
+
+    return () => unsubscribe();
+  }, []); // Empty deps - only subscribe once
 
   const handleLogReport = () => {
     perfMonitor.logReport();
@@ -305,12 +317,12 @@ export const PerformanceDisplay: React.FC = () => {
           borderRadius: '3px',
           overflow: 'hidden'
         }}>
-          {(['caches', 'performance', 'features'] as const).map((mode, index) => {
+          {(['caches', 'performance', 'features', 'tile'] as const).map((mode, index) => {
             const buttonStyle = {
               background: displayMode === mode ? '#0f0' : '#333',
               color: displayMode === mode ? '#000' : '#0f0',
               border: 'none',
-              borderRight: index < 2 ? '1px solid #0f0' : 'none',
+              borderRight: index < 3 ? '1px solid #0f0' : 'none',
               padding: '2px 8px',
               cursor: 'pointer',
               fontSize: '11px'
@@ -322,7 +334,10 @@ export const PerformanceDisplay: React.FC = () => {
                 onClick={() => setDisplayMode(mode)}
                 style={buttonStyle}
               >
-                {mode === 'caches' ? 'Cache' : mode === 'performance' ? 'Timing' : 'Features'}
+                {mode === 'caches' ? 'Cache' : 
+                 mode === 'performance' ? 'Timing' : 
+                 mode === 'features' ? 'Features' : 
+                 'Tile'}
               </button>
             );
           })}
@@ -560,6 +575,59 @@ export const PerformanceDisplay: React.FC = () => {
               </button>
             </div>
           )}
+        </div>
+      )}
+      
+      {displayMode === 'tile' && disclosureState === 'detailed' && (
+        <div style={{ 
+          marginTop: '10px', 
+          borderTop: '1px solid #0f0',
+          paddingTop: '5px'
+        }}>
+          <div style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            fontSize: '11px'
+          }}>
+            <div>
+              <span style={{ color: '#888' }}>Offset: </span>
+              <span style={{ color: '#0f0' }}>{tileState.offset}</span>
+            </div>
+            <div>
+              <span style={{ color: '#888' }}>Overstep: </span>
+              <span style={{ 
+                color: tileState.overstep ? '#ff0' : '#0f0' 
+              }}>
+                {tileState.overstep ?? 'none'}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#888' }}>Range: </span>
+              <span style={{ color: '#0f0', fontSize: '10px' }}>
+                {tileState.dateRange.start} to {tileState.dateRange.end}
+              </span>
+            </div>
+            
+            <div style={{ 
+              borderTop: '1px solid #444',
+              paddingTop: '8px',
+              marginTop: '4px'
+            }}>
+              <div>
+                <span style={{ color: '#888' }}>Hover offset: </span>
+                <span style={{ color: '#0f0' }}>
+                  {tileState.mousePosition.dayOffset ?? '-'}
+                </span>
+              </div>
+              <div>
+                <span style={{ color: '#888' }}>Hover date: </span>
+                <span style={{ color: '#0f0', fontSize: '10px' }}>
+                  {tileState.mousePosition.date ?? '-'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ import { perfMonitor } from '@/shared/performance-monitor';
 import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 import { featureFlags } from '@/shared/feature-flags';
 import { getDateBoundaries } from '@/shared/date-boundaries';
+import { tileMonitor } from '@/shared/tile-monitor';
 
 interface CompositeTileProps {
   endDate: CalendarDate;
@@ -221,11 +222,42 @@ const CompositeTileComponent = ({
         tooltipData.label = `${facilityName} ${unitName}`;
       }
       
+      // Report to tile monitor
+      // Note: tooltip returns startDate, not date, and capacityFactor, not value
+      const tooltipDate = tooltipData.date || tooltipData.startDate;
+      const tooltipValue = tooltipData.value !== undefined ? tooltipData.value : tooltipData.capacityFactor;
+      
+      if (tooltipDate) {
+        // Calculate day offset from earliestDataDay
+        const boundaries = getDateBoundaries();
+        const dayOffset = getDaysBetween(boundaries.earliestDataDay, tooltipDate);
+        
+        tileMonitor.updateMousePosition(
+          dayOffset,
+          tooltipDate.toString(),
+          facilityName,
+          unitName || tooltipData.unitName,
+          tooltipValue
+        );
+      } else {
+        // We have tooltip data but no date - still update with what we have
+        tileMonitor.updateMousePosition(
+          null,
+          null,
+          facilityName,
+          unitName || tooltipData.unitName,
+          tooltipValue
+        );
+      }
+      
       // Broadcast the tooltip data via custom event
       const event = new CustomEvent('tooltip-data-hover', { 
         detail: tooltipData
       });
       window.dispatchEvent(event);
+    } else {
+      // Clear mouse position when no tooltip
+      tileMonitor.clearMousePosition();
     }
     } catch (error) {
       console.error(`Error in CompositeTile updateTooltip for ${facilityCode}:`, error);
@@ -437,14 +469,18 @@ const CompositeTileComponent = ({
     const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
     
     const render = () => {
+      // Log and report tile state
+      const boundaries = getDateBoundaries();
+      const offset = getDaysBetween(boundaries.earliestDataDay, dateRange.end);
+      const overstep = boundaries.calculateOverstep(offset);
+      
+      // Report to tile monitor (for all tiles, not just Bayswater)
+      tileMonitor.updateTileState(offset, overstep, dateRange.start, dateRange.end);
+      
       // Log what we're painting (only for Bayswater to reduce noise)
       if (facilityCode === 'BAYSW' && featureFlags.get('gestureLogging')) {
-        // Calculate overstep (days beyond latest data day)
-        const boundaries = getDateBoundaries();
-        const overstep = Math.max(0, dateRange.end.compare(boundaries.latestDataDay) > 0 ? 
-          getDaysBetween(boundaries.latestDataDay, dateRange.end) : 0);
-        
         console.log('🎨 PAINT: ', {
+          offset,
           range: `${dateRange.start.toString()} to ${dateRange.end.toString()}`,
           overstep,
           ts: Date.now()
@@ -632,6 +668,9 @@ const CompositeTileComponent = ({
         onMouseLeave={() => {
           // Clear hover position on document root
           document.documentElement.style.removeProperty('--hover-x');
+          
+          // Clear mouse position in tile monitor
+          tileMonitor.clearMousePosition();
           
           // Broadcast hover end event
           const event = new CustomEvent('tooltip-data-hover-end');

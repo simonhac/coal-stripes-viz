@@ -1,5 +1,5 @@
 import { CalendarDate } from '@internationalized/date';
-import { getTodayAEST } from '@/shared/date-utils';
+import { getTodayAEST, getDaysBetween } from '@/shared/date-utils';
 import { DATE_BOUNDARIES } from '@/shared/config';
 
 /**
@@ -14,7 +14,7 @@ import { DATE_BOUNDARIES } from '@/shared/config';
 export function getDateBoundaries() {
   // Data boundaries
   const earliestDataDay = DATE_BOUNDARIES.EARLIEST_START_DATE;
-  const earliestDataEndDay = earliestDataDay.add({ days: 364 }); // 365 days from start for end date navigation
+  const earliestDataEndDay = earliestDataDay.add({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }); // 365 days from start for end date navigation
   const latestDataDay = getTodayAEST().subtract({ days: 1 }); // Yesterday AEST
   
   // Display boundaries (with slop buffer)
@@ -70,6 +70,31 @@ export function getDateBoundaries() {
       if (endDate.compare(earliestDisplayEndDay) < 0) return earliestDisplayEndDay;
       if (endDate.compare(latestDisplayDay) > 0) return latestDisplayDay;
       return endDate;
+    },
+    
+    /**
+     * Calculate overstep based on offset from earliestDataDay
+     * @param offset Days since earliestDataDay
+     * @returns Overstep amount (positive when outside valid data bounds), null when within bounds
+     */
+    calculateOverstep(offset: number): number | null {
+      // Offset 0 = earliestDataDay
+      // Offset 364 = earliestDataEndDay (first valid end date for full year)
+      const DAYS_IN_YEAR = 364; // 365 days of data requires end date at day 364
+      
+      // Calculate the maximum valid offset (days from earliestDataDay to latestDataDay)
+      const maxValidOffset = getDaysBetween(earliestDataDay, latestDataDay);
+      
+      if (offset < DAYS_IN_YEAR) {
+        // We're before the first valid end date
+        return DAYS_IN_YEAR - offset;
+      } else if (offset > maxValidOffset) {
+        // We're after the latest valid data
+        return offset - maxValidOffset;
+      }
+      
+      // We're within valid bounds
+      return null;
     }
   };
 }
