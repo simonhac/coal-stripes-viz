@@ -10,6 +10,7 @@ import { DateRange } from '../components/DateRange';
 import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useDateRangeAnimator } from '@/hooks/useDateRangeAnimator';
+import { useGestureSpring } from '@/hooks/useGestureSpringSimple';
 import './opennem.css';
 
 export default function Home() {
@@ -41,18 +42,29 @@ export default function Home() {
   // Use navigateToMonth directly as it already has the correct signature
   const handleMonthClick = navigateToMonth;
   
+  // Handle date navigation with unified gesture control
+  const handleDateNavigate = useCallback((newEndDate: CalendarDate, isDragging: boolean) => {
+    setEndDate(newEndDate);
+    setIsDragging(isDragging);
+    // Sync animated date - during drag it updates continuously, 
+    // when not dragging it's for direct navigation
+    setAnimatedEndDate(newEndDate);
+  }, []);
+  
+  // Set up unified gesture handling with spring animations
+  const { bind, elementRef } = useGestureSpring({
+    currentEndDate: endDate || getDateBoundaries().latestDataDay,
+    onDateNavigate: handleDateNavigate,
+  });
+  
   // Handle date navigation from tiles and regions
   useEffect(() => {
-    const handleDateNavigate = (e: Event) => {
+    const handleDateNavigateEvent = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { newEndDate, isDragging } = customEvent.detail;
       
       if (newEndDate) {
-        setEndDate(newEndDate);
-        setIsDragging(isDragging);
-        // Sync animated date - during drag it updates continuously, 
-        // when not dragging it's for direct navigation
-        setAnimatedEndDate(newEndDate);
+        handleDateNavigate(newEndDate, isDragging);
       }
     };
     
@@ -79,14 +91,14 @@ export default function Home() {
       }
     };
     
-    window.addEventListener('date-navigate', handleDateNavigate);
+    window.addEventListener('date-navigate', handleDateNavigateEvent);
     window.addEventListener('date-animate', handleDateAnimate);
     
     return () => {
-      window.removeEventListener('date-navigate', handleDateNavigate);
+      window.removeEventListener('date-navigate', handleDateNavigateEvent);
       window.removeEventListener('date-animate', handleDateAnimate);
     };
-  }, []); // Empty array - handlers don't need to change
+  }, [handleDateNavigate]); // Update when handleDateNavigate changes
   
   // Create a shared animator for handling drag physics
   const handleAnimatorNavigate = useCallback((date: CalendarDate, isDragging: boolean) => {
@@ -298,8 +310,13 @@ export default function Home() {
 
         {/* Main Stripes Visualization */}
         <div 
-          ref={containerRef} 
+          ref={(el) => {
+            containerRef.current = el;
+            elementRef.current = el;
+          }} 
           className="opennem-stripes-viz"
+          style={{ touchAction: 'none' }}
+          {...bind()}
         >
           {/* Create a section for each region */}
           {Array.from(facilitiesByRegion.entries()).map(([regionCode, facilities]) => {

@@ -8,7 +8,6 @@ import { CapFacXAxis } from './CapFacXAxis';
 import { FacilityLabel } from './FacilityLabel';
 import { RegionLabel } from './RegionLabel';
 import { yearDataVendor, calculateAverageCapacityFactor, getRegionNames } from '@/client/year-data-vendor';
-import { useGestureSpring } from '@/hooks/useGestureSpring';
 
 interface RegionSectionProps {
   regionCode: string;
@@ -32,20 +31,6 @@ export function RegionSection({
   // Get region names
   const regionNames = getRegionNames(regionCode);
   const tooltipRegionName = isMobile ? regionNames.short : regionNames.long;
-  
-  // Handle date navigation
-  const handleDateNavigate = useCallback((newEndDate: CalendarDate, isDragging: boolean) => {
-    const event = new CustomEvent('date-navigate', { 
-      detail: { newEndDate, isDragging } 
-    });
-    window.dispatchEvent(event);
-  }, []);
-  
-  // Set up unified gesture handling with spring animations
-  const { bind, elementRef } = useGestureSpring({
-    currentEndDate: endDate,
-    onDateNavigate: handleDateNavigate,
-  });
   
   
   // Debug helper to format tooltip data
@@ -156,12 +141,7 @@ export function RegionSection({
         />
         <CapFacTooltip data={tooltipData} />
       </div>
-      <div 
-        ref={elementRef}
-        className="opennem-region-content" 
-        style={{ touchAction: 'none' }}
-        {...bind()}
-      >
+      <div className="opennem-region-content">
         <div className="opennem-facility-group">
           {/* Display all facilities for this region */}
           {facilities.map(facility => {

@@ -27,8 +27,9 @@ export function useGestureSpring({
   const maxDaysForward = daysBetween(currentEndDate, boundaries.latestDataDay);
   const maxDaysBack = daysBetween(boundaries.earliestDataEndDay, currentEndDate);
   
-  // Track if we're actively dragging
+  // Track if we're actively dragging or animating
   const isDraggingRef = useRef(false);
+  const animatingRef = useRef(false);
   const lastUpdateRef = useRef<number>(0);
   
   // Prevent browser navigation on horizontal scroll
@@ -52,6 +53,25 @@ export function useGestureSpring({
   const [springProps, springApi] = useSpring(() => ({
     x: 0,
     config: config.default,
+    onChange: (result) => {
+      // Update date during spring animation (momentum)
+      if (result.value.x !== undefined && animatingRef.current) {
+        const animatedDays = Math.round(result.value.x);
+        const animatedDate = startDateRef.current.add({ days: animatedDays });
+        const clampedDate = boundaries.clampEndDateToDisplayBounds(animatedDate);
+        
+        // Debug spring animation
+        const startDate = clampedDate.subtract({ days: 364 });
+        console.log('🌊 SPRNG:', {
+          range: `${startDate.toString()} to ${clampedDate.toString()}`,
+          x: Math.round(result.value.x * 1000) / 1000,
+          animatedDays,
+          ts: Date.now()
+        });
+        
+        onDateNavigate(clampedDate, false);
+      }
+    }
   }));
   
   
@@ -97,6 +117,9 @@ export function useGestureSpring({
             const targetDate = startDateRef.current.add({ days: dayOffset });
             const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
             onDateNavigate(clampedDate, true);
+            
+            // Keep spring in sync with drag position (but don't animate)
+            springApi.set({ x: dayOffset });
           }
           
           // Log drag movement
@@ -151,28 +174,101 @@ export function useGestureSpring({
           
           if (isOutOfBounds) {
             // Spring back to boundary smoothly
-            onDateNavigate(finalClamped, false);
-          } else if (Math.abs(vx) > 0.5) {
-            // Apply momentum if velocity is significant
-            // Velocity is in pixels/second, convert to reasonable day offset
-            const momentumDays = pixelsToDays(vx * 200); // Scale velocity to pixels (already rounded)
-            const momentumTarget = startDateRef.current.add({ days: finalOffset + momentumDays });
-            const clampedMomentum = boundaries.clampEndDateToDisplayBounds(momentumTarget);
+            const clampedOffset = daysBetween(startDateRef.current, finalClamped);
+            animatingRef.current = true;
+            springApi.start({
+              to: { x: clampedOffset },
+              config: { tension: 200, friction: 30 },
+              onRest: () => {
+                animatingRef.current = false;
+              }
+            });
+          } else if (Math.abs(vx) > 0.2) {  // Lower threshold for touch
+            // Apply momentum with smooth spring animation
+            // Debug: let's see what we're getting (always log this for now)
+            console.log('🔍 MOMENTUM DEBUG:', {
+              movement_mx: mx,
+              finalOffset,
+              velocity_vx: vx,
+              dragDirection: Math.sign(finalOffset),
+              velocityDirection: Math.sign(vx),
+            });
+            
+            // Velocity convention: positive vx when dragging right (backward in time)
+            // Movement convention: negative offset when going backward in time
+            // We want momentum to continue in the same direction as the drag
+            const momentumScale = 300; // Scale for touch momentum
+            const tileCanvas = document.querySelector('.opennem-facility-canvas');
+            const tileWidth = tileCanvas ? tileCanvas.getBoundingClientRect().width : 1000;
+            
+            // Use the drag direction to determine momentum direction
+            // If we were going backward (negative offset), continue backward
+            const dragDirection = Math.sign(finalOffset) || -1; // Default to backward if zero
+            const momentumPixels = Math.abs(vx) * momentumScale * dragDirection;
+            const momentumDays = Math.round((momentumPixels / tileWidth) * 365);
+            const momentumTarget = finalOffset + momentumDays;
+            
+            // Clamp to boundaries
+            const maxForward = daysBetween(startDateRef.current, boundaries.latestDataDay);
+            const maxBackward = -daysBetween(boundaries.earliestDataEndDay, startDateRef.current);
+            const clampedMomentumTarget = Math.max(maxBackward, Math.min(maxForward, momentumTarget));
             
             if (featureFlags.get('gestureLogging')) {
               console.log('🚀 MOMENTUM:', {
                 velocity: vx,
                 momentumDays,
                 from: finalOffset,
-                to: daysBetween(startDateRef.current, clampedMomentum),
+                to: clampedMomentumTarget,
                 ts: Date.now()
               });
             }
             
-            onDateNavigate(clampedMomentum, false);
+            // Animate to momentum target with physics-based spring
+            const currentRange = startDateRef.current.add({ days: finalOffset });
+            const targetRange = startDateRef.current.add({ days: clampedMomentumTarget });
+            
+            console.log('🎯 Starting spring animation:', {
+              currentRange: `${currentRange.subtract({ days: 364 }).toString()} to ${currentRange.toString()}`,
+              targetRange: `${targetRange.subtract({ days: 364 }).toString()} to ${targetRange.toString()}`,
+              from: finalOffset,
+              to: clampedMomentumTarget,
+              currentSpringValue: springProps.x.get()
+            });
+            
+            // The spring should already be at finalOffset from the drag
+            // Just animate to the momentum target
+            animatingRef.current = true;
+            
+            console.log('🚀 STARTING SPRING:', {
+              currentX: springProps.x.get(),
+              targetX: clampedMomentumTarget,
+              animating: animatingRef.current
+            });
+            
+            springApi.start({
+              to: { x: clampedMomentumTarget },
+              config: { 
+                tension: 170,
+                friction: 26,
+                mass: 1
+              },
+              onRest: (result) => {
+                animatingRef.current = false;
+                console.log('🏁 Spring animation complete:', {
+                  finalX: result.value.x,
+                  targetWas: clampedMomentumTarget,
+                  finished: result.finished,
+                  cancelled: result.cancelled
+                });
+              },
+              onStart: () => {
+                console.log('🏁 Spring animation actually started');
+              }
+            });
           } else {
             // Just update to final position
             onDateNavigate(finalClamped, false);
+            // Don't reset spring here - let it stay at drag position
           }
         }
       },
@@ -295,7 +391,6 @@ export function useGestureSpring({
           };
         },
         rubberband: true, // Enable elastic effect
-        from: () => [0, 0], // Always start from current position
         axis: 'x', // Only allow horizontal dragging
       },
       wheel: {
