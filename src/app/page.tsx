@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
+import { getDaysBetween } from '@/shared/date-utils';
+import { DATE_BOUNDARIES } from '@/shared/config';
 import { PerformanceDisplay } from '../components/PerformanceDisplay';
 import { OpenElectricityHeader } from '../components/OpenElectricityHeader';
 import { RegionSection } from '../components/RegionSection';
@@ -10,7 +12,7 @@ import { DateRange } from '../components/DateRange';
 import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useDateRangeAnimator } from '@/hooks/useDateRangeAnimator';
-import { useGestureSpring } from '@/hooks/useGestureSpringSimple';
+import { useGestureSpring } from '@/hooks/useGestureSpringIdiomatic';
 import './opennem.css';
 
 export default function Home() {
@@ -25,7 +27,7 @@ export default function Home() {
   
   // Calculate animated date range from animatedEndDate
   const animatedDateRange = animatedEndDate ? {
-    start: animatedEndDate.subtract({ days: 364 }),
+    start: animatedEndDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }),
     end: animatedEndDate
   } : null;
   
@@ -51,10 +53,25 @@ export default function Home() {
     setAnimatedEndDate(newEndDate);
   }, []);
   
+  // Calculate offset bounds for gesture spring
+  const boundaries = getDateBoundaries();
+  const currentEndDateForGesture = endDate || boundaries.latestDataDay;
+  const currentOffset = getDaysBetween(boundaries.earliestDataEndDay, currentEndDateForGesture);
+  const maxOffset = getDaysBetween(boundaries.earliestDataEndDay, boundaries.latestDataDay);
+  
+  // Handle offset changes from gesture spring
+  const handleOffsetChange = useCallback((offset: number, isDragging: boolean) => {
+    // Convert offset to date (can be negative for elastic overshoot)
+    const newEndDate = boundaries.earliestDataEndDay.add({ days: offset });
+    handleDateNavigate(newEndDate, isDragging);
+  }, [boundaries, handleDateNavigate]);
+  
   // Set up unified gesture handling with spring animations
   const { bind, elementRef } = useGestureSpring({
-    currentEndDate: endDate || getDateBoundaries().latestDataDay,
-    onDateNavigate: handleDateNavigate,
+    initialOffset: currentOffset,  // Only used for initialization
+    minOffset: 0,
+    maxOffset,
+    onOffsetChange: handleOffsetChange,
   });
   
   // Handle date navigation from tiles and regions
@@ -153,7 +170,7 @@ export default function Home() {
   
   // Target date range (for display in header)
   const targetDateRange = endDate ? {
-    start: endDate.subtract({ days: 364 }),
+    start: endDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }),
     end: endDate
   } : null;
   // Initial load
@@ -163,7 +180,7 @@ export default function Home() {
         // Calculate end date and determine which years we need
         const boundaries = getDateBoundaries();
         const calculatedEndDate = boundaries.latestDataDay;
-        const startDate = calculatedEndDate.subtract({ days: 364 }); // For determining which years to load
+        const startDate = calculatedEndDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }); // For determining which years to load
         
         // Determine which years we need
         const startYear = startDate.year;
