@@ -3,10 +3,10 @@ import { useSpring, config } from '@react-spring/web';
 import { useDrag, useWheel } from '@use-gesture/react';
 import { featureFlags } from '@/shared/feature-flags';
 import { DATE_BOUNDARIES } from '@/shared/config';
+import { isOffsetOutOfBounds } from '@/shared/date-boundaries';
 
 interface GestureSpringOptions {
-  initialOffset: number;  // Changed from currentOffset - only for initialization
-  minOffset: number;
+  currentOffset: number;  // The actual current offset from parent
   maxOffset: number;
   onOffsetChange: (offset: number, isDragging: boolean) => void;
 }
@@ -21,17 +21,17 @@ const WHEEL_SENSITIVITY = 0.5;
  * Deals only with numeric offsets, no date knowledge
  */
 export function useGestureSpring({
-  initialOffset,
-  minOffset,
+  currentOffset,
   maxOffset,
   onOffsetChange,
 }: GestureSpringOptions) {
+  const minOffset = 0;  // Always 0 - the earliest offset
   const elementRef = useRef<HTMLDivElement>(null);
   const lastLoggedOffsetRef = useRef<number | null>(null);
   
   // Current position - use a ref to track the actual position
-  const [currentPosition, setCurrentPosition] = useState(initialOffset);
-  const positionRef = useRef(initialOffset);
+  const [currentPosition, setCurrentPosition] = useState(currentOffset);
+  const positionRef = useRef(currentOffset);
   
   // Update ref when position changes
   const updatePosition = useCallback((newPos: number) => {
@@ -108,9 +108,14 @@ export function useGestureSpring({
       first,
       active,
       movement: [mx], 
-      velocity: [vx],
-      memo = positionRef.current || initialOffset  // Initialize memo with actual position or initial
+      velocity: [vx],  // Note: This is always positive (it's speed, not velocity)
+      direction: [dx],  // This is -1, 0, or 1 (the actual direction)
+      memo  // Will be undefined on first call
     }) => {
+      // Initialize memo with current offset on first drag
+      if (memo === undefined) {
+        memo = currentOffset;
+      }
       if (first) {
         isDraggingRef.current = true; // Mark as dragging
         // Cancel any ongoing animation
@@ -129,6 +134,19 @@ export function useGestureSpring({
       const pixelsPerDay = getPixelsPerDay();
       const dayDelta = mx / pixelsPerDay; // Don't round - keep it smooth
       const targetOffset = memo - dayDelta; // Drag left = increase offset
+      
+      // Debug: log the relationship between movement and offset
+      if (featureFlags.get('gestureLogging') && !active && Math.abs(vx) > 0.1) {
+        console.log('🔍 DRAG PHYSICS:', {
+          mx: mx.toFixed(1),
+          speed: vx.toFixed(2),  // vx is always positive (speed)
+          direction: dx,  // -1, 0, or 1
+          mxDirection: mx > 0 ? 'RIGHT' : mx < 0 ? 'LEFT' : 'NONE',
+          dragDirection: dx < 0 ? 'LEFT' : dx > 0 ? 'RIGHT' : 'NONE',
+          offsetChange: (targetOffset - memo).toFixed(1),
+          offsetDirection: targetOffset > memo ? 'INCREASING' : targetOffset < memo ? 'DECREASING' : 'NONE'
+        });
+      }
       
       if (active) {
         // During drag: allow some elasticity past bounds
@@ -154,45 +172,55 @@ export function useGestureSpring({
         // Released: clear dragging flag and check for momentum or snapback
         isDraggingRef.current = false;
         
-        // Use targetOffset - this is where we actually dragged to
-        const currentPos = targetOffset;
-        const isOutOfBounds = currentPos < minOffset || currentPos > maxOffset;
+        // Use the ACTUAL current position from the ref - this is where we visually are
+        const releasePos = positionRef.current;
+        const outOfBounds = isOffsetOutOfBounds(releasePos);
         
-        if (isOutOfBounds) {
+        if (outOfBounds) {
           // Snapback to nearest boundary - mount a spring for this
-          const snapTarget = currentPos < minOffset ? minOffset : maxOffset;
+          const snapTarget = releasePos < minOffset ? minOffset : maxOffset;
           if (featureFlags.get('gestureLogging')) {
             console.log('🔙 SNAPBACK:', { 
-              from: currentPos, 
+              from: releasePos, 
               to: snapTarget,
-              distance: snapTarget - currentPos
+              distance: snapTarget - releasePos
             });
           }
           // Mount a spring for snapback animation
           setAnimationConfig({
-            from: currentPos,
+            from: releasePos,
             to: snapTarget,
             config: { tension: 120, friction: 20 } // Gentle spring
           });
         } else if (Math.abs(vx) > VELOCITY_THRESHOLD) {
           // Apply momentum - mount a spring for this
-          const momentumPixels = vx * MOMENTUM_SCALE;
+          // IMPORTANT: vx is always positive (it's speed), dx is the direction (-1, 0, 1)
+          // We need to combine them to get the true velocity vector
+          const trueVelocity = vx * dx;  // Combine speed with direction
+          // In our viewport: drag right (dx=1) should decrease offset (go back in time)
+          // So positive velocity should decrease offset
+          const momentumPixels = trueVelocity * MOMENTUM_SCALE;
           const momentumDays = momentumPixels / pixelsPerDay; // Don't round
-          const momentumTarget = targetOffset - momentumDays;
+          const momentumTarget = releasePos - momentumDays;  // Subtract: positive velocity decreases offset
           const clampedTarget = Math.max(minOffset, Math.min(maxOffset, momentumTarget));
           
           if (featureFlags.get('gestureLogging')) {
             console.log('🚀 MOMENTUM:', { 
-              velocity: vx, 
-              from: targetOffset,
+              speed: vx,  // Always positive
+              direction: dx,  // -1, 0, or 1
+              dragDirection: dx < 0 ? 'LEFT' : dx > 0 ? 'RIGHT' : 'NONE',
+              trueVelocity,
+              momentumDays: momentumDays.toFixed(1),
+              from: releasePos,  // Log actual position
               to: clampedTarget,
-              distance: clampedTarget - targetOffset
+              distance: clampedTarget - releasePos,
+              expectedMotion: dx < 0 ? 'FORWARD_IN_TIME' : dx > 0 ? 'BACKWARD_IN_TIME' : 'NONE'
             });
           }
           
-          // Mount a spring for momentum animation
+          // Mount a spring for momentum animation - from actual position
           setAnimationConfig({
-            from: currentPos,
+            from: releasePos,
             to: clampedTarget,
             config: { tension: 170, friction: 26 }
           });
@@ -201,12 +229,12 @@ export function useGestureSpring({
           // No spring needed!
           if (featureFlags.get('gestureLogging')) {
             console.log('✋ STAY:', { 
-              at: currentPos
+              at: releasePos
             });
           }
           // Just update the position, no animation
-          updatePosition(currentPos);
-          onOffsetChange(Math.round(currentPos), false);
+          updatePosition(releasePos);
+          onOffsetChange(Math.round(releasePos), false);
         }
       }
       
@@ -222,7 +250,7 @@ export function useGestureSpring({
   const wheelBind = useWheel(
     ({ delta: [dx], active }) => {
       const dayDelta = dx * WHEEL_SENSITIVITY; // Don't round - smooth scrolling
-      const targetOffset = positionRef.current + dayDelta;  // Use positionRef for accurate current position
+      const targetOffset = currentOffset + dayDelta;  // Use currentOffset from props, not stale ref
       const clampedOffset = Math.max(minOffset, Math.min(maxOffset, targetOffset));
       
       if (featureFlags.get('gestureLogging')) {
@@ -244,7 +272,7 @@ export function useGestureSpring({
       } else {
         // After scroll: create ephemeral spring for smooth animation
         // Only animate if we're not already at the target
-        const currentPos = positionRef.current;
+        const currentPos = currentOffset;  // Use currentOffset from props
         if (Math.abs(currentPos - clampedOffset) > 0.1) {
           if (featureFlags.get('gestureLogging')) {
             console.log('🎢 WHEEL ANIMATION:', { 

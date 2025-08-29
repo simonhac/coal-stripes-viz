@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDateBoundaries } from '@/shared/date-boundaries';
+import { DATE_BOUNDARIES } from '@/shared/config';
 import { useDateRangeAnimator } from './useDateRangeAnimator';
 
 interface UseKeyboardNavigationOptions {
@@ -46,7 +47,7 @@ export function useKeyboardNavigation({
   // Navigate to a specific month
   const navigateToMonth = useCallback((year: number, month: number) => {
     const firstOfMonth = new CalendarDate(year, month, 1);
-    const newEndDate = firstOfMonth.add({ days: 364 });
+    const newEndDate = firstOfMonth.add({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
     const boundaries = getDateBoundaries();
     
     // Clamp to data boundaries
@@ -69,7 +70,7 @@ export function useKeyboardNavigation({
   // Navigate to January 1 of a given year
   const navigateToYearStart = useCallback((targetYear: number) => {
     const jan1 = new CalendarDate(targetYear, 1, 1);
-    const newEndDate = jan1.add({ days: 364 });
+    const newEndDate = jan1.add({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
     const boundaries = getDateBoundaries();
     
     // Clamp to data boundaries
@@ -113,7 +114,7 @@ export function useKeyboardNavigation({
         e.preventDefault();
         if (isCmd) {
           // Command+Left: Go to Jan 1 of start year (or previous year if already Jan 1)
-          const startDate = currentEndDate.subtract({ days: 364 });
+          const startDate = currentEndDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
           const targetYear = (startDate.month === 1 && startDate.day === 1) 
             ? startDate.year - 1 
             : startDate.year;
@@ -125,7 +126,7 @@ export function useKeyboardNavigation({
         e.preventDefault();
         if (isCmd) {
           // Command+Right: Go to Jan 1 of end year (or next year if start date is already Jan 1)
-          const startDate = currentEndDate.subtract({ days: 364 });
+          const startDate = currentEndDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
           const targetYear = (startDate.month === 1 && startDate.day === 1) 
             ? currentEndDate.year + 1 
             : currentEndDate.year;

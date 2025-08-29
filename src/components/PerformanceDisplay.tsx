@@ -587,7 +587,7 @@ export const PerformanceDisplay: React.FC = () => {
           <div style={{ 
             display: 'flex',
             flexDirection: 'column',
-            gap: '8px',
+            gap: '4px',
             fontSize: '11px'
           }}>
             <div>
@@ -611,10 +611,10 @@ export const PerformanceDisplay: React.FC = () => {
             
             <div style={{ 
               borderTop: '1px solid #444',
-              paddingTop: '8px',
+              paddingTop: '4px',
               marginTop: '4px'
             }}>
-              <div>
+              <div style={{ marginBottom: '4px' }}>
                 <span style={{ color: '#888' }}>Hover offset: </span>
                 <span style={{ color: '#0f0' }}>
                   {tileState.mousePosition.dayOffset ?? '-'}

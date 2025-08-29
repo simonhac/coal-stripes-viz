@@ -68,6 +68,9 @@ export const API_CONFIG = {
 
 // Date boundaries
 export const DATE_BOUNDARIES = {
+  // number of days displayed in the tile
+  TILE_WIDTH: 365,
+
   // The earliest date we have data from
   EARLIEST_START_DATE: new CalendarDate(2006, 1, 1),
 

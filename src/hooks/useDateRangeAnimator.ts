@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { CalendarDate } from '@internationalized/date';
 import { getDaysBetween as daysBetween } from '@/shared/date-utils';
 import { getDateBoundaries } from '@/shared/date-boundaries';
-import { DATE_NAV_PHYSICS } from '@/shared/config';
+import { DATE_NAV_PHYSICS, DATE_BOUNDARIES } from '@/shared/config';
 import { SessionManager, SessionType, MoveSession } from '@/client/debugging';
 
 export interface AnimatorState {
@@ -47,7 +47,7 @@ export function useDateRangeAnimator({
   // Calculate rubber band effect for positions outside data range
   const applyRubberBandEffect = useCallback((targetEndDate: CalendarDate): CalendarDate => {
     const boundaries = getDateBoundaries();
-    const startDate = targetEndDate.subtract({ days: 364 });
+    const startDate = targetEndDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
     
     // Check if we're beyond data boundaries
     const beyondRightBoundary = targetEndDate.compare(boundaries.latestDataDay) > 0;
@@ -71,7 +71,7 @@ export function useDateRangeAnimator({
       // Beyond left data boundary - use earliestDataEndDay as boundary
       dataBoundaryDate = boundaries.earliestDataEndDay;
       overshoot = daysBetween(dataBoundaryDate, targetEndDate); // This will be negative when dragging left
-      maxStretch = daysBetween(boundaries.earliestDisplayDay, boundaries.earliestDataDay) + 364;
+      maxStretch = daysBetween(boundaries.earliestDisplayDay, boundaries.earliestDataDay) + DATE_BOUNDARIES.TILE_WIDTH - 1;
     }
     
     // Logarithmic rubber band function: more pull = less additional movement
@@ -113,7 +113,7 @@ export function useDateRangeAnimator({
     // Apply velocity damping when rubber banding
     if (isRubberBanding) {
       // Calculate how far we are into the rubber band zone
-      const startDate = targetDate.subtract({ days: 364 });
+      const startDate = targetDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
       const beyondRightBoundary = targetDate.compare(boundaries.latestDataDay) > 0;
       const beyondLeftBoundary = startDate.compare(boundaries.earliestDataDay) < 0;
       
@@ -124,7 +124,7 @@ export function useDateRangeAnimator({
         overshootRatio = Math.min(overshoot / maxStretch, 1);
       } else if (beyondLeftBoundary) {
         const overshoot = Math.abs(daysBetween(boundaries.earliestDataEndDay, targetDate));
-        const maxStretch = daysBetween(boundaries.earliestDisplayDay, boundaries.earliestDataDay) + 364;
+        const maxStretch = daysBetween(boundaries.earliestDisplayDay, boundaries.earliestDataDay) + DATE_BOUNDARIES.TILE_WIDTH - 1;
         overshootRatio = Math.min(overshoot / maxStretch, 1);
       }
       
@@ -295,7 +295,7 @@ export function useDateRangeAnimator({
       // Check bounds
       const boundaries = getDateBoundaries();
       const endDate = newDate;
-      const displayStartDate = endDate.subtract({ days: 364 });
+      const displayStartDate = endDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
       
       if (endDate.compare(boundaries.latestDataDay) > 0 || 
           displayStartDate.compare(boundaries.earliestDataDay) < 0) {
@@ -390,7 +390,7 @@ export function useDateRangeAnimator({
       // Apply additional friction when within bounds (simulates momentum decay)
       const boundaries = getDateBoundaries();
       const withinBounds = currentDate.compare(boundaries.latestDataDay) <= 0 && 
-                          currentDate.subtract({ days: 364 }).compare(boundaries.earliestDataDay) >= 0;
+                          currentDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }).compare(boundaries.earliestDataDay) >= 0;
       if (withinBounds && Math.abs(displacement) < 1) {
         // When near target and within bounds, apply friction
         velocity *= DATE_NAV_PHYSICS.MOMENTUM.FRICTION;
@@ -443,7 +443,7 @@ export function useDateRangeAnimator({
     }
     
     const boundaries = getDateBoundaries();
-    const startDate = currentEndDate.subtract({ days: 364 });
+    const startDate = currentEndDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 });
     const pastMaxBoundary = currentEndDate.compare(boundaries.latestDataDay) > 0;
     const beforeMinBoundary = startDate.compare(boundaries.earliestDataDay) < 0;
     const outOfBounds = pastMaxBoundary || beforeMinBoundary;

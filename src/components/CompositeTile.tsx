@@ -10,6 +10,7 @@ import { useTouchAsHover } from '@/hooks/useTouchAsHover';
 import { featureFlags } from '@/shared/feature-flags';
 import { getDateBoundaries } from '@/shared/date-boundaries';
 import { tileMonitor } from '@/shared/tile-monitor';
+import { DATE_BOUNDARIES } from '@/shared/config';
 
 interface CompositeTileProps {
   endDate: CalendarDate;
@@ -61,7 +62,7 @@ const CompositeTileComponent = ({
   // Use provided animated date range, or calculate from endDate
   const dateRange = useMemo(() => {
     const range = animatedDateRange || {
-      start: endDate.subtract({ days: 364 }), // 364 days before end = 365 days total (inclusive)
+      start: endDate.subtract({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }), // TILE_WIDTH days total (inclusive)
       end: endDate
     };
     // Log only when it changes and only for one facility to avoid spam
@@ -228,9 +229,9 @@ const CompositeTileComponent = ({
       const tooltipValue = tooltipData.value !== undefined ? tooltipData.value : tooltipData.capacityFactor;
       
       if (tooltipDate) {
-        // Calculate day offset from earliestDataDay
+        // Calculate day offset from earliestDataEndDay (offset 0 = first valid end date)
         const boundaries = getDateBoundaries();
-        const dayOffset = getDaysBetween(boundaries.earliestDataDay, tooltipDate);
+        const dayOffset = getDaysBetween(boundaries.earliestDataEndDay, tooltipDate);
         
         tileMonitor.updateMousePosition(
           dayOffset,
@@ -458,9 +459,9 @@ const CompositeTileComponent = ({
     
     const rightWidth = startYear !== endYear ? getDayIndex(dateRange.end) + 1 : 0;
     
-    // Ensure total width is exactly 365 days
+    // Ensure total width is exactly TILE_WIDTH days
     const totalDays = leftWidth + rightWidth;
-    if (totalDays !== 365) {
+    if (totalDays !== DATE_BOUNDARIES.TILE_WIDTH) {
       console.warn(`[${facilityCode}] Width mismatch! leftWidth: ${leftWidth}, rightWidth: ${rightWidth}, total: ${totalDays}, dateRange: ${dateRange.start} to ${dateRange.end}`);
     }
     
@@ -469,9 +470,9 @@ const CompositeTileComponent = ({
     const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
     
     const render = () => {
-      // Log and report tile state
+      // Log and report tile state (offset from earliestDataEndDay, 0 = first valid end date)
       const boundaries = getDateBoundaries();
-      const offset = getDaysBetween(boundaries.earliestDataDay, dateRange.end);
+      const offset = getDaysBetween(boundaries.earliestDataEndDay, dateRange.end);
       const overstep = boundaries.calculateOverstep(offset);
       
       // Report to tile monitor (for all tiles, not just Bayswater)
@@ -541,8 +542,8 @@ const CompositeTileComponent = ({
           lastAnimationTimeRef.current = now;
           shimmerOffsetRef.current = (shimmerOffsetRef.current + delta * 0.2) % (shimmerWidth * 2);
           
-          // Fill base color
-          ctx.fillStyle = '#eeeeee';
+          // Fill base color (slightly darker for more contrast)
+          ctx.fillStyle = '#e0e0e0';
           ctx.fillRect(shimmerX, 0, shimmerWidth, canvas.height);
           
           // Draw shimmer effect
@@ -551,7 +552,7 @@ const CompositeTileComponent = ({
           
           const gradient = ctx.createLinearGradient(gradientX, 0, gradientX + gradientWidth, 0);
           gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
-          gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)');
+          gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.6)');  // Increased from 0.4 to 0.6
           gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
           
           ctx.save();

@@ -14,7 +14,7 @@ import { DATE_BOUNDARIES } from '@/shared/config';
 export function getDateBoundaries() {
   // Data boundaries
   const earliestDataDay = DATE_BOUNDARIES.EARLIEST_START_DATE;
-  const earliestDataEndDay = earliestDataDay.add({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }); // 365 days from start for end date navigation
+  const earliestDataEndDay = earliestDataDay.add({ days: DATE_BOUNDARIES.TILE_WIDTH - 1 }); // First valid end date for full year
   const latestDataDay = getTodayAEST().subtract({ days: 1 }); // Yesterday AEST
   
   // Display boundaries (with slop buffer)
@@ -73,21 +73,21 @@ export function getDateBoundaries() {
     },
     
     /**
-     * Calculate overstep based on offset from earliestDataDay
-     * @param offset Days since earliestDataDay
+     * Calculate overstep based on offset from earliestDataEndDay
+     * @param offset Days since earliestDataEndDay (offset 0 = first valid end date)
      * @returns Overstep amount (positive when outside valid data bounds), null when within bounds
      */
     calculateOverstep(offset: number): number | null {
-      // Offset 0 = earliestDataDay
-      // Offset 364 = earliestDataEndDay (first valid end date for full year)
-      const DAYS_IN_YEAR = 364; // 365 days of data requires end date at day 364
+      // Offset 0 = earliestDataEndDay (first valid end date for full year)
+      // Negative offset = before first valid end date
+      // Positive offset = days after first valid end date
       
-      // Calculate the maximum valid offset (days from earliestDataDay to latestDataDay)
-      const maxValidOffset = getDaysBetween(earliestDataDay, latestDataDay);
+      // Calculate the maximum valid offset (days from earliestDataEndDay to latestDataDay)
+      const maxValidOffset = getDaysBetween(earliestDataEndDay, latestDataDay);
       
-      if (offset < DAYS_IN_YEAR) {
+      if (offset < 0) {
         // We're before the first valid end date
-        return DAYS_IN_YEAR - offset;
+        return -offset;
       } else if (offset > maxValidOffset) {
         // We're after the latest valid data
         return offset - maxValidOffset;
@@ -97,6 +97,17 @@ export function getDateBoundaries() {
       return null;
     }
   };
+}
+
+/**
+ * Check if an offset (days from earliestDataEndDay) is within valid data bounds
+ * @param offset Days since earliestDataEndDay (0 = earliestDataEndDay)
+ * @returns true if offset is out of bounds
+ */
+export function isOffsetOutOfBounds(offset: number): boolean {
+  const boundaries = getDateBoundaries();
+  const maxOffset = getDaysBetween(boundaries.earliestDataEndDay, boundaries.latestDataDay);
+  return offset < 0 || offset > maxOffset;
 }
 
 // Export a type for the return value

@@ -68,8 +68,7 @@ export default function Home() {
   
   // Set up unified gesture handling with spring animations
   const { bind, elementRef } = useGestureSpring({
-    initialOffset: currentOffset,  // Only used for initialization
-    minOffset: 0,
+    currentOffset,
     maxOffset,
     onOffsetChange: handleOffsetChange,
   });
