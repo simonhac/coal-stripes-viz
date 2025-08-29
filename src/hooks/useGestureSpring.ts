@@ -1,403 +1,323 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useSpring, config } from '@react-spring/web';
-import { useGesture } from '@use-gesture/react';
-import { CalendarDate } from '@internationalized/date';
-import { getDateBoundaries } from '@/shared/date-boundaries';
-import { getDaysBetween as daysBetween } from '@/shared/date-utils';
+import { useDrag, useWheel } from '@use-gesture/react';
 import { featureFlags } from '@/shared/feature-flags';
+import { DATE_BOUNDARIES } from '@/shared/config';
+import { isOffsetOutOfBounds } from '@/shared/date-boundaries';
 
 interface GestureSpringOptions {
-  currentEndDate: CalendarDate;
-  onDateNavigate: (date: CalendarDate, isDragging: boolean) => void;
+  currentOffset: number;  // The actual current offset from parent
+  maxOffset: number;
+  onOffsetChange: (offset: number, isDragging: boolean) => void;
 }
 
+// Constants - no magic numbers
+const VELOCITY_THRESHOLD = 0.2;
+const MOMENTUM_SCALE = 300;
+const WHEEL_SENSITIVITY = 0.5;
+
 /**
- * Simplified gesture handling using @use-gesture's built-in bounds and rubberband
+ * Pure gesture and spring physics hook
+ * Deals only with numeric offsets, no date knowledge
  */
 export function useGestureSpring({
-  currentEndDate,
-  onDateNavigate,
+  currentOffset,
+  maxOffset,
+  onOffsetChange,
 }: GestureSpringOptions) {
+  const minOffset = 0;  // Always 0 - the earliest offset
   const elementRef = useRef<HTMLDivElement>(null);
-  const startDateRef = useRef<CalendarDate>(currentEndDate);
+  const lastLoggedOffsetRef = useRef<number | null>(null);
   
-  // Calculate bounds based on date boundaries
-  const boundaries = getDateBoundaries();
-  // Maximum days we can scroll forward (negative pixels) or back (positive pixels) from current position
-  const maxDaysForward = daysBetween(currentEndDate, boundaries.latestDataDay);
-  const maxDaysBack = daysBetween(boundaries.earliestDataEndDay, currentEndDate);
+  // Current position - use a ref to track the actual position
+  const [currentPosition, setCurrentPosition] = useState(currentOffset);
+  const positionRef = useRef(currentOffset);
   
-  // Track if we're actively dragging or animating
-  const isDraggingRef = useRef(false);
-  const animatingRef = useRef(false);
-  const lastUpdateRef = useRef<number>(0);
-  
-  // Prevent browser navigation on horizontal scroll
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      // Only prevent if it's primarily horizontal scrolling
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && e.deltaX !== 0) {
-        e.preventDefault();
-      }
-    };
-    
-    // Add at window level with passive: false to allow preventDefault
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    
-    return () => {
-      window.removeEventListener('wheel', handleWheel);
-    };
+  // Update ref when position changes
+  const updatePosition = useCallback((newPos: number) => {
+    positionRef.current = newPos;
+    setCurrentPosition(newPos);
   }, []);
   
-  // Spring for smooth animations
-  const [springProps, springApi] = useSpring(() => ({
-    x: 0,
-    config: config.default,
-    onChange: (result) => {
-      // Update date during spring animation (momentum)
-      if (result.value.x !== undefined && animatingRef.current) {
-        const animatedDays = Math.round(result.value.x);
-        const animatedDate = startDateRef.current.add({ days: animatedDays });
-        const clampedDate = boundaries.clampEndDateToDisplayBounds(animatedDate);
-        
-        // Debug spring animation
-        const startDate = clampedDate.subtract({ days: 364 });
-        console.log('🌊 SPRNG:', {
-          range: `${startDate.toString()} to ${clampedDate.toString()}`,
-          x: Math.round(result.value.x * 1000) / 1000,
-          animatedDays,
-          ts: Date.now()
-        });
-        
-        onDateNavigate(clampedDate, false);
-      }
+  // Animation config - when null, no spring is mounted
+  const [animationConfig, setAnimationConfig] = useState<{
+    from: number;
+    to: number;
+    config: any;
+  } | null>(null);
+  
+  // Only create spring when we have an animation to run
+  const [springValues, springApi] = useSpring(() => {
+    if (!animationConfig) {
+      // No animation, return static value
+      return { offset: currentPosition };
     }
-  }));
-  
-  
-  // Convert pixel offset to days (rounded immediately)
-  const pixelsToDays = useCallback((pixels: number): number => {
-    // Get the actual width of the tile canvas
-    const tileCanvas = document.querySelector('.opennem-facility-canvas');
-    if (!tileCanvas) {
-      console.error('Could not find tile canvas element');
-      return 0;
-    }
-    const tileWidth = tileCanvas.getBoundingClientRect().width;
-    // Round immediately to avoid fractional days
-    return Math.round(-(pixels / tileWidth) * 365);
-  }, []);
-  
-  // Set up unified gesture handling with built-in bounds and rubberband
-  const bind = useGesture(
-    {
-      onDrag: ({ offset: [ox], active, last, first, velocity: [vx], movement: [mx] }) => {
-        if (first) {
-          // Update start position to current position when drag starts
-          startDateRef.current = currentEndDate;
-          isDraggingRef.current = true;
-          if (featureFlags.get('gestureLogging')) {
-            console.log('🎬 DRAG START:', {
-              range: `${currentEndDate.subtract({ days: 364 }).toString()} to ${currentEndDate.toString()}`,
-              ts: Date.now()
-            });
-          }
+    
+    return {
+      from: { offset: animationConfig.from },
+      to: { offset: animationConfig.to },
+      config: animationConfig.config,
+      onChange: (result) => {
+        const rawOffset = result.value.offset;
+        const roundedOffset = Math.round(rawOffset);
+        
+        if (featureFlags.get('gestureLogging') && roundedOffset !== lastLoggedOffsetRef.current) {
+          console.log('📍 POS:', {
+            offset: roundedOffset,
+            raw: rawOffset.toFixed(2),
+            outOfBounds: roundedOffset < minOffset || roundedOffset > maxOffset,
+            ts: Date.now()
+          });
+          lastLoggedOffsetRef.current = roundedOffset;
         }
         
-        // Convert pixel movement to days (already rounded in pixelsToDays)
-        const dayOffset = pixelsToDays(mx);
-        
-        if (active) {
-          // During drag, directly update date without spring animation
-          // Throttle updates to prevent overwhelming React
-          const now = Date.now();
-          if (now - lastUpdateRef.current > 16) { // ~60fps
-            lastUpdateRef.current = now;
-            // Update the date for smooth tracking
-            const targetDate = startDateRef.current.add({ days: dayOffset });
-            const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
-            onDateNavigate(clampedDate, true);
-            
-            // Keep spring in sync with drag position (but don't animate)
-            springApi.set({ x: dayOffset });
-          }
-          
-          // Log drag movement
-          const logTarget = startDateRef.current.add({ days: dayOffset });
-          const logClamped = boundaries.clampEndDateToDisplayBounds(logTarget);
-          const startDate = logClamped.subtract({ days: 364 });
-          
-          // Calculate overstep (how many days past the boundary we are showing)
-          const maxForward = daysBetween(startDateRef.current, boundaries.latestDataDay);
-          const maxBackward = daysBetween(boundaries.earliestDataEndDay, startDateRef.current);
-          let overstep = 0;
-          let mode = 'normal';
-          
-          if (dayOffset > maxForward) {
-            overstep = dayOffset - maxForward;
-            mode = 'rubber';
-          } else if (dayOffset < -maxBackward) {
-            overstep = Math.abs(dayOffset + maxBackward);
-            mode = 'rubber';
-          }
-          
-          if (featureFlags.get('gestureLogging')) {
-            console.log('✊ DRAG: ', {
-              range: `${startDate.toString()} to ${logClamped.toString()}`,
-              offset: dayOffset,
-              mode,
-              overstep,
-              ts: Date.now()
-            });
-          }
-        } else if (last) {
-          isDraggingRef.current = false;
-          
-          // Final position based on movement (already rounded in pixelsToDays)
-          const finalOffset = pixelsToDays(mx);
-          const finalTarget = startDateRef.current.add({ days: finalOffset });
-          const finalClamped = boundaries.clampEndDateToDisplayBounds(finalTarget);
-          
-          // Check if we need to spring back from out of bounds
-          const isOutOfBounds = finalTarget.compare(boundaries.latestDataDay) > 0 || 
-                                finalTarget.subtract({ days: 364 }).compare(boundaries.earliestDataDay) < 0;
-          
-          if (featureFlags.get('gestureLogging')) {
-            console.log('🏁 DRAG END:', {
-              offset: finalOffset,
-              velocity: vx,
-              springBack: isOutOfBounds,
-              momentum: Math.abs(vx) > 0.2,
-              ts: Date.now()
-            });
-          }
-          
-          if (isOutOfBounds) {
-            // Spring back to boundary smoothly
-            const clampedOffset = daysBetween(startDateRef.current, finalClamped);
-            animatingRef.current = true;
-            springApi.start({
-              to: { x: clampedOffset },
-              config: { tension: 200, friction: 30 },
-              onRest: () => {
-                animatingRef.current = false;
-              }
-            });
-          } else if (Math.abs(vx) > 0.2) {  // Lower threshold for touch
-            // Apply momentum with smooth spring animation
-            // Debug: let's see what we're getting (always log this for now)
-            console.log('🔍 MOMENTUM DEBUG:', {
-              movement_mx: mx,
-              finalOffset,
-              velocity_vx: vx,
-              dragDirection: Math.sign(finalOffset),
-              velocityDirection: Math.sign(vx),
-            });
-            
-            // Velocity convention: positive vx when dragging right (backward in time)
-            // Movement convention: negative offset when going backward in time
-            // We want momentum to continue in the same direction as the drag
-            const momentumScale = 300; // Scale for touch momentum
-            const tileCanvas = document.querySelector('.opennem-facility-canvas');
-            const tileWidth = tileCanvas ? tileCanvas.getBoundingClientRect().width : 1000;
-            
-            // Use the drag direction to determine momentum direction
-            // If we were going backward (negative offset), continue backward
-            const dragDirection = Math.sign(finalOffset) || -1; // Default to backward if zero
-            const momentumPixels = Math.abs(vx) * momentumScale * dragDirection;
-            const momentumDays = Math.round((momentumPixels / tileWidth) * 365);
-            const momentumTarget = finalOffset + momentumDays;
-            
-            // Clamp to boundaries
-            const maxForward = daysBetween(startDateRef.current, boundaries.latestDataDay);
-            const maxBackward = -daysBetween(boundaries.earliestDataEndDay, startDateRef.current);
-            const clampedMomentumTarget = Math.max(maxBackward, Math.min(maxForward, momentumTarget));
-            
-            if (featureFlags.get('gestureLogging')) {
-              console.log('🚀 MOMENTUM:', {
-                velocity: vx,
-                momentumDays,
-                from: finalOffset,
-                to: clampedMomentumTarget,
-                ts: Date.now()
-              });
-            }
-            
-            // Animate to momentum target with physics-based spring
-            const currentRange = startDateRef.current.add({ days: finalOffset });
-            const targetRange = startDateRef.current.add({ days: clampedMomentumTarget });
-            
-            console.log('🎯 Starting spring animation:', {
-              currentRange: `${currentRange.subtract({ days: 364 }).toString()} to ${currentRange.toString()}`,
-              targetRange: `${targetRange.subtract({ days: 364 }).toString()} to ${targetRange.toString()}`,
-              from: finalOffset,
-              to: clampedMomentumTarget,
-              currentSpringValue: springProps.x.get()
-            });
-            
-            // The spring should already be at finalOffset from the drag
-            // Just animate to the momentum target
-            animatingRef.current = true;
-            
-            console.log('🚀 STARTING SPRING:', {
-              currentX: springProps.x.get(),
-              targetX: clampedMomentumTarget,
-              animating: animatingRef.current
-            });
-            
-            springApi.start({
-              to: { x: clampedMomentumTarget },
-              config: { 
-                tension: 170,
-                friction: 26,
-                mass: 1
-              },
-              onRest: (result) => {
-                animatingRef.current = false;
-                console.log('🏁 Spring animation complete:', {
-                  finalX: result.value.x,
-                  targetWas: clampedMomentumTarget,
-                  finished: result.finished,
-                  cancelled: result.cancelled
-                });
-              },
-              onStart: () => {
-                console.log('🏁 Spring animation actually started');
-              }
-            });
-          } else {
-            // Just update to final position
-            onDateNavigate(finalClamped, false);
-            // Don't reset spring here - let it stay at drag position
-          }
-        }
+        // Update position during animation
+        updatePosition(rawOffset);
+        onOffsetChange(roundedOffset, false);
       },
-      
-      onWheel: ({ delta: [dx, dy], active, last, first, direction: [dirX, dirY], movement: [mx] }) => {
-        // Only process and log horizontal scrolling
-        if (Math.abs(dirX) <= Math.abs(dirY)) {
-          return; // Vertical scroll, ignore
+      onRest: (result) => {
+        const finalOffset = Math.round(result.value.offset);
+        if (featureFlags.get('gestureLogging')) {
+          console.log('🏁 ANIMATION COMPLETE:', {
+            offset: finalOffset,
+            ts: Date.now()
+          });
         }
         
-        if (first) {
-          startDateRef.current = currentEndDate;
+        // Update final position and clear animation
+        updatePosition(finalOffset);
+        onOffsetChange(finalOffset, false);
+        setAnimationConfig(null); // Unmount the spring
+      }
+    };
+  }, [animationConfig]); // Recreate spring when animation config changes
+  
+  // Track if we're dragging
+  const isDraggingRef = useRef(false);
+  
+  // Get element width for pixel->day conversion
+  const getPixelsPerDay = useCallback(() => {
+    if (!elementRef.current) return 1;
+    const width = elementRef.current.getBoundingClientRect().width;
+    return width / DATE_BOUNDARIES.TILE_WIDTH;
+  }, []);
+  
+  // Drag handler - no spring during drag, just direct updates
+  const dragBind = useDrag(
+    ({ 
+      first,
+      active,
+      movement: [mx], 
+      velocity: [vx],  // Note: This is always positive (it's speed, not velocity)
+      direction: [dx],  // This is -1, 0, or 1 (the actual direction)
+      memo  // Will be undefined on first call
+    }) => {
+      // Initialize memo with current offset on first drag
+      if (memo === undefined) {
+        memo = currentOffset;
+      }
+      if (first) {
+        isDraggingRef.current = true; // Mark as dragging
+        // Cancel any ongoing animation
+        setAnimationConfig(null);
+        
+        if (featureFlags.get('gestureLogging')) {
+          const pixPerDay = getPixelsPerDay();
+          console.log('🎬 DRAG START:', { 
+            offset: Math.round(memo),
+            pixelsPerDay: pixPerDay.toFixed(2),
+            elementWidth: elementRef.current?.getBoundingClientRect().width
+          });
+        }
+      }
+      
+      const pixelsPerDay = getPixelsPerDay();
+      const dayDelta = mx / pixelsPerDay; // Don't round - keep it smooth
+      const targetOffset = memo - dayDelta; // Drag left = increase offset
+      
+      // Debug: log the relationship between movement and offset
+      if (featureFlags.get('gestureLogging') && !active && Math.abs(vx) > 0.1) {
+        console.log('🔍 DRAG PHYSICS:', {
+          mx: mx.toFixed(1),
+          speed: vx.toFixed(2),  // vx is always positive (speed)
+          direction: dx,  // -1, 0, or 1
+          mxDirection: mx > 0 ? 'RIGHT' : mx < 0 ? 'LEFT' : 'NONE',
+          dragDirection: dx < 0 ? 'LEFT' : dx > 0 ? 'RIGHT' : 'NONE',
+          offsetChange: (targetOffset - memo).toFixed(1),
+          offsetDirection: targetOffset > memo ? 'INCREASING' : targetOffset < memo ? 'DECREASING' : 'NONE'
+        });
+      }
+      
+      if (active) {
+        // During drag: allow some elasticity past bounds
+        const ELASTIC_LIMIT = 100; // Max units past bounds
+        const clampedOffset = Math.max(minOffset - ELASTIC_LIMIT, Math.min(maxOffset + ELASTIC_LIMIT, targetOffset));
+        
+        // Direct state update - no spring!
+        updatePosition(clampedOffset);
+        
+        // Log and notify parent
+        const roundedOffset = Math.round(clampedOffset);
+        if (featureFlags.get('gestureLogging') && roundedOffset !== lastLoggedOffsetRef.current) {
+          console.log('🎭 DRAG:', {
+            offset: roundedOffset,
+            raw: clampedOffset.toFixed(2),
+            ts: Date.now()
+          });
+          lastLoggedOffsetRef.current = roundedOffset;
+        }
+        // Update parent during drag for real-time feedback
+        onOffsetChange(roundedOffset, true); // true = dragging
+      } else {
+        // Released: clear dragging flag and check for momentum or snapback
+        isDraggingRef.current = false;
+        
+        // Use the ACTUAL current position from the ref - this is where we visually are
+        const releasePos = positionRef.current;
+        const outOfBounds = isOffsetOutOfBounds(releasePos);
+        
+        if (outOfBounds) {
+          // Snapback to nearest boundary - mount a spring for this
+          const snapTarget = releasePos < minOffset ? minOffset : maxOffset;
           if (featureFlags.get('gestureLogging')) {
-            console.log('🎡 WHEEL START:', {
-              range: `${currentEndDate.subtract({ days: 364 }).toString()} to ${currentEndDate.toString()}`,
-              ts: Date.now()
+            console.log('🔙 SNAPBACK:', { 
+              from: releasePos, 
+              to: snapTarget,
+              distance: snapTarget - releasePos
             });
           }
-        }
-        
-        // Convert movement to days (already rounded in pixelsToDays)
-        const rawDayOffset = pixelsToDays(-mx);
-        
-        // Calculate the target date and clamp it immediately
-        const targetDate = startDateRef.current.add({ days: rawDayOffset });
-        const clampedDate = boundaries.clampEndDateToDisplayBounds(targetDate);
-        
-        // Calculate how many days we can actually move from start
-        const maxDaysForward = daysBetween(startDateRef.current, boundaries.latestDataDay);
-        const maxDaysBackward = daysBetween(boundaries.earliestDataEndDay, startDateRef.current);
-        
-        // Strictly limit the offset to valid bounds plus small rubber band
-        let finalOffset = rawDayOffset;
-        const RUBBER_BAND_DAYS = 10;
-        
-        if (rawDayOffset > maxDaysForward) {
-          // Going too far forward - apply rubber band
-          const excess = rawDayOffset - maxDaysForward;
-          const rubberBand = Math.min(excess * 0.1, RUBBER_BAND_DAYS);
-          finalOffset = maxDaysForward + Math.round(rubberBand);
-        } else if (rawDayOffset < -maxDaysBackward) {
-          // Going too far backward - apply rubber band
-          const excess = Math.abs(rawDayOffset + maxDaysBackward);
-          const rubberBand = Math.min(excess * 0.1, RUBBER_BAND_DAYS);
-          finalOffset = -maxDaysBackward - Math.round(rubberBand);
-        }
-        
-        // Update during active wheel
-        if (active) {
-          const now = Date.now();
-          if (now - lastUpdateRef.current > 16) { // Throttle to ~60fps
-            lastUpdateRef.current = now;
-            
-            // Calculate display date with rubber band applied
-            const displayDate = startDateRef.current.add({ days: finalOffset });
-            const displayClamped = boundaries.clampEndDateToDisplayBounds(displayDate);
-            onDateNavigate(displayClamped, true);
-            
-            if (featureFlags.get('gestureLogging')) {
-              const range = `${displayClamped.subtract({ days: 364 }).toString()} to ${displayClamped.toString()}`;
-              const overstep = Math.abs(finalOffset) > Math.abs(rawDayOffset) ? 0 :
-                              finalOffset > maxDaysForward ? finalOffset - maxDaysForward :
-                              finalOffset < -maxDaysBackward ? Math.abs(finalOffset + maxDaysBackward) : 0;
-              console.log('🎡 WHEEL: ', {
-                range,
-                offset: finalOffset,
-                overstep,
-                ts: now
-              });
-            }
-          }
-        }
-        
-        if (last) {
-          // Snap back to the valid boundary if we were rubber banding
-          const wasRubberBanding = finalOffset > maxDaysForward || finalOffset < -maxDaysBackward;
+          // Mount a spring for snapback animation
+          setAnimationConfig({
+            from: releasePos,
+            to: snapTarget,
+            config: { tension: 120, friction: 20 } // Gentle spring
+          });
+        } else if (Math.abs(vx) > VELOCITY_THRESHOLD) {
+          // Apply momentum - mount a spring for this
+          // IMPORTANT: vx is always positive (it's speed), dx is the direction (-1, 0, 1)
+          // We need to combine them to get the true velocity vector
+          const trueVelocity = vx * dx;  // Combine speed with direction
+          // In our viewport: drag right (dx=1) should decrease offset (go back in time)
+          // So positive velocity should decrease offset
+          const momentumPixels = trueVelocity * MOMENTUM_SCALE;
+          const momentumDays = momentumPixels / pixelsPerDay; // Don't round
+          const momentumTarget = releasePos - momentumDays;  // Subtract: positive velocity decreases offset
+          const clampedTarget = Math.max(minOffset, Math.min(maxOffset, momentumTarget));
           
-          if (wasRubberBanding) {
-            // Snap back to the actual boundary (not including rubber band)
-            const snapBackOffset = finalOffset > maxDaysForward ? maxDaysForward : -maxDaysBackward;
-            const snapBackDate = startDateRef.current.add({ days: snapBackOffset });
-            const snapBackClamped = boundaries.clampEndDateToDisplayBounds(snapBackDate);
-            onDateNavigate(snapBackClamped, false);
-            
-            if (featureFlags.get('gestureLogging')) {
-              console.log('🏁 WHEEL END (snapped back):', {
-                range: `${snapBackClamped.subtract({ days: 364 }).toString()} to ${snapBackClamped.toString()}`,
-                ts: Date.now()
-              });
-            }
-          } else {
-            // We're within bounds, stay where we are but update isDragging to false
-            const finalDate = startDateRef.current.add({ days: finalOffset });
-            const finalClamped = boundaries.clampEndDateToDisplayBounds(finalDate);
-            onDateNavigate(finalClamped, false); // Important: set isDragging to false
-            
-            if (featureFlags.get('gestureLogging')) {
-              console.log('🏁 WHEEL END:', {
-                range: `${finalClamped.subtract({ days: 364 }).toString()} to ${finalClamped.toString()}`,
-                ts: Date.now()
-              });
-            }
+          if (featureFlags.get('gestureLogging')) {
+            console.log('🚀 MOMENTUM:', { 
+              speed: vx,  // Always positive
+              direction: dx,  // -1, 0, or 1
+              dragDirection: dx < 0 ? 'LEFT' : dx > 0 ? 'RIGHT' : 'NONE',
+              trueVelocity,
+              momentumDays: momentumDays.toFixed(1),
+              from: releasePos,  // Log actual position
+              to: clampedTarget,
+              distance: clampedTarget - releasePos,
+              expectedMotion: dx < 0 ? 'FORWARD_IN_TIME' : dx > 0 ? 'BACKWARD_IN_TIME' : 'NONE'
+            });
           }
+          
+          // Mount a spring for momentum animation - from actual position
+          setAnimationConfig({
+            from: releasePos,
+            to: clampedTarget,
+            config: { tension: 170, friction: 26 }
+          });
+        } else {
+          // No momentum, no out of bounds - stay exactly where we are
+          // No spring needed!
+          if (featureFlags.get('gestureLogging')) {
+            console.log('✋ STAY:', { 
+              at: releasePos
+            });
+          }
+          // Just update the position, no animation
+          updatePosition(releasePos);
+          onOffsetChange(Math.round(releasePos), false);
+        }
+      }
+      
+      return memo;
+    },
+    {
+      axis: 'x',
+      filterTaps: true,
+    }
+  );
+  
+  // Wheel handler - direct updates during scroll, ephemeral spring after
+  const wheelBind = useWheel(
+    ({ delta: [dx], active }) => {
+      const dayDelta = dx * WHEEL_SENSITIVITY; // Don't round - smooth scrolling
+      const targetOffset = currentOffset + dayDelta;  // Use currentOffset from props, not stale ref
+      const clampedOffset = Math.max(minOffset, Math.min(maxOffset, targetOffset));
+      
+      if (featureFlags.get('gestureLogging')) {
+        console.log('🎡 WHEEL:', {
+          dx,
+          dayDelta,
+          currentOffset: Math.round(positionRef.current),
+          targetOffset,
+          clampedOffset,
+          active
+        });
+      }
+      
+      if (active) {
+        // During scroll: cancel any animation and apply direct update
+        setAnimationConfig(null);  // Cancel any ongoing animation
+        updatePosition(clampedOffset);
+        onOffsetChange(Math.round(clampedOffset), false);
+      } else {
+        // After scroll: create ephemeral spring for smooth animation
+        // Only animate if we're not already at the target
+        const currentPos = currentOffset;  // Use currentOffset from props
+        if (Math.abs(currentPos - clampedOffset) > 0.1) {
+          if (featureFlags.get('gestureLogging')) {
+            console.log('🎢 WHEEL ANIMATION:', { 
+              from: currentPos,
+              to: clampedOffset,
+              distance: clampedOffset - currentPos
+            });
+          }
+          
+          // Mount a spring for wheel animation
+          setAnimationConfig({
+            from: currentPos,
+            to: clampedOffset,
+            config: { tension: 300, friction: 30 }
+          });
+        } else {
+          // Already at target, just update
+          updatePosition(clampedOffset);
+          onOffsetChange(Math.round(clampedOffset), false);
         }
       }
     },
     {
-      drag: {
-        bounds: () => {
-          // Calculate bounds dynamically when gesture starts
-          const tileCanvas = document.querySelector('.opennem-facility-canvas');
-          if (!tileCanvas) {
-            return { left: 0, right: 0 };
-          }
-          const tileWidth = tileCanvas.getBoundingClientRect().width;
-          return {
-            // Pixel bounds: negative pixels go forward in time, positive pixels go back
-            left: -maxDaysForward * (tileWidth / 365), // Max forward (future) - negative pixels
-            right: maxDaysBack * (tileWidth / 365)     // Max back (past) - positive pixels
-          };
-        },
-        rubberband: true, // Enable elastic effect
-        axis: 'x', // Only allow horizontal dragging
-      },
-      wheel: {
-        axis: 'lock', // Lock to initial movement direction (horizontal or vertical)
-      }
+      axis: 'x'
     }
   );
+  
+  // Combine bindings - properly merge the event handler objects
+  const bind = () => {
+    return {
+      ...dragBind(),
+      ...wheelBind()
+    };
+  };
+  
+  // Prevent browser navigation on horizontal scroll
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && e.deltaX !== 0) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
   
   return { bind, elementRef };
 }

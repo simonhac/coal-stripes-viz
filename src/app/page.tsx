@@ -12,7 +12,7 @@ import { DateRange } from '../components/DateRange';
 import { yearDataVendor, getRegionNames } from '@/client/year-data-vendor';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useDateRangeAnimator } from '@/hooks/useDateRangeAnimator';
-import { useGestureSpring } from '@/hooks/useGestureSpringIdiomatic';
+import { useGestureSpring } from '@/hooks/useGestureSpring';
 import './opennem.css';
 
 export default function Home() {
