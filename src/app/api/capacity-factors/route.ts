@@ -109,11 +109,46 @@ export async function GET(request: Request) {
 		return response;
 	} catch (error) {
 		console.error("API Error:", error);
-		return NextResponse.json(
-			{
-				error: error instanceof Error ? error.message : "Internal server error",
-			},
-			{ status: 500 },
-		);
+		
+		// Check if this is an OpenElectricity API error
+		let errorResponse: any = {
+			error: error instanceof Error ? error.message : "Internal server error",
+		};
+		
+		// If the error has response details from OpenElectricity, include them
+		if (error && typeof error === 'object' && 'response' in error) {
+			const apiError = error as any;
+			if (apiError.response) {
+				errorResponse.originalURL = apiError.response.url || apiError.config?.url;
+				errorResponse.originalResponseCode = apiError.response.status;
+				
+				// If there's additional error data from the API response
+				if (apiError.response.data) {
+					errorResponse.originalError = apiError.response.data;
+				}
+			}
+		}
+		
+		// Also check if error has a cause that might contain API details
+		if (error instanceof Error && error.cause) {
+			const cause = error.cause as any;
+			if (cause.url) {
+				errorResponse.originalURL = cause.url;
+			}
+			if (cause.status) {
+				errorResponse.originalResponseCode = cause.status;
+			}
+		}
+		
+		// Check for request details added by OEClientQueued
+		if (error && typeof error === 'object' && 'requestDetails' in error) {
+			const details = (error as any).requestDetails;
+			if (details.url && !errorResponse.originalURL) {
+				errorResponse.originalURL = details.url;
+			}
+			errorResponse.requestDetails = details;
+		}
+		
+		return NextResponse.json(errorResponse, { status: 500 });
 	}
 }

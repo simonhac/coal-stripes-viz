@@ -33,6 +33,13 @@ export class OEClientQueued {
       },
       onError: (error) => {
         console.error('Facilities request failed:', error);
+        // Enhance error with request details
+        if (error && typeof error === 'object') {
+          (error as any).requestDetails = {
+            url: '/facilities',
+            method: 'GET'
+          };
+        }
       }
     });
   }
@@ -82,6 +89,15 @@ export class OEClientQueued {
       },
       onError: (error) => {
         console.error(`${networkCode} data request failed:`, error);
+        // Enhance error with request details
+        if (error && typeof error === 'object') {
+          (error as any).requestDetails = {
+            url: fullUrl,
+            method: 'GET',
+            networkCode,
+            facilityCodes: facilityList
+          };
+        }
       }
     });
   }
@@ -104,6 +120,16 @@ export class OEClientQueued {
       },
       onError: (error) => {
         console.error(`${networkCode} network data failed:`, error);
+        // Enhance error with request details
+        if (error && typeof error === 'object') {
+          (error as any).requestDetails = {
+            url: `/network/${networkCode}/data`,
+            method: 'GET',
+            networkCode,
+            metrics,
+            params
+          };
+        }
       }
     });
   }

@@ -165,13 +165,8 @@ export class YearDataVendor {
     }
 
     // Check if already in queue
-    const queueStats = this.requestQueue.getStats();
-    const inProgress = [
-      ...queueStats.activeLabels,
-      ...queueStats.queuedLabels
-    ];
-    
-    if (inProgress.includes(year.toString())) {
+    const url = `/api/capacity-factors?year=${year}`;
+    if (this.requestQueue.hasRequestForUrl(url)) {
       return;
     }
 

@@ -34,8 +34,8 @@ export interface QueueStats {
   active: number;
   circuitOpen: boolean;
   failureCount: number;
-  activeLabels: string[];
   queuedLabels: string[];
+  activeRequestsWithRetries: Array<{ label: string; retryCount: number }>;
 }
 
 export class RequestQueue<T = any> {
@@ -324,21 +324,24 @@ export class RequestQueue<T = any> {
 
   // Get queue statistics
   public getStats(): QueueStats {
-    const activeLabels = Array.from(this.activeRequests.values())
-      .map(req => req.label)
-      .filter((label): label is string => label !== undefined);
-    
     const queuedLabels = this.queue
       .map(req => req.label)
       .filter((label): label is string => label !== undefined);
+    
+    const activeRequestsWithRetries = Array.from(this.activeRequests.values())
+      .filter(req => req.label !== undefined)
+      .map(req => ({
+        label: req.label!,
+        retryCount: req.retryCount
+      }));
     
     return {
       queued: this.queue.length,
       active: this.active.size,
       circuitOpen: this.circuitOpen,
       failureCount: this.failureCount,
-      activeLabels,
-      queuedLabels
+      queuedLabels,
+      activeRequestsWithRetries
     };
   }
 
@@ -361,6 +364,25 @@ export class RequestQueue<T = any> {
       });
     }
     return activeItems;
+  }
+
+  // Check if a request with the given URL is in queue or active
+  public hasRequestForUrl(url: string): boolean {
+    // Check active requests
+    for (const request of this.activeRequests.values()) {
+      if (request.url === url) {
+        return true;
+      }
+    }
+    
+    // Check queued requests
+    for (const request of this.queue) {
+      if (request.url === url) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   // Clear the queue

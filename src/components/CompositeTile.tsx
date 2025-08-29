@@ -55,6 +55,9 @@ const CompositeTileComponent = ({
   const lastRenderedRangeRef = useRef<string>('');
   const shimmerOffsetRef = useRef<number>(0);
   const lastAnimationTimeRef = useRef<number>(performance.now());
+  const lastLoggedOffsetRef = useRef<number | null>(null);
+  const sameOffsetCountRef = useRef<number>(0);
+  const loggingSuppressedRef = useRef<boolean>(false);
   
   // Mouse position tracking for tooltip updates during scrolling
   const mousePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -469,6 +472,42 @@ const CompositeTileComponent = ({
     // Check if we need shimmer animation
     const needsShimmer = tiles.leftState === 'pendingData' || (startYear !== endYear && tiles.rightState === 'pendingData');
     
+    // Helper function to log paint events with shimmer suppression
+    const logPaintEvent = (offset: number, overstep: number | null) => {
+      // Only log for Bayswater to reduce noise
+      if (facilityCode !== 'BAYSW' || !featureFlags.get('gestureLogging')) {
+        return;
+      }
+      
+      // Check if this is a repeated shimmer at the same offset
+      if (offset === lastLoggedOffsetRef.current && needsShimmer) {
+        sameOffsetCountRef.current++;
+        
+        // After 10 identical shimmer paints, suppress logging
+        if (sameOffsetCountRef.current === 10) {
+          console.log('🎨 PAINT:  shimmering... will disable debug logging until a change in offset');
+          loggingSuppressedRef.current = true;
+        }
+      } else {
+        // Offset changed, reset counters and re-enable logging
+        if (loggingSuppressedRef.current) {
+          loggingSuppressedRef.current = false;
+        }
+        lastLoggedOffsetRef.current = offset;
+        sameOffsetCountRef.current = 0;
+      }
+      
+      // Only log if not suppressed
+      if (!loggingSuppressedRef.current) {
+        console.log('🎨 PAINT: ', {
+          offset,
+          range: `${dateRange.start.toString()} to ${dateRange.end.toString()}`,
+          overstep,
+          ts: Date.now()
+        });
+      }
+    };
+    
     const render = () => {
       // Log and report tile state (offset from earliestDataEndDay, 0 = first valid end date)
       const boundaries = getDateBoundaries();
@@ -478,15 +517,8 @@ const CompositeTileComponent = ({
       // Report to tile monitor (for all tiles, not just Bayswater)
       tileMonitor.updateTileState(offset, overstep, dateRange.start, dateRange.end);
       
-      // Log what we're painting (only for Bayswater to reduce noise)
-      if (facilityCode === 'BAYSW' && featureFlags.get('gestureLogging')) {
-        console.log('🎨 PAINT: ', {
-          offset,
-          range: `${dateRange.start.toString()} to ${dateRange.end.toString()}`,
-          overstep,
-          ts: Date.now()
-        });
-      }
+      // Log paint events with shimmer suppression
+      logPaintEvent(offset, overstep);
 
       // draw left tile
       if (tiles.leftState === 'hasData' && tiles.left) {

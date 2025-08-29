@@ -437,21 +437,21 @@ export const PerformanceDisplay: React.FC = () => {
                   minHeight: '20px',
                   marginLeft: '10px'
                 }}>
-                  {cacheStats.activeLabels && cacheStats.activeLabels.length > 0 ? (
-                    cacheStats.activeLabels.map((label: string) => (
+                  {cacheStats.activeRequestsWithRetries && cacheStats.activeRequestsWithRetries.length > 0 ? (
+                    cacheStats.activeRequestsWithRetries.map((req: { label: string; retryCount: number }) => (
                       <span
-                        key={label}
+                        key={req.label}
                         style={{
                           display: 'inline-block',
                           padding: '2px 6px',
-                          backgroundColor: '#005500',
-                          color: '#0f0',
+                          backgroundColor: req.retryCount > 0 ? '#550055' : '#005500',
+                          color: req.retryCount > 0 ? '#f0f' : '#0f0',
                           borderRadius: '10px',
                           fontSize: '9px',
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        {label}
+                        {req.label}{req.retryCount > 0 && ` (retry ${req.retryCount})`}
                       </span>
                     ))
                   ) : (
